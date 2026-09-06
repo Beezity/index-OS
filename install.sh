@@ -12,55 +12,96 @@ say(){ printf '%s::%s %s\n' "$CYAN" "$NC" "$1"; }
 ok(){  printf '   %s\xe2\x9c\x93%s %s\n' "$GRN" "$NC" "$1"; }
 bad(){ printf '   %s\xe2\x9c\x97%s %s\n' "$RED" "$NC" "$1"; }
 note(){ printf '   %s%s%s\n' "$DIM" "$1" "$NC"; }
+warn(){ printf '   %s\xe2\x9a\xa0%s %s\n' "$RED" "$NC" "$1"; }
 CFG="$HOME/.config"; THEMES="$HOME/.local/share/themes"
 
 say "WILL OF THE CITY :: THE INDEX  —  labwc (plug & play)"
 [ -d "$DIR/labwc" ] || { bad "run this from inside the index-OS repo (labwc/ not found)"; exit 1; }
 
+# ---------- FEDORA DETECTION & PRE-FLIGHT CHECKS ----------
+say "detecting distro + running pre-flight checks..."
+PKG=""
+DISTRO=""
+command -v pacman >/dev/null && { PKG=pacman; DISTRO="Arch"; }
+command -v apt-get >/dev/null && { PKG=apt; DISTRO="Debian/Ubuntu"; }
+command -v dnf >/dev/null && { PKG=dnf; DISTRO="Fedora"; }
+command -v zypper >/dev/null && { PKG=zypper; DISTRO="openSUSE"; }
+
+if [ -z "$PKG" ]; then
+  bad "unknown distro/package manager"
+  note "install manually: labwc swaybg swayidle foot wofi wtype quickshell qt6-multimedia qt6-svg fastfetch ffmpeg"
+  exit 1
+fi
+
+ok "detected: $DISTRO"
+
+# ========== FEDORA-SPECIFIC PRE-FLIGHT CHECKS ==========
+if [ "$PKG" = "dnf" ]; then
+  echo
+  say "FEDORA PRE-FLIGHT CHECKS"
+  
+  # Check 1: PipeWire vs PulseAudio (Fedora should have PipeWire)
+  if systemctl --user is-active --quiet pulseaudio.service; then
+    warn "PulseAudio is running (legacy). Fedora should use PipeWire."
+    note "This will still work, but consider: sudo dnf remove pulseaudio"
+  elif systemctl --user is-active --quiet pipewire.service; then
+    ok "PipeWire is running (correct for Fedora)"
+  else
+    warn "No audio server detected. Install will proceed but audio may not work."
+  fi
+  
+  # Check 2: cli11-devel availability (needed for quickshell build)
+  if ! dnf info cli11-devel >/dev/null 2>&1; then
+    warn "cli11-devel not in standard repos (may need COPR for quickshell build)"
+    note "Will attempt to build without it; if quickshell fails, see:"
+    note "  https://quickshell.outfoxxed.me/docs/guide/install/"
+  else
+    ok "cli11-devel is available"
+  fi
+  
+  # Check 3: Xwayland package name
+  if ! dnf info xorg-x11-server-Xwayland >/dev/null 2>&1; then
+    warn "xorg-x11-server-Xwayland not found (Xwayland support may fail)"
+  else
+    ok "xorg-x11-server-Xwayland is available"
+  fi
+  
+  echo
+fi
+
 # ---------- 1. packages (multi-distro: pacman / apt / dnf / zypper) ----------
 say "detecting distro + installing packages..."
-PKG=""
-command -v pacman >/dev/null && PKG=pacman
-command -v apt-get >/dev/null && PKG=apt
-command -v dnf >/dev/null && PKG=dnf
-command -v zypper >/dev/null && PKG=zypper
 
 case "$PKG" in
   pacman)
     sudo pacman -S --needed --noconfirm \
-        labwc swaybg swayidle foot wofi wtype thunar thunar-archive-plugin thunar-volman xarchiver file-roller cups cups-pdf system-config-printer grim slurp wl-clipboard libnotify playerctl blueman networkmanager fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt xdg-desktop-portal xdg-desktop-portal-wlr pipewire pipewire-pulse wlopm gammastep pavucontrol wlr-randr nwg-displays swappy \
-        cliphist udiskie wlopm gvfs udisks2 tumbler ffmpegthumbnailer thunar-archive-plugin xarchiver noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-liberation \
+        labwc swaybg swayidle foot wofi wtype thunar thunar-archive-plugin thunar-volman xarchiver file-roller cups cups-pdf system-config-printer grim slurp wl-clipboard libnotify playerctl blueman cliphist udiskie wlopm gvfs udisks2 tumbler ffmpegthumbnailer xarchiver noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-liberation \
         qt6-multimedia qt6-svg qt6-declarative fastfetch wireplumber ffmpeg gst-libav gst-plugins-good \
-        brightnessctl upower wlopm ttf-dejavu noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra gnome-themes-extra qt6ct qt5ct polkit-gnome xorg-xwayland cliphist udiskie xdg-utils xdg-user-dirs dex flatpak gvfs gvfs-mtp tumbler base-devel cmake meson git 2>/dev/null \
+        brightnessctl upower wlopm ttf-dejavu noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra gnome-themes-extra qt6ct qt5ct polkit-gnome xorg-xwayland cliphist udiskie xdg-utils xdg-user-dirs \
         || note "(some packages failed - continuing)"
     ;;
   apt)
     sudo apt-get update -y 2>/dev/null || true
     sudo apt-get install -y \
-        labwc swaybg swayidle foot wofi wtype thunar thunar-archive-plugin thunar-volman xarchiver file-roller cups cups-pdf system-config-printer grim slurp wl-clipboard libnotify playerctl blueman networkmanager fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt xdg-desktop-portal xdg-desktop-portal-wlr pipewire pipewire-pulse wlopm gammastep pavucontrol wlr-randr nwg-displays swappy \
-        cliphist udiskie wlopm gvfs udisks2 tumbler ffmpegthumbnailer thunar-archive-plugin xarchiver noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-liberation \
+        labwc swaybg swayidle foot wofi wtype thunar thunar-archive-plugin thunar-volman xarchiver file-roller cups cups-pdf system-config-printer grim slurp wl-clipboard libnotify playerctl blueman cliphist udiskie wlopm gvfs udisks2 tumbler ffmpegthumbnailer xarchiver noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-liberation \
         qt6-multimedia-dev libqt6svg6 qml6-module-qtquick fastfetch wireplumber ffmpeg gstreamer1.0-libav \
-        brightnessctl upower fonts-dejavu fonts-noto fonts-noto-cjk fonts-noto-color-emoji cups printer-driver-all system-config-printer gnome-themes-extra qt6ct policykit-1-gnome xwayland wl-clipboard udiskie xdg-utils xdg-user-dirs dex flatpak gvfs gvfs-backends cmake meson ninja-build build-essential git \
+        brightnessctl upower fonts-dejavu fonts-noto fonts-noto-cjk fonts-noto-color-emoji cups printer-driver-all system-config-printer gnome-themes-extra qt6ct policykit-1-gnome xwayland wl-clipboard xdg-utils xdg-user-dirs \
         2>/dev/null || note "(some apt packages failed - continuing)"
     ;;
   dnf)
     sudo dnf install -y \
-        labwc swaybg swayidle foot wofi wtype thunar thunar-archive-plugin thunar-volman xarchiver file-roller cups cups-pdf system-config-printer grim slurp wl-clipboard libnotify playerctl blueman networkmanager fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt xdg-desktop-portal xdg-desktop-portal-wlr pipewire pipewire-pulse wlopm gammastep pavucontrol wlr-randr nwg-displays swappy \
-        cliphist udiskie wlopm gvfs udisks2 tumbler ffmpegthumbnailer thunar-archive-plugin xarchiver noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-liberation \
+        labwc swaybg swayidle foot wofi wtype thunar thunar-archive-plugin thunar-volman xarchiver file-roller cups cups-pdf system-config-printer grim slurp wl-clipboard libnotify playerctl blueman cliphist udiskie wlopm gvfs udisks2 tumbler ffmpegthumbnailer xarchiver noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-liberation \
         qt6-qtmultimedia qt6-qtsvg qt6-qtdeclarative fastfetch wireplumber ffmpeg \
-        brightnessctl upower dejavu-sans-fonts google-noto-sans-fonts google-noto-sans-cjk-fonts google-noto-emoji-color-fonts cups system-config-printer gnome-themes-extra qt6ct polkit-gnome xorg-x11-server-Xwayland udiskie xdg-utils xdg-user-dirs dex flatpak gvfs cmake meson ninja-build gcc-c++ git \
+        brightnessctl upower dejavu-sans-fonts google-noto-sans-fonts google-noto-sans-cjk-fonts google-noto-emoji-color-fonts cups system-config-printer gnome-themes-extra qt6ct polkit-gnome xorg-x11-server-Xwayland xdg-utils xdg-user-dirs \
         2>/dev/null || note "(some dnf packages failed - continuing)"
     ;;
   zypper)
     sudo zypper --non-interactive install \
-        labwc swaybg swayidle foot wofi wtype thunar thunar-archive-plugin thunar-volman xarchiver file-roller cups cups-pdf system-config-printer grim slurp wl-clipboard libnotify playerctl blueman networkmanager fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt xdg-desktop-portal xdg-desktop-portal-wlr pipewire pipewire-pulse wlopm gammastep pavucontrol wlr-randr nwg-displays swappy \
-        cliphist udiskie wlopm gvfs udisks2 tumbler ffmpegthumbnailer thunar-archive-plugin xarchiver noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-liberation \
-        qt6-multimedia-imports qt6-svg qt6-declarative-imports fastfetch wireplumber ffmpeg \
-        brightnessctl upower dejavu-fonts noto-sans-fonts noto-sans-cjk-fonts noto-coloremoji-fonts cups system-config-printer gnome-themes-extra qt6ct polkit-gnome xwayland udiskie xdg-utils xdg-user-dirs dex flatpak gvfs cmake meson ninja gcc-c++ git \
+        labwc swaybg swayidle foot wofi wtype thunar thunar-archive-plugin thunar-volman xarchiver file-roller cups cups-pdf system-config-printer grim slurp wl-clipboard libnotify playerctl blueman cliphist udiskie wlopm gvfs udisks2 tumbler ffmpegthumbnailer xarchiver noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-liberation \
+        qt6-qtmultimedia-imports qt6-qtsvg qt6-qtdeclarative-imports fastfetch wireplumber ffmpeg \
+        brightnessctl upower dejavu-fonts noto-sans-fonts noto-sans-cjk-fonts noto-coloremoji-fonts cups system-config-printer gnome-themes-extra qt6ct polkit-gnome xwayland udiskie xdg-utils xdg-user-dirs \
         2>/dev/null || note "(some zypper packages failed - continuing)"
     ;;
-  *)
-    note "unknown distro/package manager — install manually: labwc swaybg swayidle foot wofi wtype quickshell qt6-multimedia qt6-svg fastfetch ffmpeg" ;;
 esac
 
 # quickshell: packaged on Arch (AUR); build from source elsewhere
@@ -74,9 +115,19 @@ if ! command -v quickshell >/dev/null && ! command -v qs >/dev/null; then
     say "quickshell not packaged here — building from source (slow)..."
     # build deps per distro
     case "$PKG" in
-      apt)    sudo apt-get install -y qt6-base-dev qt6-declarative-dev qt6-wayland-dev libwayland-dev wayland-protocols libpam0g-dev libjemalloc-dev libpipewire-0.3-dev cli11-dev 2>/dev/null || true ;;
-      dnf)    sudo dnf install -y qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland-devel wayland-devel wayland-protocols-devel pam-devel jemalloc-devel pipewire-devel cli11-devel 2>/dev/null || true ;;
-      zypper) sudo zypper --non-interactive install qt6-base-devel qt6-declarative-devel qt6-wayland-devel wayland-devel wayland-protocols-devel pam-devel jemalloc-devel pipewire-devel 2>/dev/null || true ;;
+      apt)    sudo apt-get install -y qt6-base-dev qt6-declarative-dev qt6-wayland-dev libwayland-dev wayland-protocols libpam0g-dev libjemalloc-dev libpipewire-0.3-dev cli11-dev 2>/dev/null || true
+              ;;
+      dnf)    # Fedora: try cli11-devel, but it may not be in standard repos
+              sudo dnf install -y qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland-devel wayland-devel wayland-protocols-devel pam-devel jemalloc-devel pipewire-devel 2>/dev/null || true
+              if ! dnf info cli11-devel >/dev/null 2>&1; then
+                note "cli11-devel unavailable in standard Fedora repos"
+                note "quickshell build may fail if it's required — check the build output"
+              else
+                sudo dnf install -y cli11-devel 2>/dev/null || true
+              fi
+              ;;
+      zypper) sudo zypper --non-interactive install qt6-base-devel qt6-declarative-devel qt6-wayland-devel wayland-devel wayland-protocols-devel pam-devel jemalloc-devel pipewire-devel 2>/dev/null || true
+              ;;
     esac
     TMPQ="$(mktemp -d)"
     if git clone --depth 1 https://github.com/quickshell-mirror/quickshell "$TMPQ" 2>/dev/null \
@@ -85,7 +136,9 @@ if ! command -v quickshell >/dev/null && ! command -v qs >/dev/null; then
        && sudo cmake --install "$TMPQ/build" 2>/dev/null; then
       note "quickshell built + installed from source"
     else
-      note "quickshell source build FAILED — see https://quickshell.outfoxxed.me/docs/guide/install/ for your distro"
+      warn "quickshell source build FAILED"
+      note "See https://quickshell.outfoxxed.me/docs/guide/install/ for your distro"
+      note "On Fedora: you may need to install cli11-devel from a COPR repository"
     fi
     rm -rf "$TMPQ"
   fi
