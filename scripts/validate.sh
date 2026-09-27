@@ -8,4 +8,7 @@ chk "$CFG/labwc/rc.xml" "labwc rc.xml"; chk "$CFG/labwc/autostart" "labwc autost
 if [[ "${INDEX_VALIDATE_TITLEBAR_BUTTONS:-0}" == 1 ]]; then chk "$THEMES/the-index/labwc/close.xbm" "close button"; chk "$THEMES/the-index/labwc/iconify.xbm" "minimize button"; chk "$THEMES/the-index/labwc/max.xbm" "maximize button"; fi
 chk "$CFG/quickshell/shell.qml" "Quickshell shell"; chk "$CFG/quickshell/Bar.qml" "top bar"; chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"; chk "$CFG/foot/foot.ini" "Foot config"; chk "$CFG/fish/config.fish" "Fish config"; chk "/usr/share/icons/Papirus-Dark/index.theme" "Papirus-Dark icon theme"
 if [[ "${INDEX_VALIDATE_CURSOR_ROOT:-0}" == 1 ]]; then chk "$INDEX_CURSOR_ROOT/cursors" "Capitaine cursor theme"; fi
-chk "$DATA/icons/default/index.theme" "default cursor theme"; chk "/usr/share/wayland-sessions/the-index.desktop" "GDM THE INDEX session"; systemctl is-enabled --quiet gdm.service && ok "GDM enabled" || { bad "GDM is not enabled"; FAIL=1; }; (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
+chk "$DATA/icons/default/index.theme" "default cursor theme"; chk "/usr/share/wayland-sessions/the-index.desktop" "GDM THE INDEX session"
+GDM_SERVICE="${INDEX_GDM_SERVICE:-gdm.service}"
+systemctl is-enabled --quiet "$GDM_SERVICE" && ok "GDM enabled" || { bad "GDM is not enabled ($GDM_SERVICE)"; FAIL=1; }
+(( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
