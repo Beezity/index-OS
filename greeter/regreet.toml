@@ -1,0 +1,20 @@
+[background]
+path = "/usr/share/index-os/greeter/wall.png"
+fit = "Cover"
+
+[GTK]
+application_prefer_dark_theme = true
+theme_name = "the-index-greeter"
+font_name = "Perfect DOS VGA 437 Universal 12"
+cursor_blink = false
+
+[commands]
+reboot = [ "loginctl", "reboot" ]
+poweroff = [ "loginctl", "poweroff" ]
+
+[appearance]
+greeting_msg = "WILL OF THE CITY :: THE INDEX"
+
+[widget.clock]
+format = "%a %d %b  ·  %I:%M %p"
+resolution = "500ms"
