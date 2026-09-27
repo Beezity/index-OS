@@ -36,23 +36,23 @@ ok "repository layout validated"
 say "installing dependencies..."
 PACKAGES=(
   labwc quickshell xorg-xwayland
-  swaybg swayidle wlopm wlr-randr nwg-displays grim slurp swappy wl-clipboard cliphist
+  swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
   foot wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
   xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex libnotify playerctl polkit-gnome udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
-  networkmanager bluez bluez-utils blueman
+  networkmanager nm-connection-editor bluez bluez-utils blueman
   pipewire pipewire-pulse wireplumber ffmpeg gst-libav gst-plugins-good
   qt6-multimedia qt6-svg qt6-declarative qt6-wayland qt6ct qt5ct gnome-themes-extra
   fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt
-  brightnessctl upower gammastep
+  brightnessctl upower gammastep gnome-power-manager
   ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra
   cups cups-pdf system-config-printer
   flatpak
-  git pciutils libxml2
+  git pciutils libxml2 util-linux
 )
 sudo pacman -Syu --needed --noconfirm "${PACKAGES[@]}"
 ok "all dependencies installed"
 
-for cmd in labwc quickshell swaybg swayidle foot wofi grim slurp swappy wl-copy nmcli bluetoothctl playerctl wpctl fc-cache xmllint; do
+for cmd in labwc quickshell swaybg swayidle foot wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do
   command -v "$cmd" >/dev/null 2>&1 || { bad "required command missing after installation: $cmd"; exit 1; }
 done
 
