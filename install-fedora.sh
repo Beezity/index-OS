@@ -13,7 +13,7 @@ FEDORA_VERSION="$(rpm -E %fedora)"; [[ "$FEDORA_VERSION" =~ ^[0-9]+$ ]] || { bad
 (( FEDORA_VERSION >= 43 )) || { bad "Fedora 43 or newer is required; detected Fedora $FEDORA_VERSION"; exit 1; }
 note "detected Fedora $FEDORA_VERSION"
 
-required_files=(wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/lock/lock.qml quickshell/prescript.json labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment labwc/config/index-lock labwc/config/index-idle labwc/config/index-input labwc/config/index-clip labwc/config/fontconfig/fonts.conf labwc/config/gtk/settings.ini labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf labwc/config/qt5ct/colors/the-index.conf labwc/config/qt6ct/colors/the-index.conf labwc/theme/the-index/labwc/themerc labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps labwc/session/the-index.desktop)
+required_files=(wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/lock/lock.qml quickshell/prescript.json labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment labwc/config/index-lock labwc/config/index-idle labwc/config/index-input labwc/config/index-clip labwc/config/fontconfig/fonts.conf labwc/config/gtk/settings.ini labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf labwc/config/qt5ct/colors/the-index.conf labwc/config/qt6ct/colors/the-index.conf labwc/theme/the-index/labwc/themerc labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps labwc/session/the-index.desktop fish/config.fish install-fish.sh)
 for rel in "${required_files[@]}"; do [[ -f "$DIR/$rel" ]] || { bad "repository file missing: $rel"; exit 1; }; done
 ok "repository layout validated"
 
@@ -21,7 +21,7 @@ say "installing Fedora dependencies..."
 PACKAGES=(
   labwc labwc-session xorg-x11-server-Xwayland gdm
   swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
-  foot wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
+  foot fish wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
   xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex-autostart libnotify playerctl polkit-kde udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
   NetworkManager nm-connection-editor nm-connection-editor-desktop bluez bluez-tools blueman
   pipewire pipewire-pulseaudio wireplumber ffmpeg-free gstreamer1-plugins-good gstreamer1-plugin-libav
@@ -56,7 +56,7 @@ mkdir -p "$HOME/.local/share/icons"; rm -rf "$HOME/.local/share/icons/capitaine-
 cleanup_capitaine; CAPITAINE_TMP=""; trap 'bad "installation failed at line $LINENO"; exit 1' ERR
 ok "Capitaine built and installed from upstream"
 
-for cmd in labwc quickshell swaybg swayidle foot wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do command -v "$cmd" >/dev/null 2>&1 || { bad "required command missing after installation: $cmd"; exit 1; }; done
+for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do command -v "$cmd" >/dev/null 2>&1 || { bad "required command missing after installation: $cmd"; exit 1; }; done
 QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"; [[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }; ok "Quickshell $QS_VERSION"
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service
 sudo systemctl enable gdm.service
@@ -93,6 +93,7 @@ DEST_VID="$CFG/quickshell/lock/assets/intro.mp4"; VID_SRC=""; for candidate in "
 
 say "installing application configuration..."
 mkdir -p "$CFG/wofi" "$CFG/fastfetch" "$CFG/foot"; cp -f "$DIR/wofi/config" "$CFG/wofi/config"; cp -f "$DIR/wofi/style.css" "$CFG/wofi/style.css"; cp -rf "$DIR/fastfetch/." "$CFG/fastfetch/"; cp -f "$DIR/labwc/config/foot.ini" "$CFG/foot/foot.ini"
+say "configuring Fish shell..."; bash "$DIR/install-fish.sh"
 say "configuring desktop portals..."; mkdir -p "$CFG/xdg-desktop-portal/wlr"; cp -f "$DIR/labwc/config/portal/labwc-portals.conf" "$CFG/xdg-desktop-portal/labwc-portals.conf"; cp -f "$DIR/labwc/config/portal/wlr.conf" "$CFG/xdg-desktop-portal/wlr/config"
 
 say "theming Qt applications..."
@@ -117,6 +118,6 @@ setdef(){ local bin="$1" desktop="$2"; shift 2; command -v "$bin" >/dev/null || 
 setdef thunar thunar.desktop inode/directory; setdef foot foot.desktop text/plain text/x-shellscript application/x-shellscript; setdef imv imv.desktop image/png image/jpeg image/gif image/webp image/bmp image/tiff; setdef mpv mpv.desktop video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo audio/mpeg audio/flac audio/ogg audio/wav audio/x-wav; setdef zathura org.pwmt.zathura.desktop application/pdf application/epub+zip; setdef file-roller org.gnome.FileRoller.desktop application/zip application/x-tar application/gzip application/x-7z-compressed application/vnd.rar; unset -f setdef
 
 say "validating installed configuration..."; xmllint --noout "$CFG/labwc/rc.xml" "$CFG/labwc/menu.xml" "$CFG/fontconfig/fonts.conf"
-FAIL=0; chk(){ if [[ -e "$1" ]]; then ok "$2"; else bad "$2 (missing: $1)"; FAIL=1; fi; }; chk "$CFG/labwc/rc.xml" "labwc rc.xml"; chk "$CFG/labwc/autostart" "labwc autostart"; chk "$CFG/labwc/index-lock" "lock launcher"; chk "$CFG/labwc/wall.png" "wallpaper"; chk "$THEMES/the-index/labwc/themerc" "titlebar theme"; chk "$CFG/quickshell/shell.qml" "Quickshell shell"; chk "$CFG/quickshell/Bar.qml" "top bar"; chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"; chk "$CFG/foot/foot.ini" "Foot config"; chk "/usr/share/icons/$ICON_THEME/index.theme" "Papirus-Dark icon theme"; chk "$HOME/.local/share/icons/$CURSOR_THEME/cursors" "Capitaine cursor theme"; chk "$HOME/.local/share/icons/default/index.theme" "default cursor theme"; chk "/usr/share/wayland-sessions/the-index.desktop" "GDM THE INDEX session"; systemctl is-enabled --quiet gdm.service && ok "GDM enabled" || { bad "GDM is not enabled"; FAIL=1; }; (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
+FAIL=0; chk(){ if [[ -e "$1" ]]; then ok "$2"; else bad "$2 (missing: $1)"; FAIL=1; fi; }; chk "$CFG/labwc/rc.xml" "labwc rc.xml"; chk "$CFG/labwc/autostart" "labwc autostart"; chk "$CFG/labwc/index-lock" "lock launcher"; chk "$CFG/labwc/wall.png" "wallpaper"; chk "$THEMES/the-index/labwc/themerc" "titlebar theme"; chk "$CFG/quickshell/shell.qml" "Quickshell shell"; chk "$CFG/quickshell/Bar.qml" "top bar"; chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"; chk "$CFG/foot/foot.ini" "Foot config"; chk "$CFG/fish/config.fish" "Fish config"; chk "/usr/share/icons/$ICON_THEME/index.theme" "Papirus-Dark icon theme"; chk "$HOME/.local/share/icons/$CURSOR_THEME/cursors" "Capitaine cursor theme"; chk "$HOME/.local/share/icons/default/index.theme" "default cursor theme"; chk "/usr/share/wayland-sessions/the-index.desktop" "GDM THE INDEX session"; systemctl is-enabled --quiet gdm.service && ok "GDM enabled" || { bad "GDM is not enabled"; FAIL=1; }; (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
 
-printf '\n%s:: done.%s\n%s   Fedora %s installation complete. GDM is installed and enabled. Reboot to log in and select THE INDEX from GDM\047s session menu.\n   No autologin, bootloader, kernel-command-line, or silent-boot changes were made.\n\n   You can still start THE INDEX from a TTY with:\n     dbus-run-session labwc\n%s\n' "$CYAN" "$NC" "$DIM" "$FEDORA_VERSION" "$NC"
+printf '\n%s:: done.%s\n%s   Fedora %s installation complete. GDM is installed and enabled. Reboot to log in and select THE INDEX from GDM\047s session menu.\n   Foot launches the Index-themed Fish shell; your account login shell is unchanged.\n   No autologin, bootloader, kernel-command-line, or silent-boot changes were made.\n\n   You can still start THE INDEX from a TTY with:\n     dbus-run-session labwc\n%s\n' "$CYAN" "$NC" "$DIM" "$FEDORA_VERSION" "$NC"
