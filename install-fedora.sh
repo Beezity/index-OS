@@ -22,7 +22,7 @@ PACKAGES=(
   labwc labwc-session xorg-x11-server-Xwayland
   swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
   foot wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
-  xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex-autostart libnotify playerctl polkit-gnome udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
+  xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex-autostart libnotify playerctl polkit-kde udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
   NetworkManager nm-connection-editor nm-connection-editor-desktop bluez bluez-tools blueman
   pipewire pipewire-pulseaudio wireplumber ffmpeg-free gstreamer1-plugins-good gstreamer1-plugin-libav
   qt6-qtmultimedia qt6-qtsvg qt6-qtdeclarative qt6-qtwayland qt6ct qt5ct
@@ -86,8 +86,14 @@ mkdir -p "$HOME/.local/share/icons/default"; printf '[Icon Theme]\nInherits=%s\n
 
 say "installing labwc configuration..."
 rm -rf "$CFG/labwc"; mkdir -p "$CFG/labwc"; cp -f "$DIR/labwc/config/rc.xml" "$CFG/labwc/rc.xml"; cp -f "$DIR/labwc/config/menu.xml" "$CFG/labwc/menu.xml"; cp -f "$DIR/labwc/config/autostart" "$CFG/labwc/autostart"; cp -f "$DIR/labwc/config/environment" "$CFG/labwc/environment"; cp -f "$DIR/wallpaper/the-index.png" "$CFG/labwc/wall.png"
-# Fedora calls dex's executable dex-autostart; adapt only the installed copy.
-sed -i 's/command -v dex /command -v dex-autostart /; s/dex -a -e labwc/dex-autostart -a -e labwc/' "$CFG/labwc/autostart"
+# Fedora calls dex's executable dex-autostart and ships the KDE PolicyKit agent
+# instead of polkit-gnome. Adapt only the installed Fedora copy so the shared
+# Arch configuration remains unchanged.
+sed -i \
+  -e 's/command -v dex /command -v dex-autostart /' \
+  -e 's/dex -a -e labwc/dex-autostart -a -e labwc/' \
+  -e 's#/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1#/usr/libexec/kf6/polkit-kde-authentication-agent-1#' \
+  "$CFG/labwc/autostart"
 [[ -f "$DIR/labwc/config/index.conf" ]] && cp -f "$DIR/labwc/config/index.conf" "$CFG/labwc/index.conf"
 for script in index-lock index-logout index-display-save index-display-restore index-idle index-input index-clip; do [[ -f "$DIR/labwc/config/$script" ]] || continue; cp -f "$DIR/labwc/config/$script" "$CFG/labwc/$script"; chmod +x "$CFG/labwc/$script"; done; chmod +x "$CFG/labwc/autostart"
 
@@ -130,13 +136,11 @@ chk "$CFG/labwc/rc.xml" "labwc rc.xml"; chk "$CFG/labwc/autostart" "labwc autost
 
 cat <<DONE
 
-${CYAN}:: Fedora install complete.${NC}
-${DIM}   No autologin, display-manager, bootloader, kernel-command-line, or silent-boot changes were made.
+${CYAN}:: done.${NC}
+${DIM}   Fedora $FEDORA_VERSION configured. No autologin, bootloader, kernel-command-line, or silent-boot changes were made.
 
-   Start THE INDEX from a TTY with:
+   Log out and choose the labwc session from your display manager, or start from a TTY with:
      dbus-run-session labwc
-
-   A labwc session entry is also installed for any display manager you add later.
 
    Super+Return  terminal      Super+D  launcher
    Super+Q       close         Super+L  lock
