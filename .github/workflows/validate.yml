@@ -62,12 +62,21 @@ jobs:
 
       - name: Check Quickshell component registry
         run: |
-          while read -r kind name version file; do
-            if [ "$kind" = singleton ]; then
-              test -s "quickshell/$version" || { echo "qmldir references missing file: $version"; exit 1; }
+          while read -r first second third fourth; do
+            # qmldir syntax used here is either:
+            #   Component 1.0 Component.qml
+            #   singleton Component 1.0 Component.qml
+            [ -n "$first" ] || continue
+            case "$first" in \#*) continue ;; esac
+
+            if [ "$first" = "singleton" ]; then
+              file="$fourth"
             else
-              test -s "quickshell/$file" || { echo "qmldir references missing file: $file"; exit 1; }
+              file="$third"
             fi
+
+            [ -n "$file" ] || { echo "invalid qmldir entry: $first $second $third $fourth"; exit 1; }
+            test -s "quickshell/$file" || { echo "qmldir references missing file: $file"; exit 1; }
           done < quickshell/qmldir
 
       - name: Check Index font naming consistency
