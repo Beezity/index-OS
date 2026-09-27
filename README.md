@@ -4,7 +4,6 @@
 
 # WILL OF THE CITY :: THE INDEX
 
-
 ![labwc](https://img.shields.io/badge/wm-labwc-5DADE2?style=flat-square&labelColor=05080d)
 ![quickshell](https://img.shields.io/badge/shell-quickshell-5DADE2?style=flat-square&labelColor=05080d)
 ![arch](https://img.shields.io/badge/arch-tested-5DE285?style=flat-square&labelColor=05080d)
@@ -18,45 +17,40 @@
 
 A complete desktop environment, themed after *The Index* from Project Moon.
 
-Built on **labwc** (window manager) and **quickshell** (bar, menus, lock).
+Built on **labwc** (window manager) and **Quickshell** (bar, menus, lock).
 
-> Install it on a fresh system with **no desktop environment** — this *is* the
-> desktop. It will replace what you have.
+> Install it on a fresh Arch-based system with **no desktop environment** — this
+> is intended to provide the desktop environment itself.
 
 ---
 
 ## Install
 
-You need an Arch-based system (CachyOS, EndeavourOS, Arch) with no desktop
-environment installed.
+You need an Arch-based system such as Arch Linux, CachyOS, or EndeavourOS.
 
 ```bash
 sudo pacman -S --needed git base-devel
 
-git clone https://aur.archlinux.org/yay.git ~/yay && (cd ~/yay && makepkg -si)
-
-git clone https://github.com/HariUwU/index-OS.git ~/index-OS
-cd ~/index-OS && ./install.sh
-
-reboot
+git clone https://github.com/Beezity/index-OS.git ~/index-OS
+cd ~/index-OS
+./install.sh
 ```
 
-That’s it. The installer handles everything and prints a checklist when it’s
-done — every line should be green. Reboot and your machine goes straight to the
-INDEX lock screen.
+The installer uses Arch's official repositories and installs all required
+packages, including `quickshell`, before any desktop configuration is applied.
+If a required installation step fails, the script exits instead of continuing
+with a partially configured desktop.
 
-Safe to re-run `./install.sh` any time.
+The installer deliberately does **not** configure TTY autologin, automatically
+start labwc at login, or modify GRUB/systemd-boot/Limine/kernel command lines.
 
-<details>
-<summary>Other distros (Debian, Ubuntu, Fedora, openSUSE)</summary>
+After installation, start the session from a TTY with:
 
-<br>
+```bash
+dbus-run-session labwc
+```
 
-The installer detects `apt` / `dnf` / `zypper` and installs the right packages,
-but this is **experimental** — quickshell is only packaged on Arch, so it gets
-compiled from source. That’s slow and the most likely thing to fail.
-
-</details>
+`./install.sh` is safe to run again on the intended fresh/no-other-DE setup.
 
 ---
 
@@ -64,13 +58,13 @@ compiled from source. That’s slow and the most likely thing to fail.
 
 - **Bracket titlebars** on every window, forced server-side so apps use one bar
 - **The bar** — start menu with search, workspaces, taskbar, media, network,
-  bluetooth, battery, volume, keyboard layout, tray, centred clock
-- **Panels** — wifi picker, bluetooth pairing, notification history, quick settings
-- **The lock** — boot intro video, scramble auth, WILL OF THE CITY fixer modal
+  Bluetooth, battery, volume, keyboard layout, tray, centred clock
+- **Panels** — Wi-Fi picker, Bluetooth pairing, notification history, quick settings
+- **The lock** — intro video support, scramble auth, WILL OF THE CITY fixer modal
 - **Prescript of the day** — a desktop widget that scrambles into a new
   instruction each morning
 - **Sound and animation** throughout, with an ON/OFF toggle
-- **Silent boot** — autologin straight into the lock, no text, no flash
+- **Standard session startup** — no autologin or bootloader modifications
 
 ---
 
@@ -80,7 +74,7 @@ Drop a file in `assets/`, re-run `./install.sh`.
 
 | File | What it changes |
 |------|-----------------|
-| `assets/intro.mp4` | boot intro video |
+| `assets/intro.mp4` | lock intro video |
 | `assets/sounds/bg.mp3` | lock screen music |
 | `assets/DefaultProfile.jpg` | your profile picture |
 
@@ -100,8 +94,8 @@ Project Moon. This is an unaffiliated fan project.
 ---
 
 <div align="center">
-  
-*"We're simply carrying out our Prescript. No personal feelings are involved in this process.	"*
+
+*"We're simply carrying out our Prescript. No personal feelings are involved in this process.\t"*
 
 `>_ THE INDEX_`
 
