@@ -1,9 +1,8 @@
 //@ pragma UseQApplication
 // ============================================================
-//  WILL OF THE CITY :: THE INDEX  —  quickshell entry
-//  Loaded by `quickshell` (exec-once in hyprland.conf).
-//  Brings up the top bar + the atmosphere layer.
-//  The lock (lock/lock.qml) is run separately as lock_cmd.
+//  WILL OF THE CITY :: THE INDEX — Quickshell entry point
+//  Started by labwc/config/autostart.
+//  The secure lock screen is launched separately by index-lock.
 // ============================================================
 
 import Quickshell
