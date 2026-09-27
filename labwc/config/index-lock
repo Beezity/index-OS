@@ -1,16 +1,40 @@
 #!/bin/sh
-# WILL OF THE CITY :: THE INDEX  —  lock launcher (boot-safe, idempotent)
-pgrep -f 'lock/lock.qml' >/dev/null 2>&1 && exit 0
-# once-per-boot intro: export INDEX_INTRO=1 the first time after boot, 0 after
-BOOTED="/tmp/.index-booted-$(id -u)"
-if [ -e "$BOOTED" ]; then export INDEX_INTRO=0; else export INDEX_INTRO=1; : > "$BOOTED"; fi
-i=0
-while [ -z "$WAYLAND_DISPLAY" ] && [ "$i" -lt 30 ]; do sleep 0.2; i=$((i+1)); done
-QS="$(command -v quickshell 2>/dev/null || command -v qs 2>/dev/null)"
-[ -z "$QS" ] && exit 1
-n=0
-while [ "$n" -lt 12 ]; do
-  "$QS" -p "$HOME/.config/quickshell/lock/lock.qml" && exit 0
-  n=$((n+1)); sleep 0.4
-done
-exit 1
+# WILL OF THE CITY :: THE INDEX — secure session-lock launcher
+set -u
+
+LOCK_QML="$HOME/.config/quickshell/lock/lock.qml"
+
+# Do not start a second session lock for this user.
+pgrep -u "$(id -u)" -f '[q]uickshell.*lock/lock.qml' >/dev/null 2>&1 && exit 0
+
+[ -n "${WAYLAND_DISPLAY:-}" ] || {
+  printf '%s\n' 'index-lock: WAYLAND_DISPLAY is not set' >&2
+  exit 1
+}
+
+[ -f "$LOCK_QML" ] || {
+  printf 'index-lock: missing %s\n' "$LOCK_QML" >&2
+  exit 1
+}
+
+QS="$(command -v quickshell 2>/dev/null || command -v qs 2>/dev/null || true)"
+[ -n "$QS" ] || {
+  printf '%s\n' 'index-lock: quickshell is not installed' >&2
+  exit 1
+}
+
+# Show the optional cinematic intro once per login/session, not via a global
+# /tmp marker whose lifetime is unrelated to the Wayland session.
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+MARKER="$RUNTIME/index-intro-shown"
+if [ -e "$MARKER" ]; then
+  export INDEX_INTRO=0
+else
+  export INDEX_INTRO=1
+  : > "$MARKER"
+fi
+
+# Do not retry a crashed session-lock process. Once ext-session-lock has been
+# acquired, a compositor intentionally keeps the session locked if the client
+# dies; repeated launches only hide the real failure.
+exec "$QS" -p "$LOCK_QML"
