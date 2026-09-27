@@ -7,9 +7,24 @@ if command -v dbus-update-activation-environment >/dev/null 2>&1; then
   dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE >/dev/null 2>&1 || true
 fi
 
-# Desktop shell.
+# Desktop wallpaper.
 swaybg -i "$HOME/.config/labwc/wall.png" -m fill &
-quickshell -p "$HOME/.config/quickshell/shell.qml" &
+
+# VMware's SVGA3D + Qt Quick Wayland/EGL path can create an EGL surface and
+# then fail eglSwapBuffers with EGL_BAD_SURFACE/protocol errors. The software
+# Qt Quick backend is stable there. Keep accelerated rendering everywhere else.
+INDEX_QS_ENV=""
+if [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi 'vmware' /sys/class/dmi/id/sys_vendor; then
+  INDEX_QS_ENV="QT_QUICK_BACKEND=software"
+elif command -v systemd-detect-virt >/dev/null 2>&1 && [ "$(systemd-detect-virt 2>/dev/null || true)" = "vmware" ]; then
+  INDEX_QS_ENV="QT_QUICK_BACKEND=software"
+fi
+
+if [ -n "$INDEX_QS_ENV" ]; then
+  env $INDEX_QS_ENV quickshell -p "$HOME/.config/quickshell/shell.qml" &
+else
+  quickshell -p "$HOME/.config/quickshell/shell.qml" &
+fi
 
 # Polkit agent for privileged GUI operations.
 for p in /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 \
