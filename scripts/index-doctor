@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -u
+
+CYAN=$'\e[38;2;93;173;226m'; GREEN=$'\e[38;2;93;226;133m'; YELLOW=$'\e[38;2;255;210;92m'; RED=$'\e[38;2;255;107;107m'; DIM=$'\e[2m'; NC=$'\e[0m'
+PASS=0; WARN=0; FAIL=0
+
+ok(){ printf '  %s[OK]%s   %s\n' "$GREEN" "$NC" "$1"; ((PASS++)); }
+warn(){ printf '  %s[WARN]%s %s\n' "$YELLOW" "$NC" "$1"; ((WARN++)); }
+fail(){ printf '  %s[FAIL]%s %s\n' "$RED" "$NC" "$1"; ((FAIL++)); }
+section(){ printf '\n%s%s%s\n' "$CYAN" "$1" "$NC"; }
+has(){ command -v "$1" >/dev/null 2>&1; }
+check_cmd(){ if has "$1"; then ok "$1 available"; else fail "$1 missing"; fi; }
+check_file(){ if [[ -e "$1" ]]; then ok "$2"; else fail "$2 missing ($1)"; fi; }
+
+printf '%sWILL OF THE CITY :: THE INDEX%s\n' "$CYAN" "$NC"
+printf '%sSYSTEM DIAGNOSTIC%s\n' "$DIM" "$NC"
+
+section "SYSTEM"
+if [[ -r /etc/os-release ]]; then
+  . /etc/os-release
+  ok "${PRETTY_NAME:-${NAME:-Linux}}"
+else
+  warn "could not read /etc/os-release"
+fi
+ok "architecture: $(uname -m)"
+printf '  %sINFO%s  kernel: %s\n' "$DIM" "$NC" "$(uname -r)"
+
+section "CORE"
+for cmd in labwc quickshell foot fish fastfetch wofi; do check_cmd "$cmd"; done
+
+section "SESSION"
+check_file /usr/share/wayland-sessions/the-index.desktop "THE INDEX Wayland session registered"
+if has systemctl; then
+  if systemctl is-enabled --quiet gdm.service 2>/dev/null; then ok "GDM enabled"; else warn "GDM is not enabled"; fi
+else
+  warn "systemctl unavailable; GDM state not checked"
+fi
+if [[ "${XDG_CURRENT_DESKTOP:-}" == *labwc* || "${XDG_SESSION_DESKTOP:-}" == *labwc* ]]; then
+  ok "labwc session detected"
+else
+  warn "current session does not identify as labwc"
+fi
+
+section "INDEX CONFIG"
+check_file "$HOME/.config/labwc/rc.xml" "labwc configuration"
+check_file "$HOME/.config/labwc/autostart" "labwc autostart"
+check_file "$HOME/.config/quickshell/shell.qml" "Quickshell shell"
+check_file "$HOME/.config/quickshell/Bar.qml" "Quickshell top bar"
+check_file "$HOME/.config/foot/foot.ini" "Foot configuration"
+check_file "$HOME/.config/fish/config.fish" "Fish configuration"
+check_file "$HOME/.config/wofi/config" "Wofi configuration"
+
+section "THEMING"
+check_file "$HOME/.local/share/themes/the-index/labwc/themerc" "Index labwc theme"
+if [[ -f /usr/share/icons/Papirus-Dark/index.theme ]]; then ok "Papirus-Dark icon theme"; else fail "Papirus-Dark icon theme missing"; fi
+if [[ -d /usr/share/icons/capitaine-cursors/cursors || -d "$HOME/.local/share/icons/capitaine-cursors/cursors" ]]; then ok "Capitaine cursor theme"; else fail "Capitaine cursor theme missing"; fi
+if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA font available"; else warn "Perfect DOS VGA font could not be confirmed"; fi
+
+section "DESKTOP SERVICES"
+for cmd in nmcli wpctl wl-copy playerctl; do check_cmd "$cmd"; done
+if has systemctl; then
+  for svc in NetworkManager bluetooth cups; do
+    if systemctl is-enabled --quiet "$svc.service" 2>/dev/null; then ok "$svc enabled"; else warn "$svc not enabled"; fi
+  done
+fi
+if has pgrep && pgrep -x pipewire >/dev/null 2>&1; then ok "PipeWire running"; else warn "PipeWire not detected in current session"; fi
+if has pgrep && pgrep -x wireplumber >/dev/null 2>&1; then ok "WirePlumber running"; else warn "WirePlumber not detected in current session"; fi
+
+section "RESULT"
+printf '  %s%d passed%s / %s%d warnings%s / %s%d failed%s\n' "$GREEN" "$PASS" "$NC" "$YELLOW" "$WARN" "$NC" "$RED" "$FAIL" "$NC"
+
+if (( FAIL > 0 )); then exit 1; fi
+exit 0
