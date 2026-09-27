@@ -13,13 +13,13 @@ FEDORA_VERSION="$(rpm -E %fedora)"; [[ "$FEDORA_VERSION" =~ ^[0-9]+$ ]] || { bad
 (( FEDORA_VERSION >= 43 )) || { bad "Fedora 43 or newer is required; detected Fedora $FEDORA_VERSION"; exit 1; }
 note "detected Fedora $FEDORA_VERSION"
 
-required_files=(wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/lock/lock.qml quickshell/prescript.json labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment labwc/config/index-lock labwc/config/index-idle labwc/config/index-input labwc/config/index-clip labwc/config/fontconfig/fonts.conf labwc/config/gtk/settings.ini labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf labwc/config/qt5ct/colors/the-index.conf labwc/config/qt6ct/colors/the-index.conf labwc/theme/the-index/labwc/themerc labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps)
+required_files=(wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/lock/lock.qml quickshell/prescript.json labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment labwc/config/index-lock labwc/config/index-idle labwc/config/index-input labwc/config/index-clip labwc/config/fontconfig/fonts.conf labwc/config/gtk/settings.ini labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf labwc/config/qt5ct/colors/the-index.conf labwc/config/qt6ct/colors/the-index.conf labwc/theme/the-index/labwc/themerc labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps labwc/session/the-index.desktop)
 for rel in "${required_files[@]}"; do [[ -f "$DIR/$rel" ]] || { bad "repository file missing: $rel"; exit 1; }; done
 ok "repository layout validated"
 
 say "installing Fedora dependencies..."
 PACKAGES=(
-  labwc labwc-session xorg-x11-server-Xwayland
+  labwc labwc-session xorg-x11-server-Xwayland gdm
   swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
   foot wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
   xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex-autostart libnotify playerctl polkit-kde udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
@@ -38,43 +38,33 @@ ok "official Fedora dependencies installed"
 say "installing Quickshell..."
 sudo dnf -y install dnf5-plugins || sudo dnf -y install dnf-plugins-core
 dnf copr --help >/dev/null 2>&1 || { bad "DNF COPR support is unavailable; cannot install Quickshell."; exit 1; }
-if ! sudo dnf -y copr enable nett00n/hyprland; then
-  bad "could not enable nett00n/hyprland COPR for Fedora $FEDORA_VERSION; Quickshell is required"
-  exit 1
-fi
-if ! sudo dnf -y install quickshell; then
-  bad "Quickshell is unavailable from nett00n/hyprland for Fedora $FEDORA_VERSION"
-  exit 1
-fi
+if ! sudo dnf -y copr enable nett00n/hyprland; then bad "could not enable nett00n/hyprland COPR for Fedora $FEDORA_VERSION; Quickshell is required"; exit 1; fi
+if ! sudo dnf -y install quickshell; then bad "Quickshell is unavailable from nett00n/hyprland for Fedora $FEDORA_VERSION"; exit 1; fi
 ok "Quickshell installed"
 
 say "building Capitaine cursor theme..."
 CAPITAINE_TMP="$(mktemp -d)"
 cleanup_capitaine(){ [[ -n "${CAPITAINE_TMP:-}" ]] && rm -rf "$CAPITAINE_TMP"; }
 trap 'cleanup_capitaine; bad "installation failed at line $LINENO"; exit 1' ERR
-if ! git clone --depth=1 https://github.com/keeferrourke/capitaine-cursors.git "$CAPITAINE_TMP/capitaine-cursors"; then
-  bad "could not download Capitaine from its upstream repository"
-  exit 1
-fi
+if ! git clone --depth=1 https://github.com/keeferrourke/capitaine-cursors.git "$CAPITAINE_TMP/capitaine-cursors"; then bad "could not download Capitaine from its upstream repository"; exit 1; fi
 CAPITAINE_SRC="$CAPITAINE_TMP/capitaine-cursors"
 for cmd in inkscape xcursorgen bc; do command -v "$cmd" >/dev/null 2>&1 || { bad "Capitaine build dependency missing: $cmd"; exit 1; }; done
-(
-  cd "$CAPITAINE_SRC"
-  ./build.sh -p unix -t dark -d tv
-)
+( cd "$CAPITAINE_SRC"; ./build.sh -p unix -t dark -d tv )
 CAPITAINE_BUILD="$CAPITAINE_SRC/dist/dark"
 [[ -d "$CAPITAINE_BUILD/cursors" && -f "$CAPITAINE_BUILD/index.theme" ]] || { bad "Capitaine build completed without producing dist/dark cursor theme"; exit 1; }
-mkdir -p "$HOME/.local/share/icons"
-rm -rf "$HOME/.local/share/icons/capitaine-cursors"
-mkdir -p "$HOME/.local/share/icons/capitaine-cursors"
-cp -a "$CAPITAINE_BUILD/." "$HOME/.local/share/icons/capitaine-cursors/"
-cleanup_capitaine; CAPITAINE_TMP=""
-trap 'bad "installation failed at line $LINENO"; exit 1' ERR
+mkdir -p "$HOME/.local/share/icons"; rm -rf "$HOME/.local/share/icons/capitaine-cursors"; mkdir -p "$HOME/.local/share/icons/capitaine-cursors"; cp -a "$CAPITAINE_BUILD/." "$HOME/.local/share/icons/capitaine-cursors/"
+cleanup_capitaine; CAPITAINE_TMP=""; trap 'bad "installation failed at line $LINENO"; exit 1' ERR
 ok "Capitaine built and installed from upstream"
 
 for cmd in labwc quickshell swaybg swayidle foot wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do command -v "$cmd" >/dev/null 2>&1 || { bad "required command missing after installation: $cmd"; exit 1; }; done
 QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"; [[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }; ok "Quickshell $QS_VERSION"
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service
+sudo systemctl enable gdm.service
+
+say "installing GDM session..."
+sudo install -Dm644 "$DIR/labwc/session/the-index.desktop" /usr/share/wayland-sessions/the-index.desktop
+ok "THE INDEX session registered with GDM"
+
 if command -v flatpak >/dev/null 2>&1; then flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || note "Flathub setup failed; continuing because it is optional"; fi
 
 say "installing fonts..."
@@ -83,17 +73,12 @@ mkdir -p "$HOME/.local/share/fonts" "$CFG/fontconfig"; shopt -s nullglob; fonts=
 say "configuring icon and cursor themes..."
 ICON_THEME="Papirus-Dark"; CURSOR_THEME="capitaine-cursors"; CURSOR_SIZE=24
 [[ -f "/usr/share/icons/$ICON_THEME/index.theme" ]] || { bad "icon theme missing after installation: $ICON_THEME"; exit 1; }
-CURSOR_ROOT="$HOME/.local/share/icons/$CURSOR_THEME"
-[[ -d "$CURSOR_ROOT/cursors" && -f "$CURSOR_ROOT/index.theme" ]] || { bad "Capitaine cursor theme missing after installation"; exit 1; }
+CURSOR_ROOT="$HOME/.local/share/icons/$CURSOR_THEME"; [[ -d "$CURSOR_ROOT/cursors" && -f "$CURSOR_ROOT/index.theme" ]] || { bad "Capitaine cursor theme missing after installation"; exit 1; }
 mkdir -p "$HOME/.local/share/icons/default"; printf '[Icon Theme]\nInherits=%s\n' "$CURSOR_THEME" > "$HOME/.local/share/icons/default/index.theme"
 
 say "installing labwc configuration..."
 rm -rf "$CFG/labwc"; mkdir -p "$CFG/labwc"; cp -f "$DIR/labwc/config/rc.xml" "$CFG/labwc/rc.xml"; cp -f "$DIR/labwc/config/menu.xml" "$CFG/labwc/menu.xml"; cp -f "$DIR/labwc/config/autostart" "$CFG/labwc/autostart"; cp -f "$DIR/labwc/config/environment" "$CFG/labwc/environment"; cp -f "$DIR/wallpaper/the-index.png" "$CFG/labwc/wall.png"
-sed -i \
-  -e 's/command -v dex /command -v dex-autostart /' \
-  -e 's/dex -a -e labwc/dex-autostart -a -e labwc/' \
-  -e 's#/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1#/usr/libexec/kf6/polkit-kde-authentication-agent-1#' \
-  "$CFG/labwc/autostart"
+sed -i -e 's/command -v dex /command -v dex-autostart /' -e 's/dex -a -e labwc/dex-autostart -a -e labwc/' -e 's#/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1#/usr/libexec/kf6/polkit-kde-authentication-agent-1#' "$CFG/labwc/autostart"
 [[ -f "$DIR/labwc/config/index.conf" ]] && cp -f "$DIR/labwc/config/index.conf" "$CFG/labwc/index.conf"
 for script in index-lock index-logout index-display-save index-display-restore index-idle index-input index-clip; do [[ -f "$DIR/labwc/config/$script" ]] || continue; cp -f "$DIR/labwc/config/$script" "$CFG/labwc/$script"; chmod +x "$CFG/labwc/$script"; done; chmod +x "$CFG/labwc/autostart"
 
@@ -132,6 +117,6 @@ setdef(){ local bin="$1" desktop="$2"; shift 2; command -v "$bin" >/dev/null || 
 setdef thunar thunar.desktop inode/directory; setdef foot foot.desktop text/plain text/x-shellscript application/x-shellscript; setdef imv imv.desktop image/png image/jpeg image/gif image/webp image/bmp image/tiff; setdef mpv mpv.desktop video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo audio/mpeg audio/flac audio/ogg audio/wav audio/x-wav; setdef zathura org.pwmt.zathura.desktop application/pdf application/epub+zip; setdef file-roller org.gnome.FileRoller.desktop application/zip application/x-tar application/gzip application/x-7z-compressed application/vnd.rar; unset -f setdef
 
 say "validating installed configuration..."; xmllint --noout "$CFG/labwc/rc.xml" "$CFG/labwc/menu.xml" "$CFG/fontconfig/fonts.conf"
-FAIL=0; chk(){ if [[ -e "$1" ]]; then ok "$2"; else bad "$2 (missing: $1)"; FAIL=1; fi; }; chk "$CFG/labwc/rc.xml" "labwc rc.xml"; chk "$CFG/labwc/autostart" "labwc autostart"; chk "$CFG/labwc/index-lock" "lock launcher"; chk "$CFG/labwc/wall.png" "wallpaper"; chk "$THEMES/the-index/labwc/themerc" "titlebar theme"; chk "$CFG/quickshell/shell.qml" "Quickshell shell"; chk "$CFG/quickshell/Bar.qml" "top bar"; chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"; chk "$CFG/foot/foot.ini" "Foot config"; chk "/usr/share/icons/$ICON_THEME/index.theme" "Papirus-Dark icon theme"; chk "$HOME/.local/share/icons/$CURSOR_THEME/cursors" "Capitaine cursor theme"; chk "$HOME/.local/share/icons/default/index.theme" "default cursor theme"; (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
+FAIL=0; chk(){ if [[ -e "$1" ]]; then ok "$2"; else bad "$2 (missing: $1)"; FAIL=1; fi; }; chk "$CFG/labwc/rc.xml" "labwc rc.xml"; chk "$CFG/labwc/autostart" "labwc autostart"; chk "$CFG/labwc/index-lock" "lock launcher"; chk "$CFG/labwc/wall.png" "wallpaper"; chk "$THEMES/the-index/labwc/themerc" "titlebar theme"; chk "$CFG/quickshell/shell.qml" "Quickshell shell"; chk "$CFG/quickshell/Bar.qml" "top bar"; chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"; chk "$CFG/foot/foot.ini" "Foot config"; chk "/usr/share/icons/$ICON_THEME/index.theme" "Papirus-Dark icon theme"; chk "$HOME/.local/share/icons/$CURSOR_THEME/cursors" "Capitaine cursor theme"; chk "$HOME/.local/share/icons/default/index.theme" "default cursor theme"; chk "/usr/share/wayland-sessions/the-index.desktop" "GDM THE INDEX session"; systemctl is-enabled --quiet gdm.service && ok "GDM enabled" || { bad "GDM is not enabled"; FAIL=1; }; (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
 
-printf '\n%s:: done.%s\n%s   Fedora %s installation complete. No autologin, bootloader, kernel-command-line, or silent-boot changes were made.\n\n   Start THE INDEX from a TTY with:\n     dbus-run-session labwc\n%s\n' "$CYAN" "$NC" "$DIM" "$FEDORA_VERSION" "$NC"
+printf '\n%s:: done.%s\n%s   Fedora %s installation complete. GDM is installed and enabled. Reboot to log in and select THE INDEX from GDM\047s session menu.\n   No autologin, bootloader, kernel-command-line, or silent-boot changes were made.\n\n   You can still start THE INDEX from a TTY with:\n     dbus-run-session labwc\n%s\n' "$CYAN" "$NC" "$DIM" "$FEDORA_VERSION" "$NC"
