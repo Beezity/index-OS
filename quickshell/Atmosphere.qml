@@ -25,7 +25,7 @@ PanelWindow {
 
     Process {
         running: true
-        command: ["hostname"]
+        command: ["sh", "-c", "hostname | LC_ALL=C tr -cd 'A-Za-z0-9._-' | cut -c1-63"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var value = text.trim()
@@ -57,17 +57,21 @@ PanelWindow {
         renderType: Text.NativeRendering
     }
 
+    // This is a full-screen software Canvas, so keep its redraw rate modest.
+    // 20 FPS is smooth enough for slow ambient particles while cutting the
+    // continuous paint workload substantially, especially on VMware where
+    // Quickshell deliberately uses Qt's software renderer.
     Canvas {
         id: cv
         anchors.fill: parent
         property var parts: []
         Component.onCompleted: {
-            for (var i = 0; i < 60; i++)
+            for (var i = 0; i < 40; i++)
                 parts.push({
                     x: Math.random() * width,
                     y: Math.random() * height,
                     r: Math.random() * 1.6 + 0.4,
-                    s: Math.random() * 0.4 + 0.12,
+                    s: Math.random() * 0.6 + 0.18,
                     a: Math.random() * 0.5 + 0.18,
                     d: Math.random() * 0.6 - 0.3
                 });
@@ -75,7 +79,7 @@ PanelWindow {
         onPaint: {
             var ctx = getContext("2d");
             ctx.clearRect(0, 0, width, height);
-            ctx.shadowBlur = 6;
+            ctx.shadowBlur = 4;
             ctx.shadowColor = "rgba(93,173,226,0.85)";
             for (var i = 0; i < parts.length; i++) {
                 var p = parts[i];
@@ -88,7 +92,7 @@ PanelWindow {
                 ctx.fill();
             }
         }
-        Timer { interval: 33; running: true; repeat: true; onTriggered: cv.requestPaint() }
+        Timer { interval: 50; running: true; repeat: true; onTriggered: cv.requestPaint() }
     }
 
     Rectangle {
