@@ -58,9 +58,9 @@ jobs:
           )
           for f in "${files[@]}"; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
 
-      - name: Reject stale compositor/install references
+      - name: Reject removed boot behavior
         run: |
-          if grep -RniE 'hyprland|hypridle|quickshell-git|tty1 autologin|GRUB_CMDLINE' README.md quickshell labwc install.sh; then
-            echo 'stale compositor or boot-modification reference found'
+          if grep -niE 'tty1 autologin|GRUB_CMDLINE|/etc/kernel/cmdline|limine|systemd-boot' README.md install.sh; then
+            echo 'removed boot/autologin behavior was reintroduced'
             exit 1
           fi
