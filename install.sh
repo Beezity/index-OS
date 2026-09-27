@@ -42,7 +42,6 @@ PACKAGES=(
   networkmanager nm-connection-editor bluez bluez-utils blueman
   pipewire pipewire-pulse wireplumber ffmpeg gst-libav gst-plugins-good
   qt6-multimedia qt6-svg qt6-declarative qt6-wayland qt6ct qt5ct gnome-themes-extra
-  fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt
   brightnessctl upower gammastep gnome-power-manager
   ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra
   capitaine-cursors
