@@ -63,7 +63,7 @@ if command -v dex >/dev/null 2>&1; then
   dex -a -e labwc >/dev/null 2>&1 &
 fi
 
-# Fcitx5 provides the keyboard/input-method indicator used by the bar. It starts
-# with the user's normal system layout; additional languages are configured with
-# fcitx5-configtool rather than being forced by this repo.
-command -v fcitx5 >/dev/null 2>&1 && fcitx5 -d --replace --disable=notificationitem >/dev/null 2>&1 &
+# Fcitx5 used to be started here for the bar's input-layout indicator. The
+# indicator is gone, so do not keep an otherwise idle input-method daemon in
+# every Index session. Users who need an IME can enable fcitx5 through their
+# normal XDG autostart configuration.
