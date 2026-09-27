@@ -123,6 +123,8 @@ PanelWindow {
                     delegate: Rectangle {
                         required property var modelData
                         readonly property bool isActive: ToplevelManager.activeToplevel === modelData
+                        readonly property string rawTitle: modelData.title || modelData.appId || "window"
+                        readonly property string displayTitle: rawTitle.length > 18 ? rawTitle.slice(0, 15) + "..." : rawTitle
                         Layout.preferredWidth: Math.min(160, taskLabel.implicitWidth + 26)
                         Layout.minimumWidth: 40
                         implicitHeight: 22
@@ -139,10 +141,10 @@ PanelWindow {
                             id: taskLabel
                             anchors.left: parent.left; anchors.leftMargin: taskIcon.visible ? 22 : 6
                             anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.title || modelData.appId || "window"
+                            text: parent.displayTitle
                             font.family: bar.pixel; font.pixelSize: 12
                             color: parent.isActive ? "#04141c" : bar.cyanB
-                            elide: Text.ElideRight
+                            clip: true
                         }
                         MouseArea { id: taskArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: modelData.activate() }
                     }
@@ -172,8 +174,6 @@ PanelWindow {
                 }
                 Process {
                     id: netProc
-                    // Display stable connection-type labels instead of profile names.
-                    // This also keeps the DOS font path strictly ASCII-safe.
                     command: ["sh", "-c", "type=$(nmcli -t -f TYPE connection show --active 2>/dev/null | head -1); case \"$type\" in 802-3-ethernet|ethernet) printf 'ETHERNET' ;; 802-11-wireless|wifi|wireless) printf 'WI-FI' ;; *) name=$(nmcli -t -f NAME connection show --active 2>/dev/null | head -1); printf '%s' \"$name\" | LC_ALL=C tr -cd ' -~' ;; esac"]
                     stdout: StdioCollector { onStreamFinished: netText.ssid = text.trim() }
                 }
