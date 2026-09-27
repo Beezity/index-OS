@@ -21,7 +21,7 @@ jobs:
 
       - name: Shellcheck scripts
         run: |
-          shellcheck install.sh \
+          shellcheck --severity=error install.sh \
             labwc/config/autostart \
             labwc/config/index-lock \
             labwc/config/index-idle \
