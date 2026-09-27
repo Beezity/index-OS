@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Distro adapters back up before package- or distro-specific file changes. The shared
+# installer calls this helper defensively as well, so skip that second snapshot.
+if [[ "${INDEX_BACKUP_DONE:-0}" == 1 ]]; then exit 0; fi
+
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/index-os"
 BACKUP_ROOT="$STATE_DIR/backups"
 STAMP="$(date '+%Y%m%d-%H%M%S')-$$"
@@ -22,13 +26,11 @@ record(){
   fi
 }
 
-# Directories replaced wholesale by the installer.
 record "$HOME/.config/labwc"
 record "$HOME/.config/quickshell"
 record "$HOME/.config/fastfetch"
 record "$HOME/.local/share/themes/the-index"
 
-# Individual files written inside otherwise user-owned directories.
 for path in \
   "$HOME/.config/fontconfig/fonts.conf" \
   "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-3.0/gtk.css" \
@@ -47,11 +49,8 @@ for path in \
   record "$path"
 done
 
-# Fedora installs Capitaine here; Arch normally gets it from the package manager.
 record "$HOME/.local/share/icons/capitaine-cursors"
 
-# Current bundled fonts. Keeping these explicit lets index-backup work after it has
-# been installed to ~/.local/bin and no longer lives beside the repository.
 for font in \
   MotivaSans-Regular.ttf \
   PerfectDOSVGA437-Thai-v2.ttf \
