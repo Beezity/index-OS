@@ -19,14 +19,14 @@ jobs:
       - name: Check installer syntax
         run: |
           bash -n install.sh install-fedora.sh install-fish.sh setup.sh remove-display-manager.sh
-          bash -n scripts/common.sh scripts/install-common.sh scripts/validate.sh
+          bash -n scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore
           bash -n scripts/distro/arch.sh scripts/distro/fedora.sh
           fish -n fish/config.fish
 
       - name: Shellcheck scripts
         run: |
           shellcheck --severity=error install.sh install-fedora.sh install-fish.sh setup.sh remove-display-manager.sh \
-            scripts/common.sh scripts/install-common.sh scripts/validate.sh \
+            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore \
             scripts/distro/arch.sh scripts/distro/fedora.sh \
             labwc/config/autostart labwc/config/index-lock labwc/config/index-idle \
             labwc/config/index-input labwc/config/index-clip \
@@ -53,7 +53,7 @@ jobs:
             labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf
             labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps
             assets/PerfectDOSVGA437-Universal.ttf install.sh install-fedora.sh install-fish.sh setup.sh remove-display-manager.sh
-            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/distro/arch.sh scripts/distro/fedora.sh
+            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/distro/arch.sh scripts/distro/fedora.sh
           )
           for f in "${files[@]}"; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
 
