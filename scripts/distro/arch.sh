@@ -3,12 +3,12 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INDEX_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"; export INDEX_ROOT
-# shellcheck source=../common.sh
 source "$SCRIPT_DIR/common.sh"
 trap 'bad "installation failed at line $LINENO"; exit 1' ERR
 
 say "WILL OF THE CITY :: THE INDEX — labwc"
 command -v pacman >/dev/null 2>&1 || { bad "Arch Linux/pacman is required."; exit 1; }
+validate_repository_layout
 
 say "installing dependencies..."
 PACKAGES=(
@@ -26,11 +26,9 @@ PACKAGES=(
 )
 sudo pacman -Syu --needed --noconfirm "${PACKAGES[@]}"
 ok "all dependencies installed"
-
 for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do require_command "$cmd"; done
 QS_VERSION="$(pacman -Q quickshell | awk '{print $2}' | cut -d- -f1)"
 if command -v vercmp >/dev/null 2>&1 && (( $(vercmp "$QS_VERSION" 0.3.0) < 0 )); then bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; fi
-
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service
 sudo systemctl enable gdm.service
 
