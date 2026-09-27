@@ -6,7 +6,7 @@ A labwc desktop environment themed after *The Index* from Project Moon. labwc is
 
 ## Install
 
-THE INDEX currently supports Arch Linux/Arch-based systems and Fedora Linux. Both installers configure the same labwc/Quickshell desktop while using distribution-appropriate packages and setup.
+THE INDEX currently supports Arch Linux/Arch-based systems, Fedora Linux, Debian 13 (Trixie), and Debian Sid. All installers configure the same labwc/Quickshell desktop while using distribution-appropriate packages and setup.
 
 ### Arch Linux
 
@@ -34,9 +34,23 @@ bash ./install-fedora.sh
 
 The Fedora installer uses Fedora packages where available. Quickshell is installed from the `nett00n/hyprland` COPR because it is not currently provided by the official Fedora repositories. The Capitaine cursor theme is built from its upstream source and installed for the current user.
 
-Both installers install the desktop only. They do not install a display manager, enable autologin, or modify the bootloader/kernel command line.
+### Debian 13 / Sid
 
-After installation, log in on a TTY and start Index with:
+Target: Debian 13 (Trixie) stable or Debian Sid using APT and systemd.
+
+```bash
+sudo apt update
+sudo apt install -y git
+git clone https://github.com/Beezity/index-OS.git ~/index-OS
+cd ~/index-OS
+bash ./install-debian.sh
+```
+
+On Debian 13, Quickshell 0.3+ is installed from `trixie-backports`; if the backports suite is not already configured, the installer adds an `index-os-trixie-backports.sources` entry under `/etc/apt/sources.list.d/`. Debian Sid installs Quickshell directly from the normal Sid repositories. Capitaine is built from upstream source and installed for the current user.
+
+All supported installers install and enable GDM and register THE INDEX as a Wayland session. Reboot after installation, choose THE INDEX from GDM's session menu, and sign in normally.
+
+You can also start THE INDEX manually from a TTY with:
 
 ```bash
 dbus-run-session labwc
@@ -48,14 +62,15 @@ On an existing Fedora GNOME installation, you can switch to TTY3 from a terminal
 sudo chvt 3
 ```
 
-If you want to test Index without GDM retaining the graphical session, save your work first and then stop GDM from the TTY:
+If you want to test Index without GDM retaining the graphical session, save your work first and then stop GDM from the TTY. On Arch/Fedora use `gdm`; on Debian use `gdm3`:
 
 ```bash
-sudo systemctl stop gdm
+sudo systemctl stop gdm      # Arch/Fedora
+sudo systemctl stop gdm3     # Debian
 dbus-run-session labwc
 ```
 
-Start GDM again afterward with `sudo systemctl start gdm` or reboot.
+Start the appropriate GDM service again afterward or reboot.
 
 If you installed the earlier experimental greetd/ReGreet login on Arch, remove its active system configuration with:
 
@@ -83,7 +98,7 @@ For VMware guest integration, install the appropriate open-vm-tools package for 
 - grim/slurp/swappy screen capture
 - wlroots/GTK portal configuration
 - Papirus-Dark application icons and Capitaine cursors
-- Normal TTY login with no display-manager dependency
+- GDM session entry for THE INDEX
 
 ## Main shortcuts
 
@@ -101,7 +116,7 @@ For VMware guest integration, install the appropriate open-vm-tools package for 
 
 ## Optional assets
 
-Drop optional assets in `assets/`, then rerun the installer for your distribution (`bash ./setup.sh` on Arch or `bash ./install-fedora.sh` on Fedora).
+Drop optional assets in `assets/`, then rerun the installer for your distribution (`bash ./setup.sh` on Arch, `bash ./install-fedora.sh` on Fedora, or `bash ./install-debian.sh` on Debian).
 
 | File | What it changes |
 |---|---|
