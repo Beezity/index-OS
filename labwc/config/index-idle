@@ -1,17 +1,29 @@
 #!/bin/sh
-# WILL OF THE CITY :: THE INDEX — idle daemon driven by a saved setting
+# WILL OF THE CITY :: THE INDEX — idle/lock policy
+set -u
+
 CONF="$HOME/.config/labwc/index.conf"
 LOCKER="$HOME/.config/labwc/index-lock"
 SEC=600
-[ -f "$CONF" ] && eval "$(grep -E '^[A-Z_]+=[^ ]*$' "$CONF" 2>/dev/null)" 2>/dev/null
-[ -n "$SCREEN_OFF_SEC" ] && SEC="$SCREEN_OFF_SEC"
-pkill -x swayidle 2>/dev/null
-sleep 0.3
+
+if [ -f "$CONF" ]; then
+  value="$(sed -n 's/^SCREEN_OFF_SEC=\([0-9][0-9]*\)$/\1/p' "$CONF" | tail -n1)"
+  [ -n "$value" ] && SEC="$value"
+fi
+
+pkill -x swayidle 2>/dev/null || true
+sleep 0.2
+
 if [ "$SEC" -gt 0 ] 2>/dev/null; then
+  OFF_SEC=$((SEC + 5))
   exec swayidle -w \
-    timeout "$SEC" 'wlopm --off \*' \
-    resume            'wlopm --on \*' \
-    lock          "sh $LOCKER"
+    timeout "$SEC"     "$LOCKER" \
+    timeout "$OFF_SEC" 'wlopm --off \*' \
+    resume              'wlopm --on \*' \
+    before-sleep        "$LOCKER" \
+    lock                "$LOCKER"
 else
-  exec swayidle -w lock "sh $LOCKER"
+  exec swayidle -w \
+    before-sleep "$LOCKER" \
+    lock         "$LOCKER"
 fi

@@ -1,56 +1,54 @@
 #!/bin/sh
-# WILL OF THE CITY :: THE INDEX  —  labwc autostart
-LOCKER="$HOME/.config/labwc/index-lock"
+# WILL OF THE CITY :: THE INDEX — labwc autostart
 
-# lock first (small fixed head start to cut the flash)
-sh "$LOCKER" &
-sleep 0.5
+# Export the Wayland session to D-Bus/systemd so portals and desktop services
+# launched on demand inherit the correct compositor environment.
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE >/dev/null 2>&1 || true
+fi
 
-# desktop
+# Desktop shell.
 swaybg -i "$HOME/.config/labwc/wall.png" -m fill &
 quickshell -p "$HOME/.config/quickshell/shell.qml" &
 
-# polkit agent — apps that need a password (installers, disk tools) work
+# Polkit agent for privileged GUI operations.
 for p in /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 \
-         /usr/libexec/polkit-gnome-authentication-agent-1 \
-         /usr/lib/polkit-kde-authentication-agent-1; do
-  [ -x "$p" ] && { "$p" & break; }
-done
-
-# clipboard history (Super+V to browse)
-if command -v wl-paste >/dev/null && command -v cliphist >/dev/null; then
-  wl-paste --type text  --watch cliphist store &
-  wl-paste --type image --watch cliphist store &
-fi
-
-# auto-mount USB drives
-command -v udiskie >/dev/null && udiskie --no-notify &
-
-# idle: screen-off timeout comes from ~/.config/labwc/index.conf
-# restore saved brightness
-[ -f "$HOME/.config/labwc/index.conf" ] && . "$HOME/.config/labwc/index.conf" 2>/dev/null
-[ -n "$BRIGHTNESS" ] && command -v brightnessctl >/dev/null && brightnessctl set "$BRIGHTNESS%" >/dev/null 2>&1
-
-# apply saved input settings, then reload labwc so they take effect
-( sh "$HOME/.config/labwc/index-input"; sleep 1; pkill -HUP labwc ) >/dev/null 2>&1 &
-
-sh "$HOME/.config/labwc/index-idle" &
-sh "$HOME/.config/labwc/index-display-restore" &
-
-# XDG autostart apps (managed in Settings -> START WITH DESKTOP)
-# use a real .desktop launcher so Exec= quoting/env prefixes are handled
-for f in "$HOME"/.config/autostart/*.desktop; do
-  [ -f "$f" ] || continue
-  grep -qi '^Hidden=true' "$f" && continue
-  if command -v gtk-launch >/dev/null 2>&1; then
-    ( cd "$HOME" && gtk-launch "$(basename "$f" .desktop)" >/dev/null 2>&1 & )
-  elif command -v dex >/dev/null 2>&1; then
-    dex "$f" >/dev/null 2>&1 &
-  else
-    cmd=$(grep -m1 '^Exec=' "$f" | cut -d= -f2- | sed 's/%[fFuUdDnNickvm]//g')
-    [ -n "$cmd" ] && setsid sh -c "$cmd" >/dev/null 2>&1 &
+         /usr/libexec/polkit-gnome-authentication-agent-1; do
+  if [ -x "$p" ]; then
+    "$p" &
+    break
   fi
 done
 
-# Thai input method (Super+Space switches)
-command -v fcitx5 >/dev/null && fcitx5 -d --replace --disable=notificationitem >/dev/null 2>&1 &
+# Clipboard history (Super+V).
+if command -v wl-paste >/dev/null 2>&1 && command -v cliphist >/dev/null 2>&1; then
+  wl-paste --type text --watch cliphist store &
+  wl-paste --type image --watch cliphist store &
+fi
+
+# Removable-media automounting.
+command -v udiskie >/dev/null 2>&1 && udiskie --no-notify &
+
+# Restore persisted input/brightness/display state.
+[ -f "$HOME/.config/labwc/index.conf" ] && . "$HOME/.config/labwc/index.conf"
+if [ -n "${BRIGHTNESS:-}" ] && command -v brightnessctl >/dev/null 2>&1; then
+  brightnessctl set "$BRIGHTNESS%" >/dev/null 2>&1 || true
+fi
+
+if [ -x "$HOME/.config/labwc/index-input" ]; then
+  ( "$HOME/.config/labwc/index-input"; sleep 1; labwc --reconfigure ) >/dev/null 2>&1 &
+fi
+
+[ -x "$HOME/.config/labwc/index-idle" ] && "$HOME/.config/labwc/index-idle" &
+[ -x "$HOME/.config/labwc/index-display-restore" ] && "$HOME/.config/labwc/index-display-restore" &
+
+# XDG autostart entries. dex is installed by install.sh and correctly handles
+# Desktop Entry quoting/field codes, so avoid hand-parsing Exec= lines.
+if command -v dex >/dev/null 2>&1; then
+  dex -a -e labwc >/dev/null 2>&1 &
+fi
+
+# Fcitx5 provides the keyboard/input-method indicator used by the bar. It starts
+# with the user's normal system layout; additional languages are configured with
+# fcitx5-configtool rather than being forced by this repo.
+command -v fcitx5 >/dev/null 2>&1 && fcitx5 -d --replace --disable=notificationitem >/dev/null 2>&1 &

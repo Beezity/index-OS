@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+choice="$(printf '%s\n' \
+  'File manager: Thunar' \
+  'Terminal: Foot' \
+  'Images: imv' \
+  'Video/audio: mpv' \
+  'PDF: Zathura' \
+  'Archives: File Roller' | wofi --dmenu --prompt 'DEFAULT APP')" || exit 0
+
+case "$choice" in
+  'File manager: Thunar') xdg-mime default thunar.desktop inode/directory ;;
+  'Terminal: Foot')
+    xdg-mime default foot.desktop text/plain
+    xdg-mime default foot.desktop text/x-shellscript
+    ;;
+  'Images: imv') for m in image/png image/jpeg image/gif image/webp image/bmp image/tiff; do xdg-mime default imv.desktop "$m"; done ;;
+  'Video/audio: mpv') for m in video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo audio/mpeg audio/flac audio/ogg audio/wav audio/x-wav; do xdg-mime default mpv.desktop "$m"; done ;;
+  'PDF: Zathura') xdg-mime default org.pwmt.zathura.desktop application/pdf ;;
+  'Archives: File Roller') for m in application/zip application/x-tar application/gzip application/x-7z-compressed application/vnd.rar; do xdg-mime default file-roller.desktop "$m"; done ;;
+esac
