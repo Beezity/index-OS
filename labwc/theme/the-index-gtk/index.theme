@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=the-index
+Comment=THE INDEX cyan/black desktop theme
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=the-index
+MetacityTheme=the-index
+CursorTheme=Adwaita
+ButtonLayout=:

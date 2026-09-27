@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+OUT_DIR="${XDG_PICTURES_DIR:-$HOME/Pictures}"
+mkdir -p "$OUT_DIR"
+OUT="$OUT_DIR/index-$(date +%Y%m%d-%H%M%S).png"
+TMP="$(mktemp --suffix=.png)"
+trap 'rm -f "$TMP"' EXIT INT TERM
+
+GEOM="$(slurp)" || exit 0
+[ -n "$GEOM" ] || exit 0
+
+grim -g "$GEOM" "$TMP"
+wl-copy < "$TMP"
+if command -v swappy >/dev/null 2>&1; then
+  swappy -f "$TMP" -o "$OUT"
+else
+  cp "$TMP" "$OUT"
+fi
+
+[ -f "$OUT" ] && notify-send "THE INDEX" "screenshot saved to $OUT"
