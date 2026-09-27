@@ -30,6 +30,7 @@ PACKAGES=(
   dejavu-sans-fonts liberation-fonts-all google-noto-fonts-all
   papirus-icon-theme papirus-icon-theme-dark
   cups cups-pdf system-config-printer flatpak git pciutils libxml2 util-linux
+  inkscape xorg-x11-apps bc
 )
 sudo dnf -y install "${PACKAGES[@]}"
 ok "official Fedora dependencies installed"
@@ -47,7 +48,7 @@ if ! sudo dnf -y install quickshell; then
 fi
 ok "Quickshell installed"
 
-say "installing Capitaine cursor theme..."
+say "building Capitaine cursor theme..."
 CAPITAINE_TMP="$(mktemp -d)"
 cleanup_capitaine(){ [[ -n "${CAPITAINE_TMP:-}" ]] && rm -rf "$CAPITAINE_TMP"; }
 trap 'cleanup_capitaine; bad "installation failed at line $LINENO"; exit 1' ERR
@@ -56,13 +57,20 @@ if ! git clone --depth=1 https://github.com/keeferrourke/capitaine-cursors.git "
   exit 1
 fi
 CAPITAINE_SRC="$CAPITAINE_TMP/capitaine-cursors"
-[[ -d "$CAPITAINE_SRC/cursors" && -f "$CAPITAINE_SRC/index.theme" ]] || { bad "downloaded Capitaine repository does not contain a built cursor theme"; exit 1; }
+for cmd in inkscape xcursorgen bc; do command -v "$cmd" >/dev/null 2>&1 || { bad "Capitaine build dependency missing: $cmd"; exit 1; }; done
+(
+  cd "$CAPITAINE_SRC"
+  ./build.sh -p unix -t dark -d tv
+)
+CAPITAINE_BUILD="$CAPITAINE_SRC/dist/dark"
+[[ -d "$CAPITAINE_BUILD/cursors" && -f "$CAPITAINE_BUILD/index.theme" ]] || { bad "Capitaine build completed without producing dist/dark cursor theme"; exit 1; }
 mkdir -p "$HOME/.local/share/icons"
 rm -rf "$HOME/.local/share/icons/capitaine-cursors"
-cp -a "$CAPITAINE_SRC" "$HOME/.local/share/icons/capitaine-cursors"
+mkdir -p "$HOME/.local/share/icons/capitaine-cursors"
+cp -a "$CAPITAINE_BUILD/." "$HOME/.local/share/icons/capitaine-cursors/"
 cleanup_capitaine; CAPITAINE_TMP=""
 trap 'bad "installation failed at line $LINENO"; exit 1' ERR
-ok "Capitaine installed from upstream"
+ok "Capitaine built and installed from upstream"
 
 for cmd in labwc quickshell swaybg swayidle foot wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do command -v "$cmd" >/dev/null 2>&1 || { bad "required command missing after installation: $cmd"; exit 1; }; done
 QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"; [[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }; ok "Quickshell $QS_VERSION"
