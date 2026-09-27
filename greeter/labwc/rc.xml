@@ -7,13 +7,9 @@
   <theme>
     <name>the-index</name>
   </theme>
-  <keyboard>
-    <!-- Keep VT switching available as the recovery path. No application,
-         shell, logout or compositor-control bindings are exposed here. -->
-    <keybind key="C-A-F2"><action name="VirtualTerminal"><to>2</to></action></keybind>
-    <keybind key="C-A-F3"><action name="VirtualTerminal"><to>3</to></action></keybind>
-    <keybind key="C-A-F4"><action name="VirtualTerminal"><to>4</to></action></keybind>
-    <keybind key="C-A-F5"><action name="VirtualTerminal"><to>5</to></action></keybind>
-    <keybind key="C-A-F6"><action name="VirtualTerminal"><to>6</to></action></keybind>
-  </keyboard>
+  <!-- Intentionally no keyboard bindings. Linux VT switching is handled by
+       the kernel/logind path, so Ctrl+Alt+F2..F6 remains available without a
+       compositor action. Keeping the greeter config empty also prevents
+       terminals, launchers, menus, or compositor controls at the login screen. -->
+  <keyboard />
 </labwc_config>
