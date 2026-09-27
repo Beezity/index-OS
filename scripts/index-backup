@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/index-os"
+BACKUP_ROOT="$STATE_DIR/backups"
+STAMP="$(date '+%Y%m%d-%H%M%S')"
+DEST="$BACKUP_ROOT/$STAMP"
+MANIFEST="$DEST/manifest"
+
+mkdir -p "$DEST/files"
+: > "$MANIFEST"
+
+record(){
+  local path="$1" rel
+  if [[ -e "$path" || -L "$path" ]]; then
+    rel="${path#/}"
+    mkdir -p "$DEST/files/$(dirname "$rel")"
+    cp -a "$path" "$DEST/files/$rel"
+    printf 'present\t%s\n' "$path" >> "$MANIFEST"
+  else
+    printf 'missing\t%s\n' "$path" >> "$MANIFEST"
+  fi
+}
+
+# Directories replaced wholesale by the installer.
+record "$HOME/.config/labwc"
+record "$HOME/.config/quickshell"
+record "$HOME/.config/fastfetch"
+record "$HOME/.local/share/themes/the-index"
+
+# Individual configuration files written inside otherwise user-owned directories.
+for path in \
+  "$HOME/.config/fontconfig/fonts.conf" \
+  "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-3.0/gtk.css" \
+  "$HOME/.config/gtk-4.0/settings.ini" "$HOME/.config/gtk-4.0/gtk.css" \
+  "$HOME/.config/wofi/config" "$HOME/.config/wofi/style.css" \
+  "$HOME/.config/foot/foot.ini" "$HOME/.config/fish/config.fish" \
+  "$HOME/.config/xdg-desktop-portal/labwc-portals.conf" "$HOME/.config/xdg-desktop-portal/wlr/config" \
+  "$HOME/.config/qt5ct/qt5ct.conf" "$HOME/.config/qt5ct/colors/the-index.conf" \
+  "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt6ct/colors/the-index.conf" \
+  "$HOME/.config/environment.d/60-index-browsers.conf" \
+  "$HOME/.config/mimeapps.list" "$HOME/.config/user-dirs.dirs" "$HOME/.config/user-dirs.locale" \
+  "$HOME/.local/share/icons/default/index.theme" \
+  "$HOME/.local/bin/index-default-apps" "$HOME/.local/bin/index-snip" "$HOME/.local/bin/index-doctor" \
+  /usr/share/wayland-sessions/the-index.desktop; do
+  record "$path"
+done
+
+# Fedora installs Capitaine into the user's data directory. Arch owns it as a package,
+# so this target is normally absent there and restoration will leave the package alone.
+record "$HOME/.local/share/icons/capitaine-cursors"
+
+# Back up only the bundled font filenames that the installer can overwrite.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+shopt -s nullglob
+for src in "$REPO_ROOT"/assets/*.ttf "$REPO_ROOT"/assets/*.otf; do
+  record "$HOME/.local/share/fonts/$(basename "$src")"
+done
+shopt -u nullglob
+
+ln -sfn "$STAMP" "$BACKUP_ROOT/latest"
+printf '%s\n' "$STAMP" > "$STATE_DIR/last-backup"
+printf 'Index backup created: %s\n' "$DEST"
+printf 'Restore with: index-restore %s\n' "$STAMP"
