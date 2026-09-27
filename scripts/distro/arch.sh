@@ -4,6 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; INDEX_ROOT="$(cd 
 source "$SCRIPT_DIR/common.sh"; trap 'bad "installation failed at line $LINENO"; exit 1' ERR
 say "WILL OF THE CITY :: THE INDEX — labwc"
 command -v pacman >/dev/null 2>&1 || { bad "Arch Linux/pacman is required."; exit 1; }; validate_repository_layout
+say "backing up files managed by THE INDEX..."; bash "$SCRIPT_DIR/index-backup"; ok "pre-install backup created"
 say "installing dependencies..."
 PACKAGES=(labwc quickshell xorg-xwayland gdm swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist foot fish wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex libnotify playerctl polkit-gnome udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer networkmanager nm-connection-editor bluez bluez-utils blueman pipewire pipewire-pulse wireplumber ffmpeg gst-libav gst-plugins-good qt6-multimedia qt6-svg qt6-declarative qt6-wayland qt6ct qt5ct gnome-themes-extra brightnessctl upower gammastep gnome-power-manager ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra papirus-icon-theme capitaine-cursors cups cups-pdf system-config-printer flatpak git pciutils libxml2 util-linux)
 sudo pacman -Syu --needed --noconfirm "${PACKAGES[@]}"; ok "all dependencies installed"
