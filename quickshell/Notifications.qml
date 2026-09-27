@@ -21,6 +21,13 @@ PanelWindow {
 
     readonly property string pixel: "Perfect DOS VGA 437 Universal"
 
+    // Qt's Text.ElideRight inserts U+2026 (…), which the DOS font can render
+    // incorrectly. Keep generated truncation ASCII-only instead.
+    function asciiElide(text, maxChars) {
+        const value = text || ""
+        return value.length > maxChars ? value.slice(0, Math.max(0, maxChars - 3)) + "..." : value
+    }
+
     NotificationServer {
         id: server
         actionsSupported: true
@@ -74,10 +81,10 @@ PanelWindow {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: modelData.appName || "SYSTEM"
+                            text: notifRoot.asciiElide(modelData.appName || "SYSTEM", 36)
                             font.family: notifRoot.pixel; font.pixelSize: 12
                             color: "#3A7CA5"
-                            elide: Text.ElideRight
+                            clip: true
                         }
                         Text {
                             text: "[X]"
@@ -100,12 +107,12 @@ PanelWindow {
                     Text {
                         Layout.fillWidth: true
                         visible: (modelData.body || "") !== ""
-                        text: modelData.body
+                        text: notifRoot.asciiElide(modelData.body, 220)
                         font.family: notifRoot.pixel; font.pixelSize: 13
                         color: "#5DADE2"
                         wrapMode: Text.WordWrap
                         maximumLineCount: 4
-                        elide: Text.ElideRight
+                        clip: true
                     }
                 }
 
