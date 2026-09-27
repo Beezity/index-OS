@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+YES=0
+[[ "${1:-}" == "-y" || "${1:-}" == "--yes" ]] && YES=1
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat <<'EOF'
+usage: index-uninstall [--yes]
+
+Removes configuration and user-owned files installed by THE INDEX.
+Installed packages, unrelated files, and saved Index backups are left intact.
+
+Use index-restore afterwards if you want to restore a pre-install snapshot.
+EOF
+  exit 0
+fi
+(( $# <= 1 )) || { echo "usage: index-uninstall [--yes]" >&2; exit 2; }
+
+cat <<'EOF'
+THE INDEX configuration uninstaller
+
+This removes Index-managed configuration, themes, bundled fonts, helper commands,
+and the THE INDEX GDM session. It does not uninstall distro packages or delete backups.
+EOF
+if (( ! YES )); then
+  read -r -p "Continue? [y/N] " answer
+  [[ "$answer" =~ ^[Yy]$ ]] || { echo "Cancelled."; exit 0; }
+fi
+
+remove(){ rm -rf -- "$@"; }
+
+# Directories that THE INDEX replaces wholesale.
+remove \
+  "$HOME/.config/labwc" \
+  "$HOME/.config/quickshell" \
+  "$HOME/.config/fastfetch" \
+  "$HOME/.local/share/themes/the-index"
+
+# Files installed inside otherwise user-owned configuration directories.
+remove \
+  "$HOME/.config/fontconfig/fonts.conf" \
+  "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-3.0/gtk.css" \
+  "$HOME/.config/gtk-4.0/settings.ini" "$HOME/.config/gtk-4.0/gtk.css" \
+  "$HOME/.config/wofi/config" "$HOME/.config/wofi/style.css" \
+  "$HOME/.config/foot/foot.ini" "$HOME/.config/fish/config.fish" \
+  "$HOME/.config/xdg-desktop-portal/labwc-portals.conf" "$HOME/.config/xdg-desktop-portal/wlr/config" \
+  "$HOME/.config/qt5ct/qt5ct.conf" "$HOME/.config/qt5ct/colors/the-index.conf" \
+  "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt6ct/colors/the-index.conf" \
+  "$HOME/.config/environment.d/60-index-browsers.conf" \
+  "$HOME/.local/share/icons/default/index.theme"
+
+# Fedora's installer builds this itself. On Arch the package-owned system theme is untouched.
+remove "$HOME/.local/share/icons/capitaine-cursors"
+
+# Bundled fonts only; never remove unrelated user fonts.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+shopt -s nullglob
+for src in "$REPO_ROOT"/assets/*.ttf "$REPO_ROOT"/assets/*.otf; do
+  remove "$HOME/.local/share/fonts/$(basename "$src")"
+done
+shopt -u nullglob
+
+# Remove the system session only if present. This is the sole privileged removal.
+if [[ -e /usr/share/wayland-sessions/the-index.desktop ]]; then
+  sudo rm -f -- /usr/share/wayland-sessions/the-index.desktop
+fi
+
+# Keep backup/restore available after uninstall so the user can recover the pre-install state.
+remove \
+  "$HOME/.local/bin/index-default-apps" \
+  "$HOME/.local/bin/index-snip" \
+  "$HOME/.local/bin/index-doctor"
+
+# Clean empty directories without touching directories containing other user configuration.
+rmdir "$HOME/.config/fontconfig" "$HOME/.config/wofi" "$HOME/.config/foot" "$HOME/.config/fish" 2>/dev/null || true
+rmdir "$HOME/.config/xdg-desktop-portal/wlr" "$HOME/.config/xdg-desktop-portal" 2>/dev/null || true
+rmdir "$HOME/.config/qt5ct/colors" "$HOME/.config/qt5ct" "$HOME/.config/qt6ct/colors" "$HOME/.config/qt6ct" 2>/dev/null || true
+rmdir "$HOME/.config/environment.d" "$HOME/.local/share/icons/default" 2>/dev/null || true
+
+command -v fc-cache >/dev/null 2>&1 && fc-cache -f >/dev/null || true
+
+cat <<'EOF'
+THE INDEX configuration has been removed.
+
+Packages installed by the distro installer were left installed.
+MIME/user-directory settings were left untouched because they may have changed since installation.
+Saved backups were preserved. To recover your pre-install configuration, run:
+  index-restore latest
+
+Log out before starting another desktop session.
+EOF
