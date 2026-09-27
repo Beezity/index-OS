@@ -23,9 +23,9 @@ PACKAGES=(
   swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
   foot wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
   xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex-autostart libnotify playerctl polkit-gnome udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
-  NetworkManager NetworkManager-gnome bluez bluez-tools blueman
+  NetworkManager nm-connection-editor nm-connection-editor-desktop bluez bluez-tools blueman
   pipewire pipewire-pulseaudio wireplumber ffmpeg-free gstreamer1-plugins-good gstreamer1-plugin-libav
-  qt6-qtmultimedia qt6-qtsvg qt6-qtdeclarative qt6-qtwayland qt6ct qt5ct gnome-themes-extra
+  qt6-qtmultimedia qt6-qtsvg qt6-qtdeclarative qt6-qtwayland qt6ct qt5ct
   brightnessctl upower gammastep gnome-power-manager
   dejavu-sans-fonts liberation-fonts-all google-noto-fonts-all
   papirus-icon-theme papirus-icon-theme-dark
