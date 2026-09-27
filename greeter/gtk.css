@@ -1,0 +1,107 @@
+@define-color index_bg #05080d;
+@define-color index_panel rgba(5, 8, 13, 0.94);
+@define-color index_cyan #5dade2;
+@define-color index_cyan_bright #85c5e8;
+@define-color index_cyan_dark #3a7ca5;
+@define-color index_red #ff6b6b;
+@define-color index_text #eaf6fb;
+
+* {
+  font-family: "Perfect DOS VGA 437 Universal", monospace;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+window,
+.background {
+  color: @index_text;
+  background-color: transparent;
+}
+
+box,
+grid {
+  color: @index_text;
+}
+
+/* ReGreet's central login card. Keep selectors generic so the theme remains
+   useful across minor ReGreet widget-layout changes. */
+frame,
+.frame,
+scrolledwindow,
+popover > contents {
+  background-color: @index_panel;
+  border: 1px solid @index_cyan_dark;
+}
+
+label {
+  color: @index_text;
+}
+
+entry {
+  min-height: 38px;
+  padding: 4px 10px;
+  color: @index_text;
+  background-color: #080d14;
+  border: 1px solid @index_cyan_dark;
+  caret-color: @index_cyan_bright;
+}
+
+entry:focus {
+  border-color: @index_cyan_bright;
+}
+
+button,
+combobox > box,
+dropdown > button {
+  min-height: 34px;
+  padding: 3px 10px;
+  color: @index_cyan_bright;
+  background-color: #080d14;
+  border: 1px solid @index_cyan_dark;
+}
+
+button:hover,
+button:focus,
+combobox > box:hover,
+dropdown > button:hover {
+  color: #ffffff;
+  background-color: #0d1823;
+  border-color: @index_cyan_bright;
+}
+
+button:active,
+button.suggested-action {
+  color: @index_bg;
+  background-color: @index_cyan;
+  border-color: @index_cyan_bright;
+}
+
+selection {
+  color: @index_bg;
+  background-color: @index_cyan;
+}
+
+separator {
+  background-color: @index_cyan_dark;
+  min-height: 1px;
+  min-width: 1px;
+}
+
+.error,
+.error label,
+.error-message {
+  color: @index_red;
+}
+
+menu,
+popover > contents {
+  color: @index_text;
+  background-color: #080d14;
+  border: 1px solid @index_cyan_dark;
+}
+
+menuitem:hover,
+modelbutton:hover {
+  background-color: #10202d;
+}
