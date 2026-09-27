@@ -31,7 +31,7 @@ for cmd in labwc quickshell foot fish fastfetch wofi; do check_cmd "$cmd"; done
 section "SESSION"
 check_file /usr/share/wayland-sessions/the-index.desktop "THE INDEX Wayland session registered"
 if has systemctl; then
-  if systemctl is-enabled --quiet gdm.service 2>/dev/null; then ok "GDM enabled"; else warn "GDM is not enabled"; fi
+  if systemctl is-enabled --quiet gdm.service 2>/dev/null || systemctl is-enabled --quiet gdm3.service 2>/dev/null; then ok "GDM enabled"; else warn "GDM is not enabled"; fi
 else
   warn "systemctl unavailable; GDM state not checked"
 fi
