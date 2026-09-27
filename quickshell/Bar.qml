@@ -172,10 +172,9 @@ PanelWindow {
                 }
                 Process {
                     id: netProc
-                    // Keep externally supplied connection names inside printable ASCII.
-                    // Ethernet profile names vary (often "Wired connection 1"), so use
-                    // the stable WIRED label instead of rendering profile suffixes.
-                    command: ["sh", "-c", "name=$(nmcli -t -f NAME connection show --active 2>/dev/null | head -1); case \"$name\" in 'Wired connection'*) printf 'WIRED' ;; *) printf '%s' \"$name\" | LC_ALL=C tr -cd ' -~' ;; esac"]
+                    // Display stable connection-type labels instead of profile names.
+                    // This also keeps the DOS font path strictly ASCII-safe.
+                    command: ["sh", "-c", "type=$(nmcli -t -f TYPE connection show --active 2>/dev/null | head -1); case \"$type\" in 802-3-ethernet|ethernet) printf 'ETHERNET' ;; 802-11-wireless|wifi|wireless) printf 'WI-FI' ;; *) name=$(nmcli -t -f NAME connection show --active 2>/dev/null | head -1); printf '%s' \"$name\" | LC_ALL=C tr -cd ' -~' ;; esac"]
                     stdout: StdioCollector { onStreamFinished: netText.ssid = text.trim() }
                 }
 
