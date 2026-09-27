@@ -15,7 +15,6 @@ trap 'bad "installation failed at line $LINENO"; exit 1' ERR
 say "WILL OF THE CITY :: THE INDEX — labwc"
 command -v pacman >/dev/null 2>&1 || { bad "Arch Linux/pacman is required."; exit 1; }
 
-# Validate the checkout before changing the machine.
 required_files=(
   wallpaper/the-index.png
   quickshell/shell.qml quickshell/Bar.qml quickshell/lock/lock.qml quickshell/prescript.json
@@ -27,6 +26,7 @@ required_files=(
   labwc/theme/the-index/labwc/themerc
   labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme
   labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps
+  labwc/session/the-index.desktop
 )
 for rel in "${required_files[@]}"; do
   [[ -f "$DIR/$rel" ]] || { bad "repository file missing: $rel"; exit 1; }
@@ -35,7 +35,7 @@ ok "repository layout validated"
 
 say "installing dependencies..."
 PACKAGES=(
-  labwc quickshell xorg-xwayland
+  labwc quickshell xorg-xwayland gdm
   swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
   foot wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
   xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex libnotify playerctl polkit-gnome udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
@@ -56,7 +56,6 @@ for cmd in labwc quickshell swaybg swayidle foot wofi grim slurp swappy wl-copy 
   command -v "$cmd" >/dev/null 2>&1 || { bad "required command missing after installation: $cmd"; exit 1; }
 done
 
-# Quickshell's generic WindowManager workspace API is required by this config.
 QS_VERSION="$(pacman -Q quickshell | awk '{print $2}' | cut -d- -f1)"
 if command -v vercmp >/dev/null 2>&1 && (( $(vercmp "$QS_VERSION" 0.3.0) < 0 )); then
   bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"
@@ -64,14 +63,14 @@ if command -v vercmp >/dev/null 2>&1 && (( $(vercmp "$QS_VERSION" 0.3.0) < 0 ));
 fi
 
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service
+sudo systemctl enable gdm.service
 
-# Flathub is useful but not required for the desktop itself.
+say "installing GDM session..."
+sudo install -Dm644 "$DIR/labwc/session/the-index.desktop" /usr/share/wayland-sessions/the-index.desktop
+ok "THE INDEX session registered with GDM"
+
 if command -v flatpak >/dev/null 2>&1; then
-  if flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo; then
-    note "Flathub configured for this user"
-  else
-    note "Flathub setup failed; continuing because it is optional"
-  fi
+  if flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo; then note "Flathub configured for this user"; else note "Flathub setup failed; continuing because it is optional"; fi
 fi
 
 say "installing fonts..."
@@ -85,20 +84,14 @@ cp -f "$DIR/labwc/config/fontconfig/fonts.conf" "$CFG/fontconfig/fonts.conf"
 fc-cache -f >/dev/null
 
 say "configuring icon and cursor themes..."
-ICON_THEME="Papirus-Dark"
-CURSOR_THEME="capitaine-cursors"
-CURSOR_SIZE=24
+ICON_THEME="Papirus-Dark"; CURSOR_THEME="capitaine-cursors"; CURSOR_SIZE=24
 [[ -f "/usr/share/icons/$ICON_THEME/index.theme" ]] || { bad "icon theme missing after installation: $ICON_THEME"; exit 1; }
 [[ -d "/usr/share/icons/$CURSOR_THEME/cursors" ]] || { bad "cursor theme missing after installation: $CURSOR_THEME"; exit 1; }
 mkdir -p "$HOME/.local/share/icons/default"
-cat > "$HOME/.local/share/icons/default/index.theme" <<CURSORCONF
-[Icon Theme]
-Inherits=$CURSOR_THEME
-CURSORCONF
+printf '[Icon Theme]\nInherits=%s\n' "$CURSOR_THEME" > "$HOME/.local/share/icons/default/index.theme"
 
 say "installing labwc configuration..."
-rm -rf "$CFG/labwc"
-mkdir -p "$CFG/labwc"
+rm -rf "$CFG/labwc"; mkdir -p "$CFG/labwc"
 cp -f "$DIR/labwc/config/rc.xml" "$CFG/labwc/rc.xml"
 cp -f "$DIR/labwc/config/menu.xml" "$CFG/labwc/menu.xml"
 cp -f "$DIR/labwc/config/autostart" "$CFG/labwc/autostart"
@@ -107,8 +100,7 @@ cp -f "$DIR/wallpaper/the-index.png" "$CFG/labwc/wall.png"
 [[ -f "$DIR/labwc/config/index.conf" ]] && cp -f "$DIR/labwc/config/index.conf" "$CFG/labwc/index.conf"
 for script in index-lock index-logout index-display-save index-display-restore index-idle index-input index-clip; do
   [[ -f "$DIR/labwc/config/$script" ]] || continue
-  cp -f "$DIR/labwc/config/$script" "$CFG/labwc/$script"
-  chmod +x "$CFG/labwc/$script"
+  cp -f "$DIR/labwc/config/$script" "$CFG/labwc/$script"; chmod +x "$CFG/labwc/$script"
 done
 chmod +x "$CFG/labwc/autostart"
 
@@ -119,7 +111,6 @@ cp -f "$DIR"/labwc/theme/the-index/labwc/* "$THEMES/the-index/labwc/"
 cp -f "$DIR/labwc/theme/the-index-gtk/gtk-3.0/gtk.css" "$THEMES/the-index/gtk-3.0/gtk.css"
 cp -f "$DIR/labwc/theme/the-index-gtk/gtk-4.0/gtk.css" "$THEMES/the-index/gtk-4.0/gtk.css"
 cp -f "$DIR/labwc/theme/the-index-gtk/index.theme" "$THEMES/the-index/index.theme"
-
 mkdir -p "$CFG/gtk-3.0" "$CFG/gtk-4.0"
 cp -f "$DIR/labwc/config/gtk/settings.ini" "$CFG/gtk-3.0/settings.ini"
 cp -f "$DIR/labwc/config/gtk/settings.ini" "$CFG/gtk-4.0/settings.ini"
@@ -128,52 +119,30 @@ cp -f "$DIR/labwc/theme/the-index-gtk/gtk-4.0/gtk.css" "$CFG/gtk-4.0/gtk.css"
 
 say "installing Quickshell configuration..."
 SAVED_VID=""
-if [[ -f "$CFG/quickshell/lock/assets/intro.mp4" ]]; then
-  SAVED_VID="$(mktemp --suffix=.index-intro.mp4)"
-  cp -f "$CFG/quickshell/lock/assets/intro.mp4" "$SAVED_VID"
-fi
-rm -rf "$CFG/quickshell"
-mkdir -p "$CFG/quickshell"
-cp -rf "$DIR/quickshell/." "$CFG/quickshell/"
-
+if [[ -f "$CFG/quickshell/lock/assets/intro.mp4" ]]; then SAVED_VID="$(mktemp --suffix=.index-intro.mp4)"; cp -f "$CFG/quickshell/lock/assets/intro.mp4" "$SAVED_VID"; fi
+rm -rf "$CFG/quickshell"; mkdir -p "$CFG/quickshell"; cp -rf "$DIR/quickshell/." "$CFG/quickshell/"
 mkdir -p "$CFG/quickshell/lock/assets/sounds" "$CFG/quickshell/assets/sounds/ui"
 shopt -s nullglob
-lock_assets=("$DIR"/assets/*.ttf "$DIR"/assets/*.png "$DIR"/assets/*.jpg)
-((${#lock_assets[@]})) && cp -f "${lock_assets[@]}" "$CFG/quickshell/lock/assets/"
-lock_sounds=("$DIR"/assets/sounds/*.wav "$DIR"/assets/sounds/*.mp3 "$DIR"/assets/sounds/*.ogg)
-((${#lock_sounds[@]})) && cp -f "${lock_sounds[@]}" "$CFG/quickshell/lock/assets/sounds/"
-ui_sounds=("$DIR"/assets/sounds/ui/*.wav "$DIR"/assets/sounds/ui/*.mp3 "$DIR"/assets/sounds/ui/*.ogg)
-((${#ui_sounds[@]})) && cp -f "${ui_sounds[@]}" "$CFG/quickshell/assets/sounds/ui/"
+lock_assets=("$DIR"/assets/*.ttf "$DIR"/assets/*.png "$DIR"/assets/*.jpg); ((${#lock_assets[@]})) && cp -f "${lock_assets[@]}" "$CFG/quickshell/lock/assets/"
+lock_sounds=("$DIR"/assets/sounds/*.wav "$DIR"/assets/sounds/*.mp3 "$DIR"/assets/sounds/*.ogg); ((${#lock_sounds[@]})) && cp -f "${lock_sounds[@]}" "$CFG/quickshell/lock/assets/sounds/"
+ui_sounds=("$DIR"/assets/sounds/ui/*.wav "$DIR"/assets/sounds/ui/*.mp3 "$DIR"/assets/sounds/ui/*.ogg); ((${#ui_sounds[@]})) && cp -f "${ui_sounds[@]}" "$CFG/quickshell/assets/sounds/ui/"
 shopt -u nullglob
-
-DEST_VID="$CFG/quickshell/lock/assets/intro.mp4"
-VID_SRC=""
-for candidate in "$DIR/assets/intro.mp4" "$DIR/intro.mp4" "$DIR/quickshell/lock/assets/intro.mp4" "$HOME/Videos/intro.mp4"; do
-  [[ -f "$candidate" ]] && { VID_SRC="$candidate"; break; }
-done
-if [[ -n "$VID_SRC" ]]; then
-  cp -f "$VID_SRC" "$DEST_VID"
-elif [[ -n "$SAVED_VID" && -f "$SAVED_VID" ]]; then
-  cp -f "$SAVED_VID" "$DEST_VID"
-fi
+DEST_VID="$CFG/quickshell/lock/assets/intro.mp4"; VID_SRC=""
+for candidate in "$DIR/assets/intro.mp4" "$DIR/intro.mp4" "$DIR/quickshell/lock/assets/intro.mp4" "$HOME/Videos/intro.mp4"; do [[ -f "$candidate" ]] && { VID_SRC="$candidate"; break; }; done
+if [[ -n "$VID_SRC" ]]; then cp -f "$VID_SRC" "$DEST_VID"; elif [[ -n "$SAVED_VID" && -f "$SAVED_VID" ]]; then cp -f "$SAVED_VID" "$DEST_VID"; fi
 [[ -n "$SAVED_VID" ]] && rm -f "$SAVED_VID"
 
 say "installing application configuration..."
 mkdir -p "$CFG/wofi" "$CFG/fastfetch" "$CFG/foot"
-cp -f "$DIR/wofi/config" "$CFG/wofi/config"
-cp -f "$DIR/wofi/style.css" "$CFG/wofi/style.css"
-cp -rf "$DIR/fastfetch/." "$CFG/fastfetch/"
-cp -f "$DIR/labwc/config/foot.ini" "$CFG/foot/foot.ini"
+cp -f "$DIR/wofi/config" "$CFG/wofi/config"; cp -f "$DIR/wofi/style.css" "$CFG/wofi/style.css"; cp -rf "$DIR/fastfetch/." "$CFG/fastfetch/"; cp -f "$DIR/labwc/config/foot.ini" "$CFG/foot/foot.ini"
 
 say "configuring desktop portals..."
 mkdir -p "$CFG/xdg-desktop-portal/wlr"
-cp -f "$DIR/labwc/config/portal/labwc-portals.conf" "$CFG/xdg-desktop-portal/labwc-portals.conf"
-cp -f "$DIR/labwc/config/portal/wlr.conf" "$CFG/xdg-desktop-portal/wlr/config"
+cp -f "$DIR/labwc/config/portal/labwc-portals.conf" "$CFG/xdg-desktop-portal/labwc-portals.conf"; cp -f "$DIR/labwc/config/portal/wlr.conf" "$CFG/xdg-desktop-portal/wlr/config"
 
 say "theming Qt applications..."
 for V in qt6ct qt5ct; do
-  mkdir -p "$CFG/$V/colors"
-  cp -f "$DIR/labwc/config/$V/colors/the-index.conf" "$CFG/$V/colors/the-index.conf"
+  mkdir -p "$CFG/$V/colors"; cp -f "$DIR/labwc/config/$V/colors/the-index.conf" "$CFG/$V/colors/the-index.conf"
   cat > "$CFG/$V/$V.conf" <<QTCONF
 [Appearance]
 color_scheme_path=$HOME/.config/$V/colors/the-index.conf
@@ -194,10 +163,8 @@ done
 mkdir -p "$HOME/.local/bin"
 install -m755 "$DIR/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"
 install -m755 "$DIR/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"
-
-xdg-user-dirs-update
-mkdir -p "$HOME/Pictures"
-setdef(){ local bin="$1" desktop="$2"; shift 2; command -v "$bin" >/dev/null; local m; for m in "$@"; do xdg-mime default "$desktop" "$m"; done; }
+xdg-user-dirs-update; mkdir -p "$HOME/Pictures"
+setdef(){ local bin="$1" desktop="$2"; shift 2; command -v "$bin" >/dev/null || return 0; local m; for m in "$@"; do xdg-mime default "$desktop" "$m"; done; }
 setdef thunar thunar.desktop inode/directory
 setdef foot foot.desktop text/plain text/x-shellscript application/x-shellscript
 setdef imv imv.desktop image/png image/jpeg image/gif image/webp image/bmp image/tiff
@@ -208,9 +175,8 @@ unset -f setdef
 
 say "validating installed configuration..."
 xmllint --noout "$CFG/labwc/rc.xml" "$CFG/labwc/menu.xml" "$CFG/fontconfig/fonts.conf"
-
 FAIL=0
-chk(){ if [[ -s "$1" ]]; then ok "$2"; else bad "$2 (missing: $1)"; FAIL=1; fi; }
+chk(){ if [[ -e "$1" ]]; then ok "$2"; else bad "$2 (missing: $1)"; FAIL=1; fi; }
 chk "$CFG/labwc/rc.xml" "labwc rc.xml"
 chk "$CFG/labwc/autostart" "labwc autostart"
 chk "$CFG/labwc/index-lock" "lock launcher"
@@ -225,14 +191,17 @@ chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"
 chk "$CFG/foot/foot.ini" "Foot config"
 chk "/usr/share/icons/$ICON_THEME/index.theme" "Papirus-Dark icon theme"
 chk "$HOME/.local/share/icons/default/index.theme" "default cursor theme"
+chk "/usr/share/wayland-sessions/the-index.desktop" "GDM THE INDEX session"
+systemctl is-enabled --quiet gdm.service && ok "GDM enabled" || { bad "GDM is not enabled"; FAIL=1; }
 (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
 
 cat <<DONE
 
 ${CYAN}:: done.${NC}
-${DIM}   No autologin, bootloader, kernel-command-line, or silent-boot changes were made.
+${DIM}   GDM is installed and enabled. Reboot to log in and select THE INDEX from GDM's session menu.
+   No autologin, bootloader, kernel-command-line, or silent-boot changes were made.
 
-   Start THE INDEX from a TTY with:
+   You can still start THE INDEX from a TTY with:
      dbus-run-session labwc
 
    Super+Return  terminal      Super+D  launcher
