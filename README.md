@@ -18,9 +18,9 @@
 A labwc desktop environment themed after *The Index* from Project Moon.
 
 The compositor is **labwc**. **Quickshell 0.3+** provides the bar, menus,
-notifications, widgets and session lock. Workspace state is read directly from
-labwc through the standard `ext-workspace-v1` protocol rather than simulated
-key presses.
+notifications, widgets and session lock. **greetd + ReGreet + Cage** provide a
+small graphical login environment using the same wallpaper, pixel font and
+cyan/black visual language.
 
 > This installer is intended for a fresh Arch-based system with no existing
 > desktop environment configuration that needs to be preserved.
@@ -37,35 +37,40 @@ sudo pacman -S --needed git base-devel
 
 git clone https://github.com/Beezity/index-OS.git ~/index-OS
 cd ~/index-OS
-bash ./install.sh
+bash ./setup.sh
+sudo reboot
 ```
 
-The installer uses Arch's official repositories and installs every required
-package, including `quickshell`, before applying desktop configuration. It runs
-in fail-fast mode: a required package, command, source file or validation step
-failing stops the install rather than leaving it to continue silently.
+`setup.sh` runs the desktop installer and then installs the graphical login.
+The installers use Arch's official repositories and fail immediately if a
+required package, command, source file or validation step fails.
 
-The installer deliberately does **not** configure TTY autologin, automatically
-start labwc from a shell profile, or modify GRUB, systemd-boot, Limine, kernel
-command lines or initramfs settings.
+The setup deliberately does **not** enable autologin or modify GRUB,
+systemd-boot, Limine, kernel command lines or initramfs settings. greetd owns
+TTY1; other TTYs remain available as recovery consoles.
 
-After installation, start the session from a TTY with:
+### Login
+
+At boot, greetd launches **ReGreet** inside the minimal **Cage** compositor.
+`THE INDEX` is installed in `/usr/share/wayland-sessions` and is the session
+provided by a fresh Index installation. ReGreet also lists other X11/Wayland
+sessions installed later and remembers the last session used by each account.
+Authentication is always required; no greetd `initial_session` is configured.
+
+If the graphical greeter ever fails, switch to another TTY (for example
+`Ctrl+Alt+F2`), log in, and run:
 
 ```bash
-dbus-run-session labwc
+index-session
 ```
-
-`bash ./install.sh` can be rerun on the intended fresh/no-other-DE setup. It
-replaces this project's labwc and Quickshell configuration rather than merging
-arbitrary existing desktop configuration.
 
 ### VMware guests
 
 VMware SVGA3D can expose working direct-rendered Mesa/OpenGL while Qt Quick's
 Wayland EGL swap path still fails with an EGL surface/protocol error. Index
 detects VMware guests and uses `QT_QUICK_BACKEND=software` for the Quickshell
-shell and lock only. labwc and the rest of the desktop keep using the normal
-Mesa/VMware graphics stack. No override is applied on physical hardware.
+shell and lock only. labwc, Cage, ReGreet and the rest of the desktop keep using
+the normal graphics stack.
 
 For VMware guest integration, install and enable `open-vm-tools` separately if
 you want clipboard/host integration; it is not required by Index itself.
@@ -74,6 +79,8 @@ you want clipboard/host integration; it is not required by Index itself.
 
 ## What you get
 
+- **Index login** — greetd/ReGreet hosted by Cage, with Index wallpaper, font,
+  dark GTK4 styling, clock, session selection and reboot/shutdown controls
 - **Bracket titlebars** and matching labwc server-side decorations
 - **The bar** — start menu, native workspaces, taskbar, network, Bluetooth,
   battery, volume, keyboard layout, tray, date and centred clock
@@ -84,11 +91,11 @@ you want clipboard/host integration; it is not required by Index itself.
 - **Sound and animation** with a UI-sound toggle
 - **Screen capture** through grim/slurp/swappy
 - **Portal configuration** for wlroots screen sharing and GTK file pickers
-- **Normal login semantics** — logout exits labwc; there is no autologin shortcut
+- **Normal login semantics** — logout returns to the graphical greeter
 
-The lock, panels and compositor integration should still be tested on the target
-hardware before relying on the setup as a daily desktop. Static repository
-checks cannot reproduce every GPU, monitor, PAM or portal configuration.
+The greeter, lock, panels and compositor integration should still be tested on
+the target hardware before relying on the setup as a daily desktop. Static
+repository checks cannot reproduce every GPU, monitor, PAM or portal setup.
 
 ---
 
@@ -110,7 +117,7 @@ checks cannot reproduce every GPU, monitor, PAM or portal configuration.
 
 ## Make it yours
 
-Drop optional assets in `assets/`, then rerun `bash ./install.sh`.
+Drop optional assets in `assets/`, then rerun `bash ./setup.sh`.
 
 | File | What it changes |
 |---|---|
