@@ -20,7 +20,7 @@ if [[ "$ID" == latest ]]; then
   [[ -L "$BACKUP_ROOT/latest" ]] || { echo "No Index backup is available." >&2; exit 1; }
   ID="$(basename "$(readlink "$BACKUP_ROOT/latest")")"
 fi
-[[ "$ID" =~ ^[0-9]{8}-[0-9]{6}$ ]] || { echo "Invalid backup ID: $ID" >&2; exit 1; }
+[[ "$ID" =~ ^[0-9]{8}-[0-9]{6}-[0-9]+$ ]] || { echo "Invalid backup ID: $ID" >&2; exit 1; }
 SRC="$BACKUP_ROOT/$ID"
 MANIFEST="$SRC/manifest"
 [[ -f "$MANIFEST" ]] || { echo "Backup not found or incomplete: $ID" >&2; exit 1; }
