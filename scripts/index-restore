@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/index-os"
+BACKUP_ROOT="$STATE_DIR/backups"
+
+usage(){
+  echo "usage: index-restore [backup-id|latest]"
+  echo
+  echo "Available backups:"
+  if [[ -d "$BACKUP_ROOT" ]]; then
+    find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '  %f\n' 2>/dev/null | sort -r || true
+  fi
+}
+
+ID="${1:-latest}"
+if [[ "$ID" == "-h" || "$ID" == "--help" || "$ID" == "--list" ]]; then usage; exit 0; fi
+
+if [[ "$ID" == latest ]]; then
+  [[ -L "$BACKUP_ROOT/latest" ]] || { echo "No Index backup is available." >&2; exit 1; }
+  ID="$(basename "$(readlink "$BACKUP_ROOT/latest")")"
+fi
+[[ "$ID" =~ ^[0-9]{8}-[0-9]{6}$ ]] || { echo "Invalid backup ID: $ID" >&2; exit 1; }
+SRC="$BACKUP_ROOT/$ID"
+MANIFEST="$SRC/manifest"
+[[ -f "$MANIFEST" ]] || { echo "Backup not found or incomplete: $ID" >&2; exit 1; }
+
+restore_path(){
+  local state="$1" path="$2" saved="$SRC/files/${path#/}"
+  if [[ "$path" == /usr/* ]]; then
+    if [[ "$state" == present ]]; then
+      sudo rm -rf -- "$path"
+      sudo mkdir -p "$(dirname "$path")"
+      sudo cp -a "$saved" "$path"
+    else
+      sudo rm -rf -- "$path"
+    fi
+  else
+    if [[ "$state" == present ]]; then
+      rm -rf -- "$path"
+      mkdir -p "$(dirname "$path")"
+      cp -a "$saved" "$path"
+    else
+      rm -rf -- "$path"
+    fi
+  fi
+}
+
+printf 'Restoring Index backup %s...\n' "$ID"
+while IFS=$'\t' read -r state path; do
+  [[ "$state" == present || "$state" == missing ]] || { echo "Invalid manifest entry." >&2; exit 1; }
+  [[ -n "$path" ]] || { echo "Invalid empty manifest path." >&2; exit 1; }
+  case "$path" in "$HOME"/*|/usr/share/wayland-sessions/the-index.desktop) ;; *) echo "Refusing unsafe restore path: $path" >&2; exit 1 ;; esac
+  if [[ "$state" == present && ! -e "$SRC/files/${path#/}" && ! -L "$SRC/files/${path#/}" ]]; then
+    echo "Backup payload missing for: $path" >&2; exit 1
+  fi
+  restore_path "$state" "$path"
+done < "$MANIFEST"
+
+command -v fc-cache >/dev/null 2>&1 && fc-cache -f >/dev/null || true
+printf 'Index backup restored: %s\n' "$ID"
+printf 'Log out and back in before judging session/theme changes.\n'
