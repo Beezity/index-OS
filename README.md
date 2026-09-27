@@ -6,6 +6,10 @@ A labwc desktop environment themed after *The Index* from Project Moon. labwc is
 
 ## Install
 
+THE INDEX currently supports Arch Linux/Arch-based systems and Fedora Linux. Both installers configure the same labwc/Quickshell desktop while using distribution-appropriate packages and setup.
+
+### Arch Linux
+
 Target: a fresh Arch Linux or Arch-based installation using pacman and systemd.
 
 ```bash
@@ -15,15 +19,45 @@ cd ~/index-OS
 bash ./setup.sh
 ```
 
-The setup installs the desktop only. It does not install a display manager, enable autologin, or modify the bootloader/kernel command line.
+`setup.sh` runs the Arch installer (`install.sh`).
 
-After boot, log in on the normal Arch TTY and start Index with:
+### Fedora Linux
+
+Target: Fedora 43 or newer using dnf and systemd. Fedora 44 has been tested successfully.
+
+```bash
+sudo dnf install -y git
+git clone https://github.com/Beezity/index-OS.git ~/index-OS
+cd ~/index-OS
+bash ./install-fedora.sh
+```
+
+The Fedora installer uses Fedora packages where available. Quickshell is installed from the `nett00n/hyprland` COPR because it is not currently provided by the official Fedora repositories. The Capitaine cursor theme is built from its upstream source and installed for the current user.
+
+Both installers install the desktop only. They do not install a display manager, enable autologin, or modify the bootloader/kernel command line.
+
+After installation, log in on a TTY and start Index with:
 
 ```bash
 dbus-run-session labwc
 ```
 
-If you installed the earlier experimental greetd/ReGreet login, remove its active system configuration with:
+On an existing Fedora GNOME installation, you can switch to TTY3 from a terminal with:
+
+```bash
+sudo chvt 3
+```
+
+If you want to test Index without GDM retaining the graphical session, save your work first and then stop GDM from the TTY:
+
+```bash
+sudo systemctl stop gdm
+dbus-run-session labwc
+```
+
+Start GDM again afterward with `sudo systemctl start gdm` or reboot.
+
+If you installed the earlier experimental greetd/ReGreet login on Arch, remove its active system configuration with:
 
 ```bash
 bash ./remove-display-manager.sh
@@ -36,18 +70,19 @@ The cleanup disables greetd and removes the Index-specific greeter/session files
 
 VMware SVGA3D can provide working Mesa/OpenGL while Qt Quick's Wayland EGL path still fails. Index detects VMware guests and uses `QT_QUICK_BACKEND=software` for Quickshell and the Quickshell lock only; labwc keeps using the normal graphics stack.
 
-For VMware guest integration, `open-vm-tools` can be installed separately.
+For VMware guest integration, install the appropriate open-vm-tools package for your distribution separately.
 
 ## What you get
 
 - Index-themed labwc server-side decorations
-- Quickshell bar with workspaces, taskbar, network, Bluetooth, battery, volume, keyboard layout, tray, date and clock
+- Quickshell bar with workspaces, taskbar, network, Bluetooth, battery, volume, tray, date and clock
 - Bluetooth, notification-history and settings panels
 - Quickshell `ext-session-lock-v1` lock screen with PAM authentication
 - Prescript and atmosphere desktop layers
 - UI sound/animation controls
 - grim/slurp/swappy screen capture
 - wlroots/GTK portal configuration
+- Papirus-Dark application icons and Capitaine cursors
 - Normal TTY login with no display-manager dependency
 
 ## Main shortcuts
@@ -66,7 +101,7 @@ For VMware guest integration, `open-vm-tools` can be installed separately.
 
 ## Optional assets
 
-Drop optional assets in `assets/`, then rerun `bash ./setup.sh`.
+Drop optional assets in `assets/`, then rerun the installer for your distribution (`bash ./setup.sh` on Arch or `bash ./install-fedora.sh` on Fedora).
 
 | File | What it changes |
 |---|---|

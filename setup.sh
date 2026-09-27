@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Install the Index desktop only. Login remains the normal Arch TTY flow.
+# Arch convenience wrapper. Fedora users should run install-fedora.sh directly.
 bash "$DIR/install.sh"
 
 echo
