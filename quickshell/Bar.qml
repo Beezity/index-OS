@@ -41,7 +41,6 @@ PanelWindow {
 
     SystemClock { id: clock; precision: SystemClock.Minutes }
 
-    // ScriptModel keeps workspace delegates stable as ext-workspace updates.
     ScriptModel {
         id: workspaceModel
         values: WindowManager.windowsets
@@ -156,23 +155,6 @@ PanelWindow {
                 spacing: 10
 
                 Text {
-                    id: kbText
-                    property string layout: "EN"
-                    text: "[" + layout + "]"
-                    font.family: bar.pixel; font.pixelSize: 13; color: bar.cyanD
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { Quickshell.execDetached(["fcitx5-remote", "-t"]); kbDelay.restart() } }
-                }
-                Process {
-                    id: kbProc
-                    command: ["sh", "-c", "fcitx5-remote -n 2>/dev/null || echo keyboard-us"]
-                    stdout: StdioCollector { onStreamFinished: {
-                        var n = text.trim().replace(/^keyboard-/, "").toUpperCase()
-                        kbText.layout = n ? n.substring(0, 3) : "EN"
-                    } }
-                }
-                Timer { id: kbDelay; interval: 150; repeat: false; onTriggered: kbProc.running = true }
-
-                Text {
                     text: "[!]"
                     font.family: bar.pixel; font.pixelSize: 13
                     color: bar.notifOpen ? bar.cyanB : bar.cyanD
@@ -190,7 +172,10 @@ PanelWindow {
                 }
                 Process {
                     id: netProc
-                    command: ["sh", "-c", "nmcli -t -f NAME connection show --active 2>/dev/null | head -1"]
+                    // Keep externally supplied connection names inside printable ASCII.
+                    // Ethernet profile names vary (often "Wired connection 1"), so use
+                    // the stable WIRED label instead of rendering profile suffixes.
+                    command: ["sh", "-c", "name=$(nmcli -t -f NAME connection show --active 2>/dev/null | head -1); case \"$name\" in 'Wired connection'*) printf 'WIRED' ;; *) printf '%s' \"$name\" | LC_ALL=C tr -cd ' -~' ;; esac"]
                     stdout: StdioCollector { onStreamFinished: netText.ssid = text.trim() }
                 }
 
@@ -278,13 +263,12 @@ PanelWindow {
 
                 Timer {
                     interval: 5000; running: true; repeat: true; triggeredOnStart: true
-                    onTriggered: { kbProc.running = true; netProc.running = true; btProc.running = true; batProc.running = true; volProc.running = true }
+                    onTriggered: { netProc.running = true; btProc.running = true; batProc.running = true; volProc.running = true }
                 }
             }
         }
     }
 
-    // Catch clicks outside the start menu.
     PanelWindow {
         visible: bar.menuOpen
         anchors { top: true; bottom: true; left: true; right: true }
