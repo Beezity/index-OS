@@ -98,9 +98,9 @@ QTCONF
 done
 
 [[ -x "$INDEX_ROOT/labwc/app-fixes/apply-browser-fixes.sh" ]] && "$INDEX_ROOT/labwc/app-fixes/apply-browser-fixes.sh"
-mkdir -p "$HOME/.local/bin"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"; xdg-user-dirs-update; mkdir -p "$HOME/Pictures"
+mkdir -p "$HOME/.local/bin"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"; install -m755 "$INDEX_ROOT/scripts/index-doctor" "$HOME/.local/bin/index-doctor"; xdg-user-dirs-update; mkdir -p "$HOME/Pictures"
 setdef(){ local bin="$1" desktop="$2"; shift 2; command -v "$bin" >/dev/null || return 0; local m; for m in "$@"; do xdg-mime default "$desktop" "$m"; done; }
 setdef thunar thunar.desktop inode/directory; setdef foot foot.desktop text/plain text/x-shellscript application/x-shellscript; setdef imv imv.desktop image/png image/jpeg image/gif image/webp image/bmp image/tiff; setdef mpv mpv.desktop video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo audio/mpeg audio/flac audio/ogg audio/wav audio/x-wav; setdef zathura org.pwmt.zathura.desktop application/pdf application/epub+zip; setdef file-roller "$INDEX_FILE_ROLLER_DESKTOP" application/zip application/x-tar application/gzip application/x-7z-compressed application/vnd.rar; unset -f setdef
 
 bash "$SCRIPT_DIR/validate.sh"
-printf '\n%s:: done.%s\n%s   %s\n   Foot launches the Index-themed Fish shell; your account login shell is unchanged.\n   No autologin, bootloader, kernel-command-line, or silent-boot changes were made.\n\n   You can still start THE INDEX from a TTY with:\n     dbus-run-session labwc\n%s%s\n' "$CYAN" "$NC" "$DIM" "$INDEX_COMPLETION_FIRST_LINE" "$INDEX_COMPLETION_EXTRA" "$NC"
+printf '\n%s:: done.%s\n%s   %s\n   Foot launches the Index-themed Fish shell; your account login shell is unchanged.\n   Run index-doctor from any terminal to check the installation.\n   No autologin, bootloader, kernel-command-line, or silent-boot changes were made.\n\n   You can still start THE INDEX from a TTY with:\n     dbus-run-session labwc\n%s%s\n' "$CYAN" "$NC" "$DIM" "$INDEX_COMPLETION_FIRST_LINE" "$INDEX_COMPLETION_EXTRA" "$NC"

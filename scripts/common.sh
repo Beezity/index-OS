@@ -24,7 +24,7 @@ INDEX_REQUIRED_FILES=(
   labwc/theme/the-index/labwc/themerc
   labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme
   labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps labwc/session/the-index.desktop
-  fish/config.fish install-fish.sh
+  fish/config.fish install-fish.sh scripts/index-doctor
 )
 validate_repository_layout(){
   local rel
