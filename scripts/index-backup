@@ -45,7 +45,8 @@ for path in \
   "$HOME/.local/share/icons/default/index.theme" \
   "$HOME/.local/bin/index-default-apps" "$HOME/.local/bin/index-snip" "$HOME/.local/bin/index-doctor" \
   "$HOME/.local/bin/index-backup" "$HOME/.local/bin/index-restore" \
-  /usr/share/wayland-sessions/the-index.desktop; do
+  /usr/share/wayland-sessions/the-index.desktop \
+  /etc/apt/sources.list.d/index-os-trixie-backports.sources; do
   record "$path"
 done
 
