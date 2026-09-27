@@ -2,10 +2,9 @@
 set -Eeuo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Keep the desktop installer and privileged display-manager installer separated
-# internally, while providing one command for a fresh Arch installation.
+# Install the Index desktop only. Login remains the normal Arch TTY flow.
 bash "$DIR/install.sh"
-bash "$DIR/greeter/install.sh"
 
 echo
-echo "THE INDEX installation is complete. Reboot to enter the Index greeter."
+echo "THE INDEX installation is complete."
+echo "Log in on a TTY and start it with: dbus-run-session labwc"

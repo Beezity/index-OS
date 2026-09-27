@@ -1,5 +1,0 @@
-#!/bin/sh
-# Minimal compositor session used only to host ReGreet.
-# greetd runs this as the unprivileged greeter account.
-
-exec regreet --config /etc/greetd/regreet.toml
