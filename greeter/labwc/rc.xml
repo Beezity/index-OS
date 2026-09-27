@@ -7,13 +7,8 @@
   <theme>
     <name>the-index</name>
   </theme>
-  <keyboard>
-    <!-- Keep VT switching available as the recovery path. No application,
-         shell, logout or compositor-control bindings are exposed here. -->
-    <keybind key="C-A-F2"><action name="VirtualTerminal"><to>2</to></action></keybind>
-    <keybind key="C-A-F3"><action name="VirtualTerminal"><to>3</to></action></keybind>
-    <keybind key="C-A-F4"><action name="VirtualTerminal"><to>4</to></action></keybind>
-    <keybind key="C-A-F5"><action name="VirtualTerminal"><to>5</to></action></keybind>
-    <keybind key="C-A-F6"><action name="VirtualTerminal"><to>6</to></action></keybind>
-  </keyboard>
+  <!-- Intentionally no compositor keybindings on the login screen. VT
+       switching is handled outside labwc, so these bindings are unnecessary;
+       keeping the section empty also avoids exposing launchers or commands. -->
+  <keyboard />
 </labwc_config>
