@@ -23,14 +23,14 @@ PanelWindow {
 
     Text {
         anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 14
-        text: "// THE INDEX · district: unregistered"
+        text: "// THE INDEX - district: unregistered"
         font.family: atmo.pixel; font.pixelSize: 13
         color: atmo.cyanD
         renderType: Text.NativeRendering
     }
     Text {
         anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 14
-        text: "… I hear the waves."
+        text: "... I hear the waves."
         font.family: atmo.pixel; font.pixelSize: 13
         color: "#FF6B6B"
         renderType: Text.NativeRendering
