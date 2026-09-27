@@ -6,6 +6,7 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 
 PanelWindow {
@@ -20,10 +21,23 @@ PanelWindow {
     readonly property color cyan: "#5DADE2"
     readonly property color cyanB: "#85C5E8"
     readonly property color cyanD: "#3A7CA5"
+    property string hostname: "unknown"
+
+    Process {
+        running: true
+        command: ["hostname"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var value = text.trim()
+                if (value.length > 0)
+                    atmo.hostname = value
+            }
+        }
+    }
 
     Text {
         anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 14
-        text: "// THE INDEX - district: unregistered"
+        text: "// THE INDEX - district: " + atmo.hostname
         font.family: atmo.pixel; font.pixelSize: 13
         color: atmo.cyanD
         renderType: Text.NativeRendering
