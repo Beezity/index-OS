@@ -42,10 +42,9 @@ PACKAGES=(
   networkmanager nm-connection-editor bluez bluez-utils blueman
   pipewire pipewire-pulse wireplumber ffmpeg gst-libav gst-plugins-good
   qt6-multimedia qt6-svg qt6-declarative qt6-wayland qt6ct qt5ct gnome-themes-extra
-  fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt
   brightnessctl upower gammastep gnome-power-manager
   ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra
-  papirus-icon-theme capitaine-cursors
+  capitaine-cursors
   cups cups-pdf system-config-printer
   flatpak
   git pciutils libxml2 util-linux
@@ -85,11 +84,9 @@ shopt -u nullglob
 cp -f "$DIR/labwc/config/fontconfig/fonts.conf" "$CFG/fontconfig/fonts.conf"
 fc-cache -f >/dev/null
 
-say "configuring desktop icon and cursor themes..."
-ICON_THEME="Papirus-Dark"
+say "configuring cursor theme..."
 CURSOR_THEME="capitaine-cursors"
 CURSOR_SIZE=24
-[[ -d "/usr/share/icons/$ICON_THEME" ]] || { bad "icon theme missing after installation: $ICON_THEME"; exit 1; }
 [[ -d "/usr/share/icons/$CURSOR_THEME/cursors" ]] || { bad "cursor theme missing after installation: $CURSOR_THEME"; exit 1; }
 mkdir -p "$HOME/.local/share/icons/default"
 cat > "$HOME/.local/share/icons/default/index.theme" <<CURSORCONF
@@ -128,8 +125,8 @@ cp -f "$DIR/labwc/config/gtk/settings.ini" "$CFG/gtk-4.0/settings.ini"
 cp -f "$DIR/labwc/theme/the-index-gtk/gtk-3.0/gtk.css" "$CFG/gtk-3.0/gtk.css"
 cp -f "$DIR/labwc/theme/the-index-gtk/gtk-4.0/gtk.css" "$CFG/gtk-4.0/gtk.css"
 for gtk_settings in "$CFG/gtk-3.0/settings.ini" "$CFG/gtk-4.0/settings.ini"; do
-  sed -i '/^gtk-icon-theme-name=/d;/^gtk-cursor-theme-name=/d;/^gtk-cursor-theme-size=/d' "$gtk_settings"
-  printf 'gtk-icon-theme-name=%s\ngtk-cursor-theme-name=%s\ngtk-cursor-theme-size=%s\n' "$ICON_THEME" "$CURSOR_THEME" "$CURSOR_SIZE" >> "$gtk_settings"
+  sed -i '/^gtk-cursor-theme-name=/d;/^gtk-cursor-theme-size=/d' "$gtk_settings"
+  printf 'gtk-cursor-theme-name=%s\ngtk-cursor-theme-size=%s\n' "$CURSOR_THEME" "$CURSOR_SIZE" >> "$gtk_settings"
 done
 
 say "installing Quickshell configuration..."
@@ -184,7 +181,6 @@ for V in qt6ct qt5ct; do
 [Appearance]
 color_scheme_path=$HOME/.config/$V/colors/the-index.conf
 custom_palette=true
-icon_theme=$ICON_THEME
 standard_dialogs=default
 style=Fusion
 [Fonts]
@@ -229,7 +225,6 @@ chk "$CFG/quickshell/shell.qml" "Quickshell shell"
 chk "$CFG/quickshell/Bar.qml" "top bar"
 chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"
 chk "$CFG/foot/foot.ini" "Foot config"
-chk "/usr/share/icons/$ICON_THEME/index.theme" "Papirus-Dark icon theme"
 chk "$HOME/.local/share/icons/default/index.theme" "default cursor theme"
 (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
 
