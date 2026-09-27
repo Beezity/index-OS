@@ -4,6 +4,7 @@ Atmosphere 1.0 Atmosphere.qml
 Notifications 1.0 Notifications.qml
 Osd 1.0 Osd.qml
 BluetoothMenu 1.0 BluetoothMenu.qml
+SettingsPanel 1.0 SettingsPanel.qml
 Settings 1.0 Settings.qml
 Calendar 1.0 Calendar.qml
 Prescript 1.0 Prescript.qml
