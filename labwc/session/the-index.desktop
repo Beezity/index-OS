@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=THE INDEX
+Comment=WILL OF THE CITY :: THE INDEX
+Exec=/usr/bin/labwc
+TryExec=/usr/bin/labwc
+Type=Application
+DesktopNames=labwc;wlroots
+X-GDM-SessionRegisters=true
+X-GDM-CanRunHeadless=true

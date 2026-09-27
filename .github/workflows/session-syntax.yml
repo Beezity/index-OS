@@ -1,0 +1,18 @@
+name: Session installer syntax
+
+on:
+  pull_request:
+    paths:
+      - 'install.sh'
+      - 'install-fedora.sh'
+      - 'labwc/session/**'
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check installer shell syntax
+        run: bash -n install.sh install-fedora.sh
+      - name: Check session entry
+        run: grep -q '^Exec=/usr/bin/labwc$' labwc/session/the-index.desktop
