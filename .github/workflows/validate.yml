@@ -1,0 +1,66 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y shellcheck libxml2-utils
+
+      - name: Check installer syntax
+        run: bash -n install.sh
+
+      - name: Shellcheck scripts
+        run: |
+          shellcheck install.sh \
+            labwc/config/autostart \
+            labwc/config/index-lock \
+            labwc/config/index-idle \
+            labwc/config/index-input \
+            labwc/config/index-clip \
+            labwc/config/index-display-save \
+            labwc/config/index-display-restore \
+            labwc/config/index-logout \
+            labwc/app-fixes/index-snip \
+            labwc/app-fixes/index-default-apps \
+            labwc/app-fixes/apply-browser-fixes.sh
+
+      - name: Validate XML
+        run: |
+          xmllint --noout labwc/config/rc.xml
+          xmllint --noout labwc/config/menu.xml
+          xmllint --noout labwc/config/fontconfig/fonts.conf
+
+      - name: Check required repository assets
+        run: |
+          files=(
+            wallpaper/the-index.png
+            quickshell/shell.qml quickshell/Bar.qml quickshell/lock/lock.qml quickshell/prescript.json
+            labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment
+            labwc/config/index-lock labwc/config/index-idle labwc/config/index-input
+            labwc/theme/the-index/labwc/themerc
+            labwc/theme/the-index/labwc/close.xbm
+            labwc/theme/the-index/labwc/iconify.xbm
+            labwc/theme/the-index/labwc/max.xbm
+            labwc/theme/the-index-gtk/gtk-3.0/gtk.css
+            labwc/theme/the-index-gtk/gtk-4.0/gtk.css
+            labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf
+            labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps
+          )
+          for f in "${files[@]}"; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
+
+      - name: Reject stale compositor/install references
+        run: |
+          if grep -RniE 'hyprland|hypridle|quickshell-git|tty1 autologin|GRUB_CMDLINE' README.md quickshell labwc install.sh; then
+            echo 'stale compositor or boot-modification reference found'
+            exit 1
+          fi
