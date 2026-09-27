@@ -1,10 +1,7 @@
 // ============================================================
-//  WILL OF THE CITY :: THE INDEX  —  atmosphere (quickshell)
-//  Full-screen BACKGROUND layer: drifting cyan motes + a
-//  subtitle ticker, drawn over the wallpaper, behind windows.
-//  This replicates the HTML preview's living atmosphere.
-//  NOTE: a full-screen surface — needs real GPU (won't render
-//  under VirtualBox, same GBM limit as the wallpaper).
+//  WILL OF THE CITY :: THE INDEX — atmosphere
+//  Full-screen background layer: drifting cyan motes, glow and
+//  subtitle ticker over the wallpaper, behind normal windows.
 // ============================================================
 
 import QtQuick
@@ -20,25 +17,32 @@ PanelWindow {
     WlrLayershell.namespace: "index-atmosphere"
 
     readonly property string pixel: "Perfect DOS VGA 437 Universal"
+    readonly property color cyan: "#5DADE2"
+    readonly property color cyanB: "#85C5E8"
+    readonly property color cyanD: "#3A7CA5"
 
-    // ---- corner HUD (matches the preview corners) ----
     Text {
         anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 14
-        text: "// THE INDEX \u00b7 district: unregistered"
-        font.family: atmo.pixel; font.pixelSize: 13; color: "#3A7CA5"
+        text: "// THE INDEX · district: unregistered"
+        font.family: atmo.pixel; font.pixelSize: 13
+        color: atmo.cyanD
+        renderType: Text.NativeRendering
     }
     Text {
         anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 14
         text: "… I hear the waves."
-        font.family: atmo.pixel; font.pixelSize: 13; color: "#FF6B6B"
+        font.family: atmo.pixel; font.pixelSize: 13
+        color: "#FF6B6B"
+        renderType: Text.NativeRendering
     }
     Text {
         anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 14
         text: "> standby_"
-        font.family: atmo.pixel; font.pixelSize: 13; color: "#3A7CA5"
+        font.family: atmo.pixel; font.pixelSize: 13
+        color: atmo.cyanD
+        renderType: Text.NativeRendering
     }
 
-    // ---- drifting cyan motes ----
     Canvas {
         id: cv
         anchors.fill: parent
@@ -73,22 +77,22 @@ PanelWindow {
         Timer { interval: 33; running: true; repeat: true; onTriggered: cv.requestPaint() }
     }
 
-    // ---- breathing glow ----
     Rectangle {
         anchors.centerIn: parent
-        width: 640; height: 640; radius: 320
+        width: Math.min(640, parent.width * 0.5)
+        height: width
+        radius: width / 2
         gradient: Gradient {
-            GradientStop { position: 0.0; color: "#1a5DADE2" }
+            GradientStop { position: 0.0; color: "#145DADE2" }
             GradientStop { position: 1.0; color: "transparent" }
         }
         SequentialAnimation on opacity {
             loops: Animation.Infinite
-            NumberAnimation { from: 0.4; to: 1.0; duration: 2500; easing.type: Easing.InOutSine }
-            NumberAnimation { from: 1.0; to: 0.4; duration: 2500; easing.type: Easing.InOutSine }
+            NumberAnimation { from: 0.35; to: 0.75; duration: 2500; easing.type: Easing.InOutSine }
+            NumberAnimation { from: 0.75; to: 0.35; duration: 2500; easing.type: Easing.InOutSine }
         }
     }
 
-    // ---- subtitle ticker ----
     Column {
         id: ticker
         anchors.horizontalCenter: parent.horizontalCenter
@@ -107,18 +111,23 @@ PanelWindow {
         Text {
             id: subMain
             anchors.horizontalCenter: parent.horizontalCenter
-            font.family: "Perfect DOS VGA 437 Universal"; font.pixelSize: 21
-            color: "#e8f4fa"
+            font.family: atmo.pixel; font.pixelSize: 19
+            font.kerning: false
+            color: "#f0f8fc"
             opacity: 0
-            style: Text.Raised; styleColor: "#0a5DADE2"
+            renderType: Text.NativeRendering
+            style: Text.Raised
+            styleColor: "#3A7CA5"
             Behavior on opacity { NumberAnimation { duration: 600 } }
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: "// THE INDEX"
-            font.family: "Perfect DOS VGA 437 Universal"; font.pixelSize: 14
-            color: "#3A7CA5"
+            font.family: atmo.pixel; font.pixelSize: 13
+            font.kerning: false
+            color: atmo.cyan
             opacity: subMain.opacity
+            renderType: Text.NativeRendering
         }
 
         Timer {
@@ -129,8 +138,8 @@ PanelWindow {
             id: swap; interval: 650
             onTriggered: {
                 subMain.text = ticker.lines[ticker.idx];
-                subMain.opacity = 1;
-                ticker.idx = (ticker.idx + 1) % ticker.lines.length;
+                subMain.opacity = 1
+                ticker.idx = (ticker.idx + 1) % ticker.lines.length
             }
         }
     }

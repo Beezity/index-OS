@@ -44,9 +44,10 @@ jobs:
         run: |
           files=(
             wallpaper/the-index.png
-            quickshell/shell.qml quickshell/Bar.qml quickshell/lock/lock.qml quickshell/prescript.json
+            quickshell/shell.qml quickshell/Bar.qml quickshell/Atmosphere.qml quickshell/lock/lock.qml quickshell/prescript.json
             labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment
             labwc/config/index-lock labwc/config/index-idle labwc/config/index-input
+            labwc/config/fontconfig/fonts.conf
             labwc/theme/the-index/labwc/themerc
             labwc/theme/the-index/labwc/close.xbm
             labwc/theme/the-index/labwc/iconify.xbm
@@ -55,8 +56,38 @@ jobs:
             labwc/theme/the-index-gtk/gtk-4.0/gtk.css
             labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf
             labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps
+            assets/PerfectDOSVGA437-Universal.ttf
           )
           for f in "${files[@]}"; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
+
+      - name: Check Quickshell component registry
+        run: |
+          while read -r first second third fourth; do
+            # qmldir syntax used here is either:
+            #   Component 1.0 Component.qml
+            #   singleton Component 1.0 Component.qml
+            [ -n "$first" ] || continue
+            case "$first" in \#*) continue ;; esac
+
+            if [ "$first" = "singleton" ]; then
+              file="$fourth"
+            else
+              file="$third"
+            fi
+
+            [ -n "$file" ] || { echo "invalid qmldir entry: $first $second $third $fourth"; exit 1; }
+            test -s "quickshell/$file" || { echo "qmldir references missing file: $file"; exit 1; }
+          done < quickshell/qmldir
+
+      - name: Check Index font naming consistency
+        run: |
+          if grep -RIn --include='*.qml' --include='*.ini' --include='*.xml' \
+               'Perfect DOS VGA 437 Universal' quickshell labwc >/dev/null; then
+            :
+          else
+            echo 'Index font family is no longer referenced by desktop configuration'
+            exit 1
+          fi
 
       - name: Reject removed boot behavior in installer
         run: |
