@@ -1,7 +1,6 @@
 # WILL OF THE CITY :: THE INDEX — Fish
 
 if status is-interactive
-    # Keep the palette aligned with the Index desktop and Foot theme.
     set -g fish_color_normal 85C5E8
     set -g fish_color_command FFFFFF
     set -g fish_color_keyword 5DADE2
@@ -18,7 +17,6 @@ if status is-interactive
     set -g fish_color_autosuggestion 3A7CA5
     set -g fish_color_cancel FF6B6B
 
-    # Fastfetch is intentionally limited to interactive Fish sessions.
     if command -q fastfetch
         fastfetch
     end
@@ -32,19 +30,19 @@ end
 
 function __index_git_segment
     command -q git; or return
-    set -l root (command git rev-parse --show-toplevel 2>/dev/null); or return
+    command git rev-parse --is-inside-work-tree >/dev/null 2>&1; or return
+
     set -l branch (command git symbolic-ref --quiet --short HEAD 2>/dev/null)
     if test -z "$branch"
         set branch (command git rev-parse --short HEAD 2>/dev/null)
     end
     test -n "$branch"; or return
 
-    set -l dirty ''
-    if test -n (command git status --porcelain --untracked-files=normal 2>/dev/null)
-        set dirty '*'
+    set -l dirty (command git status --porcelain --untracked-files=normal 2>/dev/null | string collect)
+    if test -n "$dirty"
+        set branch "$branch*"
     end
-
-    printf '%s%s' "$branch" "$dirty"
+    printf '%s' "$branch"
 end
 
 function fish_prompt
@@ -61,7 +59,6 @@ function fish_prompt
     printf '%s' (prompt_hostname)
     set_color 5DADE2
     printf ' ] :: '
-
     set_color 85C5E8
     printf '%s' (prompt_pwd)
 
