@@ -58,9 +58,9 @@ jobs:
           )
           for f in "${files[@]}"; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
 
-      - name: Reject removed boot behavior
+      - name: Reject removed boot behavior in installer
         run: |
-          if grep -niE 'tty1 autologin|GRUB_CMDLINE|/etc/kernel/cmdline|limine|systemd-boot' README.md install.sh; then
-            echo 'removed boot/autologin behavior was reintroduced'
+          if grep -niE 'autologin\.conf|GRUB_CMDLINE|/etc/kernel/cmdline|/boot/loader/entries|/boot/limine|mkinitcpio|/etc/issue' install.sh; then
+            echo 'removed boot/autologin behavior was reintroduced into install.sh'
             exit 1
           fi
