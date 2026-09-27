@@ -18,16 +18,16 @@ jobs:
 
       - name: Check installer syntax
         run: |
-          bash -n install.sh install-fedora.sh install-fish.sh setup.sh remove-display-manager.sh
+          bash -n install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh
           bash -n scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore
-          bash -n scripts/distro/arch.sh scripts/distro/fedora.sh
+          bash -n scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
           fish -n fish/config.fish
 
       - name: Shellcheck scripts
         run: |
-          shellcheck --severity=error install.sh install-fedora.sh install-fish.sh setup.sh remove-display-manager.sh \
+          shellcheck --severity=error install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh \
             scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore \
-            scripts/distro/arch.sh scripts/distro/fedora.sh \
+            scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh \
             labwc/config/autostart labwc/config/index-lock labwc/config/index-idle \
             labwc/config/index-input labwc/config/index-clip \
             labwc/config/index-display-save labwc/config/index-display-restore \
@@ -52,14 +52,14 @@ jobs:
             labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css
             labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf
             labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps
-            assets/PerfectDOSVGA437-Universal.ttf install.sh install-fedora.sh install-fish.sh setup.sh remove-display-manager.sh
-            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/distro/arch.sh scripts/distro/fedora.sh
+            assets/PerfectDOSVGA437-Universal.ttf install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh
+            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
           )
           for f in "${files[@]}"; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
 
       - name: Reject legacy display manager installation
         run: |
-          if grep -nEi 'greetd|regreet|greeter/install\.sh' setup.sh install.sh install-fedora.sh scripts/*.sh scripts/distro/*.sh; then
+          if grep -nEi 'greetd|regreet|greeter/install\.sh' setup.sh install.sh install-fedora.sh install-debian.sh scripts/*.sh scripts/distro/*.sh; then
             echo 'legacy display-manager installation was reintroduced into the default setup'
             exit 1
           fi
@@ -83,7 +83,7 @@ jobs:
 
       - name: Reject removed boot behavior in installers
         run: |
-          if grep -niE 'autologin\.conf|GRUB_CMDLINE|/etc/kernel/cmdline|/boot/loader/entries|/boot/limine|mkinitcpio|/etc/issue' install.sh install-fedora.sh setup.sh scripts/*.sh scripts/distro/*.sh; then
+          if grep -niE 'autologin\.conf|GRUB_CMDLINE|/etc/kernel/cmdline|/boot/loader/entries|/boot/limine|mkinitcpio|/etc/issue' install.sh install-fedora.sh install-debian.sh setup.sh scripts/*.sh scripts/distro/*.sh; then
             echo 'removed boot/autologin behavior was reintroduced'
             exit 1
           fi
