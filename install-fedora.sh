@@ -30,7 +30,7 @@ PACKAGES=(
   dejavu-sans-fonts liberation-fonts-all google-noto-fonts-all
   papirus-icon-theme papirus-icon-theme-dark
   cups cups-pdf system-config-printer flatpak git pciutils libxml2 util-linux
-  inkscape xorg-x11-apps bc
+  inkscape xcursorgen bc
 )
 sudo dnf -y install "${PACKAGES[@]}"
 ok "official Fedora dependencies installed"
