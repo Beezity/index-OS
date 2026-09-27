@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Distro adapters back up before package- or distro-specific file changes. The shared
+# installer calls this helper defensively as well, so skip that second snapshot.
+if [[ "${INDEX_BACKUP_DONE:-0}" == 1 ]]; then exit 0; fi
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/index-os"
+BACKUP_ROOT="$STATE_DIR/backups"
+STAMP="$(date '+%Y%m%d-%H%M%S')-$$"
+DEST="$BACKUP_ROOT/$STAMP"
+MANIFEST="$DEST/manifest"
+
+mkdir -p "$DEST/files"
+: > "$MANIFEST"
+
+record(){
+  local path="$1" rel
+  if [[ -e "$path" || -L "$path" ]]; then
+    rel="${path#/}"
+    mkdir -p "$DEST/files/$(dirname "$rel")"
+    cp -a "$path" "$DEST/files/$rel"
+    printf 'present\t%s\n' "$path" >> "$MANIFEST"
+  else
+    printf 'missing\t%s\n' "$path" >> "$MANIFEST"
+  fi
+}
+
+record "$HOME/.config/labwc"
+record "$HOME/.config/quickshell"
+record "$HOME/.config/fastfetch"
+record "$HOME/.local/share/themes/the-index"
+
+for path in \
+  "$HOME/.config/fontconfig/fonts.conf" \
+  "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-3.0/gtk.css" \
+  "$HOME/.config/gtk-4.0/settings.ini" "$HOME/.config/gtk-4.0/gtk.css" \
+  "$HOME/.config/wofi/config" "$HOME/.config/wofi/style.css" \
+  "$HOME/.config/foot/foot.ini" "$HOME/.config/fish/config.fish" \
+  "$HOME/.config/xdg-desktop-portal/labwc-portals.conf" "$HOME/.config/xdg-desktop-portal/wlr/config" \
+  "$HOME/.config/qt5ct/qt5ct.conf" "$HOME/.config/qt5ct/colors/the-index.conf" \
+  "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt6ct/colors/the-index.conf" \
+  "$HOME/.config/environment.d/60-index-browsers.conf" \
+  "$HOME/.config/mimeapps.list" "$HOME/.config/user-dirs.dirs" "$HOME/.config/user-dirs.locale" \
+  "$HOME/.local/share/icons/default/index.theme" \
+  "$HOME/.local/bin/index-default-apps" "$HOME/.local/bin/index-snip" "$HOME/.local/bin/index-doctor" \
+  "$HOME/.local/bin/index-backup" "$HOME/.local/bin/index-restore" \
+  /usr/share/wayland-sessions/the-index.desktop; do
+  record "$path"
+done
+
+record "$HOME/.local/share/icons/capitaine-cursors"
+
+for font in \
+  MotivaSans-Regular.ttf \
+  PerfectDOSVGA437-Thai-v2.ttf \
+  PerfectDOSVGA437-Universal.ttf \
+  PerfectDOSVGA437.ttf \
+  gallant12x22.ttf \
+  norwester.otf; do
+  record "$HOME/.local/share/fonts/$font"
+done
+
+ln -sfn "$STAMP" "$BACKUP_ROOT/latest"
+printf '%s\n' "$STAMP" > "$STATE_DIR/last-backup"
+printf 'Index backup created: %s\n' "$DEST"
+printf 'Restore with: index-restore %s\n' "$STAMP"
