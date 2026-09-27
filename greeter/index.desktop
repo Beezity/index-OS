@@ -1,7 +1,0 @@
-[Desktop Entry]
-Name=THE INDEX
-Comment=WILL OF THE CITY :: THE INDEX
-Exec=/usr/local/bin/index-session
-TryExec=/usr/local/bin/index-session
-Type=Application
-DesktopNames=labwc
