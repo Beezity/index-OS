@@ -34,6 +34,13 @@ else
   : > "$MARKER"
 fi
 
+# Match the main shell's VMware workaround. VMware SVGA3D works for labwc/Mesa
+# but Qt Quick's Wayland EGL swap path can fail, including on the lock surface.
+if { [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi 'vmware' /sys/class/dmi/id/sys_vendor; } || \
+   { command -v systemd-detect-virt >/dev/null 2>&1 && [ "$(systemd-detect-virt 2>/dev/null || true)" = "vmware" ]; }; then
+  export QT_QUICK_BACKEND=software
+fi
+
 # Do not retry a crashed session-lock process. Once ext-session-lock has been
 # acquired, a compositor intentionally keeps the session locked if the client
 # dies; repeated launches only hide the real failure.
