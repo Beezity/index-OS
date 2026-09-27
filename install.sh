@@ -26,7 +26,7 @@ required_files=(
   labwc/theme/the-index/labwc/themerc
   labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme
   labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps
-  labwc/session/the-index.desktop
+  labwc/session/the-index.desktop fish/config.fish install-fish.sh
 )
 for rel in "${required_files[@]}"; do
   [[ -f "$DIR/$rel" ]] || { bad "repository file missing: $rel"; exit 1; }
@@ -37,7 +37,7 @@ say "installing dependencies..."
 PACKAGES=(
   labwc quickshell xorg-xwayland gdm
   swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
-  foot wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
+  foot fish wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
   xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex libnotify playerctl polkit-gnome udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
   networkmanager nm-connection-editor bluez bluez-utils blueman
   pipewire pipewire-pulse wireplumber ffmpeg gst-libav gst-plugins-good
@@ -52,7 +52,7 @@ PACKAGES=(
 sudo pacman -Syu --needed --noconfirm "${PACKAGES[@]}"
 ok "all dependencies installed"
 
-for cmd in labwc quickshell swaybg swayidle foot wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do
+for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do
   command -v "$cmd" >/dev/null 2>&1 || { bad "required command missing after installation: $cmd"; exit 1; }
 done
 
@@ -136,6 +136,9 @@ say "installing application configuration..."
 mkdir -p "$CFG/wofi" "$CFG/fastfetch" "$CFG/foot"
 cp -f "$DIR/wofi/config" "$CFG/wofi/config"; cp -f "$DIR/wofi/style.css" "$CFG/wofi/style.css"; cp -rf "$DIR/fastfetch/." "$CFG/fastfetch/"; cp -f "$DIR/labwc/config/foot.ini" "$CFG/foot/foot.ini"
 
+say "configuring Fish shell..."
+bash "$DIR/install-fish.sh"
+
 say "configuring desktop portals..."
 mkdir -p "$CFG/xdg-desktop-portal/wlr"
 cp -f "$DIR/labwc/config/portal/labwc-portals.conf" "$CFG/xdg-desktop-portal/labwc-portals.conf"; cp -f "$DIR/labwc/config/portal/wlr.conf" "$CFG/xdg-desktop-portal/wlr/config"
@@ -189,6 +192,7 @@ chk "$CFG/quickshell/shell.qml" "Quickshell shell"
 chk "$CFG/quickshell/Bar.qml" "top bar"
 chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"
 chk "$CFG/foot/foot.ini" "Foot config"
+chk "$CFG/fish/config.fish" "Fish config"
 chk "/usr/share/icons/$ICON_THEME/index.theme" "Papirus-Dark icon theme"
 chk "$HOME/.local/share/icons/default/index.theme" "default cursor theme"
 chk "/usr/share/wayland-sessions/the-index.desktop" "GDM THE INDEX session"
@@ -199,6 +203,7 @@ cat <<DONE
 
 ${CYAN}:: done.${NC}
 ${DIM}   GDM is installed and enabled. Reboot to log in and select THE INDEX from GDM's session menu.
+   Foot launches the Index-themed Fish shell; your account login shell is unchanged.
    No autologin, bootloader, kernel-command-line, or silent-boot changes were made.
 
    You can still start THE INDEX from a TTY with:
