@@ -15,6 +15,6 @@ CAPITAINE_SRC="$CAPITAINE_TMP/capitaine-cursors"; for cmd in inkscape xcursorgen
 for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do require_command "$cmd"; done
 QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"; [[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }; ok "Quickshell $QS_VERSION"; sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service; sudo systemctl enable gdm.service
 export INDEX_DEX_COMMAND="dex-autostart" INDEX_POLKIT_AGENT="/usr/libexec/kf6/polkit-kde-authentication-agent-1" INDEX_CURSOR_ROOT="$DATA/icons/capitaine-cursors" INDEX_FILE_ROLLER_DESKTOP="org.gnome.FileRoller.desktop"
-export INDEX_REQUIRE_CURSOR_INDEX=1 INDEX_VALIDATE_TITLEBAR_BUTTONS=0 INDEX_COMPLETION_EXTRA=""
+export INDEX_REQUIRE_CURSOR_INDEX=1 INDEX_VALIDATE_CURSOR_ROOT=1 INDEX_VALIDATE_TITLEBAR_BUTTONS=0 INDEX_COMPLETION_EXTRA=""
 export INDEX_COMPLETION_FIRST_LINE="Fedora $FEDORA_VERSION installation complete. GDM is installed and enabled. Reboot to log in and select THE INDEX from GDM's session menu."
 exec bash "$SCRIPT_DIR/install-common.sh"
