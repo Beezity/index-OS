@@ -3,7 +3,6 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INDEX_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"; export INDEX_ROOT
-# shellcheck source=../common.sh
 source "$SCRIPT_DIR/common.sh"
 trap 'bad "installation failed at line $LINENO"; exit 1' ERR
 
@@ -13,6 +12,7 @@ command -v dnf >/dev/null 2>&1 || { bad "Fedora Linux with dnf is required."; ex
 FEDORA_VERSION="$(rpm -E %fedora)"; [[ "$FEDORA_VERSION" =~ ^[0-9]+$ ]] || { bad "could not determine Fedora release"; exit 1; }
 (( FEDORA_VERSION >= 43 )) || { bad "Fedora 43 or newer is required; detected Fedora $FEDORA_VERSION"; exit 1; }
 note "detected Fedora $FEDORA_VERSION"
+validate_repository_layout
 
 say "installing Fedora dependencies..."
 PACKAGES=(
