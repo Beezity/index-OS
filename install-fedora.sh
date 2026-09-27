@@ -17,30 +17,48 @@ required_files=(wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml 
 for rel in "${required_files[@]}"; do [[ -f "$DIR/$rel" ]] || { bad "repository file missing: $rel"; exit 1; }; done
 ok "repository layout validated"
 
-say "preparing Fedora repositories..."
-sudo dnf -y install dnf5-plugins || sudo dnf -y install dnf-plugins-core
-dnf copr --help >/dev/null 2>&1 || { bad "dnf COPR support is unavailable"; exit 1; }
-# Quickshell is not currently in Fedora's main repositories. nett00n/hyprland
-# publishes current Fedora builds. Capitaine upstream recommends tcg/themes.
-sudo dnf -y copr enable nett00n/hyprland
-sudo dnf -y copr enable tcg/themes
-
-say "installing dependencies..."
+say "installing Fedora dependencies..."
 PACKAGES=(
-  labwc labwc-session quickshell xorg-x11-server-Xwayland
+  labwc labwc-session xorg-x11-server-Xwayland
   swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
   foot wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-mupdf pavucontrol fastfetch
   xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex-autostart libnotify playerctl polkit-gnome udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
   NetworkManager NetworkManager-gnome bluez bluez-tools blueman
-  pipewire pipewire-pulseaudio wireplumber ffmpeg-free gstreamer1-plugins-good
+  pipewire pipewire-pulseaudio wireplumber ffmpeg-free gstreamer1-plugins-good gstreamer1-plugin-libav
   qt6-qtmultimedia qt6-qtsvg qt6-qtdeclarative qt6-qtwayland qt6ct qt5ct gnome-themes-extra
   brightnessctl upower gammastep gnome-power-manager
-  dejavu-sans-fonts liberation-fonts google-noto-emoji-fonts google-noto-sans-cjk-fonts
-  papirus-icon-theme papirus-icon-theme-dark la-capitaine-cursor-theme
+  dejavu-sans-fonts liberation-fonts-all google-noto-fonts-all
+  papirus-icon-theme papirus-icon-theme-dark
   cups cups-pdf system-config-printer flatpak git pciutils libxml2 util-linux
 )
 sudo dnf -y install "${PACKAGES[@]}"
-ok "all dependencies installed"
+ok "official Fedora dependencies installed"
+
+# Keep third-party repositories out of the main dependency transaction. They
+# are enabled only after Fedora's own packages have been installed.
+say "installing Quickshell and Capitaine..."
+sudo dnf -y install dnf5-plugins || sudo dnf -y install dnf-plugins-core
+dnf copr --help >/dev/null 2>&1 || { bad "DNF COPR support is unavailable; cannot install Quickshell/Capitaine."; exit 1; }
+
+if ! sudo dnf -y copr enable nett00n/hyprland; then
+  bad "could not enable nett00n/hyprland COPR for Fedora $FEDORA_VERSION; Quickshell is required"
+  exit 1
+fi
+if ! sudo dnf -y install quickshell; then
+  bad "Quickshell is unavailable from nett00n/hyprland for Fedora $FEDORA_VERSION"
+  exit 1
+fi
+
+if ! sudo dnf -y copr enable tcg/themes; then
+  bad "could not enable tcg/themes COPR for Fedora $FEDORA_VERSION; Capitaine is required"
+  exit 1
+fi
+if ! sudo dnf -y install la-capitaine-cursor-theme; then
+  bad "Capitaine cursor theme is unavailable from tcg/themes for Fedora $FEDORA_VERSION"
+  exit 1
+fi
+ok "Quickshell and Capitaine installed"
+
 for cmd in labwc quickshell swaybg swayidle foot wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do command -v "$cmd" >/dev/null 2>&1 || { bad "required command missing after installation: $cmd"; exit 1; }; done
 QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"; [[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }; ok "Quickshell $QS_VERSION"
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service
@@ -52,7 +70,17 @@ mkdir -p "$HOME/.local/share/fonts" "$CFG/fontconfig"; shopt -s nullglob; fonts=
 say "configuring icon and cursor themes..."
 ICON_THEME="Papirus-Dark"; CURSOR_THEME="capitaine-cursors"; CURSOR_SIZE=24
 [[ -f "/usr/share/icons/$ICON_THEME/index.theme" ]] || { bad "icon theme missing after installation: $ICON_THEME"; exit 1; }
-if [[ ! -d "/usr/share/icons/$CURSOR_THEME/cursors" ]]; then FEDORA_CURSOR_DIR="$(find /usr/share/icons -maxdepth 2 -type d -name cursors -path '*apitaine*' -print -quit 2>/dev/null | xargs -r dirname)"; [[ -n "$FEDORA_CURSOR_DIR" && -d "$FEDORA_CURSOR_DIR/cursors" ]] || { bad "Capitaine cursor theme missing after installation"; exit 1; }; mkdir -p "$HOME/.local/share/icons"; ln -sfn "$FEDORA_CURSOR_DIR" "$HOME/.local/share/icons/$CURSOR_THEME"; fi
+if [[ ! -d "/usr/share/icons/$CURSOR_THEME/cursors" ]]; then
+  FEDORA_CURSOR_DIR=""
+  while IFS= read -r cursor_dir; do
+    case "$cursor_dir" in
+      *[Cc]apitaine*) FEDORA_CURSOR_DIR="${cursor_dir%/cursors}"; break ;;
+    esac
+  done < <(find /usr/share/icons -maxdepth 2 -type d -name cursors -print 2>/dev/null)
+  [[ -n "$FEDORA_CURSOR_DIR" && -d "$FEDORA_CURSOR_DIR/cursors" ]] || { bad "Capitaine cursor theme missing after installation"; exit 1; }
+  mkdir -p "$HOME/.local/share/icons"
+  ln -sfn "$FEDORA_CURSOR_DIR" "$HOME/.local/share/icons/$CURSOR_THEME"
+fi
 CURSOR_ROOT="/usr/share/icons/$CURSOR_THEME"; [[ -d "$CURSOR_ROOT/cursors" ]] || CURSOR_ROOT="$HOME/.local/share/icons/$CURSOR_THEME"; [[ -d "$CURSOR_ROOT/cursors" ]] || { bad "could not configure Capitaine cursor theme"; exit 1; }
 mkdir -p "$HOME/.local/share/icons/default"; printf '[Icon Theme]\nInherits=%s\n' "$CURSOR_THEME" > "$HOME/.local/share/icons/default/index.theme"
 
