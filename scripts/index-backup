@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/index-os"
 BACKUP_ROOT="$STATE_DIR/backups"
-STAMP="$(date '+%Y%m%d-%H%M%S')"
+STAMP="$(date '+%Y%m%d-%H%M%S')-$$"
 DEST="$BACKUP_ROOT/$STAMP"
 MANIFEST="$DEST/manifest"
 
@@ -28,7 +28,7 @@ record "$HOME/.config/quickshell"
 record "$HOME/.config/fastfetch"
 record "$HOME/.local/share/themes/the-index"
 
-# Individual configuration files written inside otherwise user-owned directories.
+# Individual files written inside otherwise user-owned directories.
 for path in \
   "$HOME/.config/fontconfig/fonts.conf" \
   "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-3.0/gtk.css" \
@@ -42,22 +42,25 @@ for path in \
   "$HOME/.config/mimeapps.list" "$HOME/.config/user-dirs.dirs" "$HOME/.config/user-dirs.locale" \
   "$HOME/.local/share/icons/default/index.theme" \
   "$HOME/.local/bin/index-default-apps" "$HOME/.local/bin/index-snip" "$HOME/.local/bin/index-doctor" \
+  "$HOME/.local/bin/index-backup" "$HOME/.local/bin/index-restore" \
   /usr/share/wayland-sessions/the-index.desktop; do
   record "$path"
 done
 
-# Fedora installs Capitaine into the user's data directory. Arch owns it as a package,
-# so this target is normally absent there and restoration will leave the package alone.
+# Fedora installs Capitaine here; Arch normally gets it from the package manager.
 record "$HOME/.local/share/icons/capitaine-cursors"
 
-# Back up only the bundled font filenames that the installer can overwrite.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-shopt -s nullglob
-for src in "$REPO_ROOT"/assets/*.ttf "$REPO_ROOT"/assets/*.otf; do
-  record "$HOME/.local/share/fonts/$(basename "$src")"
+# Current bundled fonts. Keeping these explicit lets index-backup work after it has
+# been installed to ~/.local/bin and no longer lives beside the repository.
+for font in \
+  MotivaSans-Regular.ttf \
+  PerfectDOSVGA437-Thai-v2.ttf \
+  PerfectDOSVGA437-Universal.ttf \
+  PerfectDOSVGA437.ttf \
+  gallant12x22.ttf \
+  norwester.otf; do
+  record "$HOME/.local/share/fonts/$font"
 done
-shopt -u nullglob
 
 ln -sfn "$STAMP" "$BACKUP_ROOT/latest"
 printf '%s\n' "$STAMP" > "$STATE_DIR/last-backup"
