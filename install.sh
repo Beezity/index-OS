@@ -45,6 +45,7 @@ PACKAGES=(
   fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt
   brightnessctl upower gammastep gnome-power-manager
   ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra
+  capitaine-cursors
   cups cups-pdf system-config-printer
   flatpak
   git pciutils libxml2 util-linux
@@ -84,6 +85,16 @@ shopt -u nullglob
 cp -f "$DIR/labwc/config/fontconfig/fonts.conf" "$CFG/fontconfig/fonts.conf"
 fc-cache -f >/dev/null
 
+say "configuring cursor theme..."
+CURSOR_THEME="capitaine-cursors"
+CURSOR_SIZE=24
+[[ -d "/usr/share/icons/$CURSOR_THEME/cursors" ]] || { bad "cursor theme missing after installation: $CURSOR_THEME"; exit 1; }
+mkdir -p "$HOME/.local/share/icons/default"
+cat > "$HOME/.local/share/icons/default/index.theme" <<CURSORCONF
+[Icon Theme]
+Inherits=$CURSOR_THEME
+CURSORCONF
+
 say "installing labwc configuration..."
 rm -rf "$CFG/labwc"
 mkdir -p "$CFG/labwc"
@@ -92,6 +103,7 @@ cp -f "$DIR/labwc/config/menu.xml" "$CFG/labwc/menu.xml"
 cp -f "$DIR/labwc/config/autostart" "$CFG/labwc/autostart"
 cp -f "$DIR/labwc/config/environment" "$CFG/labwc/environment"
 cp -f "$DIR/wallpaper/the-index.png" "$CFG/labwc/wall.png"
+printf '\nXCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$CURSOR_THEME" "$CURSOR_SIZE" >> "$CFG/labwc/environment"
 [[ -f "$DIR/labwc/config/index.conf" ]] && cp -f "$DIR/labwc/config/index.conf" "$CFG/labwc/index.conf"
 for script in index-lock index-logout index-display-save index-display-restore index-idle index-input index-clip; do
   [[ -f "$DIR/labwc/config/$script" ]] || continue
@@ -113,6 +125,10 @@ cp -f "$DIR/labwc/config/gtk/settings.ini" "$CFG/gtk-3.0/settings.ini"
 cp -f "$DIR/labwc/config/gtk/settings.ini" "$CFG/gtk-4.0/settings.ini"
 cp -f "$DIR/labwc/theme/the-index-gtk/gtk-3.0/gtk.css" "$CFG/gtk-3.0/gtk.css"
 cp -f "$DIR/labwc/theme/the-index-gtk/gtk-4.0/gtk.css" "$CFG/gtk-4.0/gtk.css"
+for gtk_settings in "$CFG/gtk-3.0/settings.ini" "$CFG/gtk-4.0/settings.ini"; do
+  sed -i '/^gtk-cursor-theme-name=/d;/^gtk-cursor-theme-size=/d' "$gtk_settings"
+  printf 'gtk-cursor-theme-name=%s\ngtk-cursor-theme-size=%s\n' "$CURSOR_THEME" "$CURSOR_SIZE" >> "$gtk_settings"
+done
 
 say "installing Quickshell configuration..."
 SAVED_VID=""
@@ -210,6 +226,7 @@ chk "$CFG/quickshell/shell.qml" "Quickshell shell"
 chk "$CFG/quickshell/Bar.qml" "top bar"
 chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"
 chk "$CFG/foot/foot.ini" "Foot config"
+chk "$HOME/.local/share/icons/default/index.theme" "default cursor theme"
 (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
 
 cat <<DONE
