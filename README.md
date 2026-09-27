@@ -37,7 +37,7 @@ sudo pacman -S --needed git base-devel
 
 git clone https://github.com/Beezity/index-OS.git ~/index-OS
 cd ~/index-OS
-./install.sh
+bash ./install.sh
 ```
 
 The installer uses Arch's official repositories and installs every required
@@ -55,9 +55,20 @@ After installation, start the session from a TTY with:
 dbus-run-session labwc
 ```
 
-`./install.sh` can be rerun on the intended fresh/no-other-DE setup. It replaces
-this project's labwc and Quickshell configuration rather than merging arbitrary
-existing desktop configuration.
+`bash ./install.sh` can be rerun on the intended fresh/no-other-DE setup. It
+replaces this project's labwc and Quickshell configuration rather than merging
+arbitrary existing desktop configuration.
+
+### VMware guests
+
+VMware SVGA3D can expose working direct-rendered Mesa/OpenGL while Qt Quick's
+Wayland EGL swap path still fails with an EGL surface/protocol error. Index
+detects VMware guests and uses `QT_QUICK_BACKEND=software` for the Quickshell
+shell and lock only. labwc and the rest of the desktop keep using the normal
+Mesa/VMware graphics stack. No override is applied on physical hardware.
+
+For VMware guest integration, install and enable `open-vm-tools` separately if
+you want clipboard/host integration; it is not required by Index itself.
 
 ---
 
@@ -99,7 +110,7 @@ checks cannot reproduce every GPU, monitor, PAM or portal configuration.
 
 ## Make it yours
 
-Drop optional assets in `assets/`, then rerun `./install.sh`.
+Drop optional assets in `assets/`, then rerun `bash ./install.sh`.
 
 | File | What it changes |
 |---|---|
