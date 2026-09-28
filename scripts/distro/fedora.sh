@@ -11,7 +11,12 @@ PACKAGES=(labwc labwc-session xorg-x11-server-Xwayland gdm swaybg swayidle wlopm
 sudo dnf -y install "${PACKAGES[@]}"; ok "official Fedora dependencies installed"
 say "installing Quickshell..."; sudo dnf -y install dnf5-plugins || sudo dnf -y install dnf-plugins-core; dnf copr --help >/dev/null 2>&1 || { bad "DNF COPR support is unavailable; cannot install Quickshell."; exit 1; }; if ! sudo dnf -y copr enable nett00n/hyprland; then bad "could not enable nett00n/hyprland COPR for Fedora $FEDORA_VERSION; Quickshell is required"; exit 1; fi; if ! sudo dnf -y install quickshell; then bad "Quickshell is unavailable from nett00n/hyprland for Fedora $FEDORA_VERSION"; exit 1; fi; ok "Quickshell installed"
 for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics busctl flock fc-cache xmllint; do require_command "$cmd"; done
-QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"; [[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }; ok "Quickshell $QS_VERSION"; sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service tuned.service tuned-ppd.service; sudo systemctl enable gdm.service
+QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"; [[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }
+ok "Quickshell $QS_VERSION"
+sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service tuned.service
+# tuned-ppd is D-Bus activated; starting it once verifies the compatibility service without assuming it is enableable.
+sudo systemctl start tuned-ppd.service
+sudo systemctl enable gdm.service
 export INDEX_DEX_COMMAND="dex-autostart" INDEX_POLKIT_AGENT="/usr/libexec/kf6/polkit-kde-authentication-agent-1" INDEX_CURSOR_ROOT="/usr/share/icons/Adwaita" INDEX_FILE_ROLLER_DESKTOP="org.gnome.FileRoller.desktop"
 export INDEX_REQUIRE_CURSOR_INDEX=0 INDEX_VALIDATE_CURSOR_ROOT=1 INDEX_VALIDATE_TITLEBAR_BUTTONS=0 INDEX_COMPLETION_EXTRA=""
 export INDEX_POWER_PROFILE_SERVICE="tuned-ppd.service"
