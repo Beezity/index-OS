@@ -10,7 +10,7 @@ require_wpctl() {
 }
 
 sanitize_label() {
-  tr '\t\r\n' '   '
+  tr '\t\r' '  '
 }
 
 node_label() {
@@ -93,13 +93,15 @@ require_wpctl
 case "${1:-}" in
   state)
     if ! wpctl status >/dev/null 2>&1; then
-      printf '0\t0|0\t0|0\t\t\n'
+      printf '0\t0|0\t0|0\tNO OUTPUT\tNO INPUT\n'
       exit 0
     fi
     ov=$(volume_percent @DEFAULT_AUDIO_SINK@)
     iv=$(volume_percent @DEFAULT_AUDIO_SOURCE@)
     out_name=$(node_label @DEFAULT_AUDIO_SINK@ || true)
     in_name=$(node_label @DEFAULT_AUDIO_SOURCE@ || true)
+    [ -n "$out_name" ] || out_name='NO OUTPUT'
+    [ -n "$in_name" ] || in_name='NO INPUT'
     printf '1\t%s\t%s\t%s\t%s\n' "$ov" "$iv" "$out_name" "$in_name"
     ;;
   list-outputs) list_section output ;;
