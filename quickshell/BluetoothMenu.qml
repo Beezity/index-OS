@@ -1,5 +1,5 @@
-// WILL OF THE CITY :: THE INDEX — Bluetooth pairing panel
-// Scan / pair / connect / disconnect via bluetoothctl.
+// WILL OF THE CITY :: THE INDEX — Bluetooth pairing/settings panel
+// Reused by the bar popup and SettingsPanel.
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -7,11 +7,13 @@ import Quickshell.Io
 
 Rectangle {
     id: bt
-    color: "#0a0e16"
-    border.color: "#5DADE2"
-    border.width: 2
-
+    property bool embedded: false
     signal requestClose()
+    signal requestBack()
+
+    color: embedded ? "transparent" : "#0a0e16"
+    border.color: "#5DADE2"
+    border.width: embedded ? 0 : 2
 
     readonly property string pixel: "Perfect DOS VGA 437 Universal"
     readonly property color cyan: "#5DADE2"
@@ -20,124 +22,188 @@ Rectangle {
     readonly property color warn: "#FF6B6B"
     readonly property color good: "#5DE285"
 
+    property bool ready: false
+    property bool serviceOnline: false
+    property bool adapterAvailable: false
     property bool powered: false
-    property bool scanning: false
+    property bool discovering: false
+    property string adapterName: "NO ADAPTER"
+    property string adapterAddress: "--"
     property var devices: []
     property string note: ""
 
-    Process {
-        id: powerGet
-        command: ["sh", "-c", "bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && echo 1 || echo 0"]
-        stdout: StdioCollector { onStreamFinished: bt.powered = text.trim() === "1" }
+    readonly property string helper: "$HOME/.local/bin/index-bluetooth"
+
+    function refresh(): void {
+        if (!snapshotProc.running) snapshotProc.running = true
+    }
+    function runAction(args, label): void {
+        actionProc.command = ["sh", "-c", bt.helper + " " + args + " >/dev/null 2>&1"]
+        actionProc.actionLabel = label
+        actionProc.started = true
+        actionProc.running = true
     }
 
+    onVisibleChanged: if (visible) { ready = false; refresh() }
+    Component.onCompleted: if (visible) refresh()
+
     Process {
-        id: devGet
-        // Merge paired, discovered and connected devices. `devices Connected`
-        // is reliable whereas `bluetoothctl info` without a device is not.
-        command: ["sh", "-c",
-            "{ bluetoothctl devices Paired 2>/dev/null | sed 's/^/P /'; " +
-            "bluetoothctl devices Connected 2>/dev/null | sed 's/^/C /'; " +
-            "bluetoothctl devices 2>/dev/null | sed 's/^/A /'; }"
-        ]
-        stdout: StdioCollector { onStreamFinished: {
-            var byMac = ({})
-            var order = []
-            var lines = text.trim().split("\n")
-            for (var i = 0; i < lines.length; i++) {
-                var p = lines[i].trim().split(/\s+/)
-                if (p.length < 4 || p[1] !== "Device") continue
-                var kind = p[0]
-                var mac = p[2]
-                if (!byMac[mac]) {
-                    byMac[mac] = { mac: mac, name: p.slice(3).join(" ") || mac, paired: false, connected: false }
-                    order.push(mac)
+        id: snapshotProc
+        command: ["sh", "-c", bt.helper + " snapshot 2>/dev/null"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var out = []
+                var lines = text.trim().split("\n")
+                var sawState = false
+                for (var i = 0; i < lines.length; i++) {
+                    if (!lines[i]) continue
+                    var f = lines[i].split("\t")
+                    if (f[0] === "STATE" && f.length >= 7) {
+                        sawState = true
+                        bt.serviceOnline = f[1] === "1"
+                        bt.adapterAvailable = f[2] === "1"
+                        bt.powered = f[3] === "1"
+                        bt.discovering = f[4] === "1"
+                        bt.adapterName = f[5] || "NO ADAPTER"
+                        bt.adapterAddress = f[6] || "--"
+                    } else if (f[0] === "DEVICE" && f.length >= 6) {
+                        out.push({
+                            mac: f[1], paired: f[2] === "1", connected: f[3] === "1",
+                            trusted: f[4] === "1", name: f.slice(5).join("\t") || f[1]
+                        })
+                    }
                 }
-                if (kind === "P") byMac[mac].paired = true
-                if (kind === "C") byMac[mac].connected = true
+                if (!sawState) {
+                    bt.serviceOnline = false
+                    bt.adapterAvailable = false
+                    bt.powered = false
+                    bt.discovering = false
+                    bt.adapterName = "NO ADAPTER"
+                    bt.adapterAddress = "--"
+                }
+                bt.devices = out
+                bt.ready = true
             }
-            var out = []
-            for (var j = 0; j < order.length; j++) out.push(byMac[order[j]])
-            bt.devices = out
-        } }
-    }
-
-    Timer {
-        id: poll
-        interval: 3000
-        running: bt.visible
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: { powerGet.running = true; devGet.running = true }
+        }
     }
 
     Process {
         id: actionProc
-        property string successMessage: ""
+        property bool started: false
+        property string actionLabel: ""
         command: ["true"]
         stdout: StdioCollector {}
-        onRunningChanged: if (!running) {
-            if (successMessage) bt.note = successMessage
-            refreshTimer.restart()
+        onRunningChanged: if (started && !running) {
+            started = false
+            bt.note = actionLabel + " — verifying state"
+            delayedRefresh.restart()
         }
     }
 
-    Timer { id: refreshTimer; interval: 900; repeat: false; onTriggered: { powerGet.running = true; devGet.running = true } }
-    Timer { id: scanStop; interval: 12500; repeat: false; onTriggered: { bt.scanning = false; devGet.running = true } }
+    Process {
+        id: scanProc
+        property bool started: false
+        command: ["sh", "-c", bt.helper + " scan >/dev/null 2>&1"]
+        stdout: StdioCollector {}
+        onRunningChanged: {
+            if (running) {
+                started = true
+                bt.note = "scanning for devices..."
+            } else if (started) {
+                started = false
+                bt.note = "scan complete"
+                delayedRefresh.restart()
+            }
+        }
+    }
+
+    Timer { id: delayedRefresh; interval: 700; repeat: false; onTriggered: bt.refresh() }
+    Timer {
+        interval: 3500
+        repeat: true
+        running: bt.visible
+        triggeredOnStart: false
+        onTriggered: bt.refresh()
+    }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 8
+        anchors.margins: bt.embedded ? 14 : 10
+        spacing: bt.embedded ? 12 : 8
 
         RowLayout {
             Layout.fillWidth: true
-            Text { text: ">_ BLUETOOTH_"; font.family: bt.pixel; font.pixelSize: 16; color: bt.cyanB }
-            Item { Layout.fillWidth: true }
             Text {
+                Layout.fillWidth: true
+                text: ">_ BLUETOOTH_"
+                font.family: bt.pixel; font.pixelSize: bt.embedded ? 17 : 16; color: bt.cyanB
+            }
+            Text {
+                visible: bt.adapterAvailable
                 text: bt.powered ? "[ON]" : "[OFF]"
                 font.family: bt.pixel; font.pixelSize: 12
                 color: bt.powered ? bt.good : bt.warn
                 MouseArea {
                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        actionProc.command = ["bluetoothctl", "power", bt.powered ? "off" : "on"]
-                        actionProc.successMessage = bt.powered ? "Bluetooth powered off" : "Bluetooth powered on"
-                        actionProc.running = true
-                    }
+                    enabled: bt.serviceOnline && bt.adapterAvailable && !actionProc.running
+                    onClicked: bt.runAction("power " + (bt.powered ? "off" : "on"), bt.powered ? "powering off" : "powering on")
                 }
             }
             Text {
-                text: "[X]"; font.family: bt.pixel; font.pixelSize: 12; color: bt.warn
-                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: bt.requestClose() }
+                text: bt.embedded ? "<_ BACK" : "[X]"
+                font.family: bt.pixel; font.pixelSize: bt.embedded ? 11 : 12
+                color: bt.embedded ? bt.cyanD : bt.warn
+                MouseArea {
+                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    onClicked: { if (bt.embedded) bt.requestBack(); else bt.requestClose() }
+                }
             }
         }
 
-        Rectangle { Layout.fillWidth: true; height: 1; color: bt.cyanD; opacity: 0.6 }
+        Rectangle { Layout.fillWidth: true; height: 1; color: bt.cyanD; opacity: bt.embedded ? 1 : 0.6 }
+
+        Text {
+            visible: !bt.ready || !bt.serviceOnline || !bt.adapterAvailable
+            Layout.fillWidth: true
+            text: !bt.ready ? "CHECKING BLUETOOTH..." : (!bt.serviceOnline ? "BLUETOOTH SERVICE UNAVAILABLE" : "NO BLUETOOTH ADAPTER DETECTED")
+            font.family: bt.pixel; font.pixelSize: 10
+            color: bt.ready ? bt.warn : bt.cyanD
+            wrapMode: Text.WordWrap
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true; spacing: 2
+            visible: bt.adapterAvailable
+            Text { text: "ADAPTER"; font.family: bt.pixel; font.pixelSize: 11; color: bt.cyanD }
+            Text {
+                Layout.fillWidth: true
+                text: "  " + bt.adapterName
+                font.family: bt.pixel; font.pixelSize: 11; color: bt.cyanB
+                elide: Text.ElideRight
+            }
+            Text {
+                Layout.fillWidth: true
+                text: "  " + bt.adapterAddress
+                font.family: bt.pixel; font.pixelSize: 9; color: bt.cyanD
+                elide: Text.ElideRight
+            }
+        }
 
         Rectangle {
-            Layout.fillWidth: true; height: 26
-            color: bt.scanning ? bt.cyan : "transparent"
+            Layout.fillWidth: true; height: 30
+            opacity: bt.serviceOnline && bt.adapterAvailable ? 1.0 : 0.45
+            color: scanProc.running ? bt.cyan : (scanArea.containsMouse ? "#143245" : "transparent")
             border.color: bt.cyanD; border.width: 1
             Text {
                 anchors.centerIn: parent
-                text: bt.scanning ? "SCANNING..." : "SCAN"
+                text: scanProc.running ? "SCANNING..." : "SCAN FOR DEVICES"
                 font.family: bt.pixel; font.pixelSize: 11
-                color: bt.scanning ? "#04141c" : bt.cyanB
+                color: scanProc.running ? "#04141c" : bt.cyanB
             }
             MouseArea {
-                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                enabled: !bt.scanning
-                onClicked: {
-                    if (!bt.powered) {
-                        actionProc.command = ["bluetoothctl", "power", "on"]
-                        actionProc.successMessage = "Bluetooth powered on"
-                        actionProc.running = true
-                    }
-                    bt.scanning = true
-                    Quickshell.execDetached(["bluetoothctl", "--timeout", "12", "scan", "on"])
-                    scanStop.restart()
-                }
+                id: scanArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                enabled: bt.serviceOnline && bt.adapterAvailable && !scanProc.running && !actionProc.running
+                onClicked: { bt.powered = true; scanProc.running = true }
             }
         }
 
@@ -149,76 +215,83 @@ Rectangle {
             wrapMode: Text.WordWrap
         }
 
+        Text {
+            visible: bt.ready && bt.serviceOnline && bt.adapterAvailable && bt.devices.length === 0
+            Layout.fillWidth: true
+            text: bt.powered ? "NO KNOWN DEVICES — START A SCAN" : "BLUETOOTH IS OFF"
+            font.family: bt.pixel; font.pixelSize: 10; color: bt.cyanD
+        }
+
         ListView {
             Layout.fillWidth: true; Layout.fillHeight: true
-            clip: true; spacing: 3
+            clip: true; spacing: 4
             model: bt.devices
             delegate: Rectangle {
                 required property var modelData
-                width: ListView.view.width; height: 42
+                width: ListView.view.width; height: 48
+                opacity: bt.powered ? 1.0 : 0.55
                 color: deviceArea.containsMouse ? "#143245" : (modelData.connected ? "#0c2634" : "transparent")
-                border.color: modelData.connected ? bt.good : "transparent"
+                border.color: modelData.connected ? bt.good : bt.cyanD
                 border.width: 1
 
                 Column {
                     anchors.left: parent.left; anchors.leftMargin: 8
+                    anchors.right: actionText.left; anchors.rightMargin: 6
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - 100
+                    spacing: 1
                     Text {
-                        text: modelData.name
-                        font.family: bt.pixel; font.pixelSize: 13
+                        width: parent.width; text: modelData.name
+                        font.family: bt.pixel; font.pixelSize: 12
                         color: modelData.connected ? bt.cyanB : bt.cyan
-                        elide: Text.ElideRight; width: parent.width
+                        elide: Text.ElideRight
                     }
                     Text {
-                        text: (modelData.paired ? "paired" : "new") + (modelData.connected ? " · connected" : "")
-                        font.family: bt.pixel; font.pixelSize: 9; color: bt.cyanD
+                        width: parent.width
+                        text: modelData.mac + "  " + (modelData.paired ? "paired" : "new") + (modelData.connected ? " · connected" : "")
+                        font.family: bt.pixel; font.pixelSize: 8; color: bt.cyanD
+                        elide: Text.ElideRight
                     }
                 }
 
                 Text {
+                    id: actionText
                     anchors.right: parent.right; anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    text: modelData.connected ? "[DISCONNECT]" : (modelData.paired ? "[CONNECT]" : "[PAIR]")
-                    font.family: bt.pixel; font.pixelSize: 10
+                    text: modelData.connected ? "[OFF]" : (modelData.paired ? "[CONNECT]" : "[PAIR]")
+                    font.family: bt.pixel; font.pixelSize: 9
                     color: modelData.connected ? bt.warn : bt.cyanB
                 }
 
                 MouseArea {
                     id: deviceArea
                     anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    enabled: bt.powered && !actionProc.running && !scanProc.running
                     onClicked: {
-                        var mac = modelData.mac
-                        if (modelData.connected) {
-                            bt.note = "disconnecting " + modelData.name
-                            actionProc.command = ["bluetoothctl", "disconnect", mac]
-                            actionProc.successMessage = "disconnected " + modelData.name
-                        } else if (modelData.paired) {
-                            bt.note = "connecting " + modelData.name
-                            actionProc.command = ["bluetoothctl", "connect", mac]
-                            actionProc.successMessage = "connected " + modelData.name
-                        } else {
-                            // The built-in no-input agent handles common headphones,
-                            // mice and controllers. Devices needing a displayed PIN can
-                            // be paired through the Blueman button below.
-                            bt.note = "pairing " + modelData.name
-                            actionProc.command = ["sh", "-c", "bluetoothctl --agent NoInputNoOutput pair '" + mac + "' && bluetoothctl trust '" + mac + "' && bluetoothctl connect '" + mac + "'"]
-                            actionProc.successMessage = "paired " + modelData.name
-                        }
-                        actionProc.running = true
+                        if (modelData.connected) bt.runAction("disconnect " + modelData.mac, "disconnecting " + modelData.name)
+                        else if (modelData.paired) bt.runAction("connect " + modelData.mac, "connecting " + modelData.name)
+                        else bt.runAction("pair " + modelData.mac, "pairing " + modelData.name)
                     }
                 }
             }
         }
 
-        Text {
-            Layout.fillWidth: true
-            text: ">_ advanced (blueman) _<"
-            font.family: bt.pixel; font.pixelSize: 10; color: bt.cyanD
+        Rectangle {
+            Layout.fillWidth: true; height: 32
+            color: advancedArea.containsMouse ? "#143245" : "transparent"
+            border.color: bt.cyanD; border.width: 1
+            Text { anchors.centerIn: parent; text: "OPEN ADVANCED BLUETOOTH SETTINGS"; font.family: bt.pixel; font.pixelSize: 10; color: bt.cyanB }
             MouseArea {
-                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                onClicked: { Quickshell.execDetached(["blueman-manager"]); bt.requestClose() }
+                id: advancedArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                onClicked: Quickshell.execDetached(["blueman-manager"])
             }
+        }
+
+        Text {
+            visible: bt.embedded
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: "Common headphones, mice and controllers use BlueZ through bluetoothctl. PIN/display pairing, adapter profiles and advanced device management remain in Blueman."
+            font.family: bt.pixel; font.pixelSize: 10; color: bt.cyanD
         }
     }
 }
