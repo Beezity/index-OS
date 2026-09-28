@@ -1,0 +1,147 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — power/idle policy helper
+set -eu
+
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/index.conf"
+IDLE="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/index-idle"
+
+sanitize() { printf '%s' "$1" | tr '\t\r\n' '   '; }
+
+profile_get() {
+  if command -v powerprofilesctl >/dev/null 2>&1; then
+    powerprofilesctl get 2>/dev/null && return 0
+  fi
+  if command -v busctl >/dev/null 2>&1; then
+    busctl get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile 2>/dev/null |
+      sed -n 's/^s "\(.*\)"$/\1/p' && return 0
+  fi
+  return 1
+}
+
+profile_list() {
+  out=""
+  if command -v powerprofilesctl >/dev/null 2>&1; then
+    out=$(powerprofilesctl list 2>/dev/null || true)
+  elif command -v busctl >/dev/null 2>&1; then
+    out=$(busctl get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles Profiles 2>/dev/null || true)
+  fi
+  list=""
+  for p in power-saver balanced performance; do
+    printf '%s\n' "$out" | grep -q "$p" || continue
+    [ -z "$list" ] && list=$p || list="$list,$p"
+  done
+  printf '%s' "$list"
+}
+
+profile_set() {
+  p=$1
+  case "$p" in power-saver|balanced|performance) ;; *) echo "invalid power profile: $p" >&2; exit 2 ;; esac
+  available=$(profile_list)
+  printf ',%s,' ",$available," | grep -q ",$p," || { echo "power profile unavailable: $p" >&2; exit 1; }
+  if command -v powerprofilesctl >/dev/null 2>&1; then
+    powerprofilesctl set "$p"
+    return
+  fi
+  busctl set-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile s "$p"
+}
+
+battery_info() {
+  command -v upower >/dev/null 2>&1 || { printf '0|-1|none|-1'; return; }
+  info=$(upower -i /org/freedesktop/UPower/devices/DisplayDevice 2>/dev/null || true)
+  if [ -z "$info" ]; then
+    dev=$(upower -e 2>/dev/null | grep -m1 '/battery_' || true)
+    [ -n "$dev" ] && info=$(upower -i "$dev" 2>/dev/null || true)
+  fi
+  present=$(printf '%s\n' "$info" | awk -F: '/present:/ {gsub(/[[:space:]]/,"",$2); print $2; exit}')
+  pct=$(printf '%s\n' "$info" | awk -F: '/percentage:/ {gsub(/[[:space:]%]/,"",$2); print int($2); exit}')
+  state=$(printf '%s\n' "$info" | awk -F: '/state:/ {gsub(/^[[:space:]]+/,"",$2); print $2; exit}')
+  tm=$(printf '%s\n' "$info" | awk '
+    /time to empty:|time to full:/ {
+      for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+([.][0-9]+)?$/) { n=$i+0; u=$(i+1); if (u ~ /^hour/) print int(n*60); else print int(n); exit }
+    }')
+  [ "$present" = yes ] || { printf '0|-1|none|-1'; return; }
+  [ -n "$pct" ] || pct=-1
+  [ -n "$state" ] || state=unknown
+  [ -n "$tm" ] || tm=-1
+  printf '1|%s|%s|%s' "$pct" "$state" "$tm"
+}
+
+brightness_info() {
+  if command -v brightnessctl >/dev/null 2>&1; then
+    pct=$(brightnessctl -m 2>/dev/null | awk -F, 'NR==1 {gsub(/%/,"",$4); print $4}')
+    case "$pct" in ''|*[!0-9]*) ;; *) printf '1|%s' "$pct"; return ;; esac
+  fi
+  printf '0|-1'
+}
+
+lid_present() {
+  if [ -e /proc/acpi/button/lid ] || ls /proc/acpi/button/lid* >/dev/null 2>&1; then printf '1'; return; fi
+  grep -qi 'Lid Switch' /proc/bus/input/devices 2>/dev/null && printf '1' || printf '0'
+}
+
+lid_action() {
+  v=$(grep -h '^HandleLidSwitch=' /etc/systemd/logind.conf.d/*.conf /etc/systemd/logind.conf 2>/dev/null | tail -1 | cut -d= -f2 || true)
+  case "$v" in suspend|lock|ignore) printf '%s' "$v" ;; *) printf 'suspend' ;; esac
+}
+
+screen_seconds() {
+  v=$(sed -n 's/^SCREEN_OFF_SEC=\([0-9][0-9]*\)$/\1/p' "$CONF" 2>/dev/null | tail -1 || true)
+  [ -n "$v" ] && printf '%s' "$v" || printf '600'
+}
+
+write_screen_seconds() {
+  v=$1
+  case "$v" in ''|*[!0-9]*) echo "invalid screen timeout: $v" >&2; exit 2 ;; esac
+  mkdir -p "$(dirname "$CONF")"
+  touch "$CONF"
+  lock="$CONF.lock"
+  if command -v flock >/dev/null 2>&1; then
+    (
+      flock -x 9
+      t=$(mktemp "$CONF.tmp.XXXXXX")
+      { grep -v '^SCREEN_OFF_SEC=' "$CONF" || true; printf 'SCREEN_OFF_SEC=%s\n' "$v"; } > "$t"
+      mv "$t" "$CONF"
+    ) 9>"$lock"
+  else
+    t=$(mktemp "$CONF.tmp.XXXXXX")
+    { grep -v '^SCREEN_OFF_SEC=' "$CONF" || true; printf 'SCREEN_OFF_SEC=%s\n' "$v"; } > "$t"
+    mv "$t" "$CONF"
+  fi
+  if [ -x "$IDLE" ]; then
+    setsid sh "$IDLE" >/dev/null 2>&1 &
+  fi
+}
+
+set_lid_action() {
+  a=$1
+  case "$a" in suspend|lock|ignore) ;; *) echo "invalid lid action: $a" >&2; exit 2 ;; esac
+  command -v pkexec >/dev/null 2>&1 || { echo "pkexec is required" >&2; exit 1; }
+  pkexec sh -c 'a=$1; mkdir -p /etc/systemd/logind.conf.d; printf "[Login]\nHandleLidSwitch=%s\nHandleLidSwitchExternalPower=%s\nHandleLidSwitchDocked=%s\n" "$a" "$a" "$a" > /etc/systemd/logind.conf.d/90-index.conf' sh "$a"
+}
+
+case "${1:-}" in
+  state)
+    profile=$(profile_get 2>/dev/null || true)
+    profiles=$(profile_list)
+    [ -n "$profile" ] && profile_ok=1 || profile_ok=0
+    [ -n "$profile" ] || profile=unavailable
+    bat=$(battery_info)
+    bri=$(brightness_info)
+    lid=$(lid_present)
+    action=$(lid_action)
+    sec=$(screen_seconds)
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$profile_ok" "$(sanitize "$profile")" "$(sanitize "$profiles")" "$bat" "$bri" "$lid|$action" "$sec"
+    ;;
+  set-profile) [ "$#" -eq 2 ] || exit 2; profile_set "$2" ;;
+  set-brightness)
+    [ "$#" -eq 2 ] || exit 2
+    case "$2" in ''|*[!0-9]*) exit 2 ;; esac
+    [ "$2" -ge 5 ] && [ "$2" -le 100 ] || exit 2
+    command -v brightnessctl >/dev/null 2>&1 || { echo "brightness control unavailable" >&2; exit 1; }
+    brightnessctl set "$2%" >/dev/null
+    ;;
+  set-screen-seconds) [ "$#" -eq 2 ] || exit 2; write_screen_seconds "$2" ;;
+  set-lid-action) [ "$#" -eq 2 ] || exit 2; set_lid_action "$2" ;;
+  suspend) systemctl suspend ;;
+  *) echo "usage: index-power {state|set-profile PROFILE|set-brightness PCT|set-screen-seconds SEC|set-lid-action ACTION|suspend}" >&2; exit 2 ;;
+esac
