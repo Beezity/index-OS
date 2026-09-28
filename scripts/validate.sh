@@ -6,7 +6,7 @@ xmllint --noout "$CFG/labwc/rc.xml" "$CFG/labwc/menu.xml" "$CFG/fontconfig/fonts
 FAIL=0; chk(){ if [[ -e "$1" ]]; then ok "$2"; else bad "$2 (missing: $1)"; FAIL=1; fi; }
 chk "$CFG/labwc/rc.xml" "labwc rc.xml"; chk "$CFG/labwc/autostart" "labwc autostart"; chk "$CFG/labwc/index-lock" "lock launcher"; chk "$CFG/labwc/wall.png" "wallpaper"; chk "$THEMES/the-index/labwc/themerc" "titlebar theme"
 if [[ "${INDEX_VALIDATE_TITLEBAR_BUTTONS:-0}" == 1 ]]; then chk "$THEMES/the-index/labwc/close.xbm" "close button"; chk "$THEMES/the-index/labwc/iconify.xbm" "minimize button"; chk "$THEMES/the-index/labwc/max.xbm" "maximize button"; fi
-chk "$CFG/quickshell/shell.qml" "Quickshell shell"; chk "$CFG/quickshell/Bar.qml" "top bar"; chk "$CFG/quickshell/BluetoothMenu.qml" "Bluetooth panel"; chk "$CFG/quickshell/AppearancePanel.qml" "appearance panel"; chk "$CFG/quickshell/AudioPanel.qml" "audio panel"; chk "$CFG/quickshell/NetworkPanel.qml" "network panel"; chk "$CFG/quickshell/PowerPanel.qml" "power panel"; chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"; chk "$CFG/foot/foot.ini" "Foot config"; chk "$CFG/fish/config.fish" "Fish config"; chk "/usr/share/icons/Papirus-Dark/index.theme" "Papirus-Dark icon theme"; chk "$HOME/.local/bin/index-appearance" "appearance helper"; chk "$HOME/.local/bin/index-audio" "audio helper"; chk "$HOME/.local/bin/index-network" "network helper"; chk "$HOME/.local/bin/index-bluetooth" "Bluetooth helper"; chk "$HOME/.local/bin/index-power" "power helper"
+chk "$CFG/quickshell/shell.qml" "Quickshell shell"; chk "$CFG/quickshell/Bar.qml" "top bar"; chk "$CFG/quickshell/BluetoothMenu.qml" "Bluetooth panel"; chk "$CFG/quickshell/AppearancePanel.qml" "appearance panel"; chk "$CFG/quickshell/AudioPanel.qml" "audio panel"; chk "$CFG/quickshell/NetworkPanel.qml" "network panel"; chk "$CFG/quickshell/PowerPanel.qml" "power panel"; chk "$CFG/quickshell/InputPanel.qml" "input panel"; chk "$CFG/quickshell/lock/lock.qml" "INDEX lock"; chk "$CFG/foot/foot.ini" "Foot config"; chk "$CFG/fish/config.fish" "Fish config"; chk "/usr/share/icons/Papirus-Dark/index.theme" "Papirus-Dark icon theme"; chk "$HOME/.local/bin/index-appearance" "appearance helper"; chk "$HOME/.local/bin/index-audio" "audio helper"; chk "$HOME/.local/bin/index-network" "network helper"; chk "$HOME/.local/bin/index-bluetooth" "Bluetooth helper"; chk "$HOME/.local/bin/index-power" "power helper"; chk "$HOME/.local/bin/index-input" "input helper"
 if [[ "${INDEX_VALIDATE_CURSOR_ROOT:-0}" == 1 ]]; then chk "$INDEX_CURSOR_ROOT/cursors" "Adwaita cursor theme"; fi
 chk "$DATA/icons/default/index.theme" "default cursor theme"; chk "/usr/share/wayland-sessions/the-index.desktop" "GDM THE INDEX session"
 GDM_SERVICE="${INDEX_GDM_SERVICE:-gdm.service}"
@@ -15,5 +15,10 @@ if [[ -x "$HOME/.local/bin/index-power" ]]; then
   POWER_STATE="$("$HOME/.local/bin/index-power" state 2>/dev/null || true)"
   POWER_PROFILE_OK="${POWER_STATE%%$'\t'*}"
   [[ "$POWER_PROFILE_OK" == 1 ]] && ok "power profile backend available" || { bad "power profile backend unavailable"; FAIL=1; }
+fi
+if [[ -x "$HOME/.local/bin/index-input" ]]; then
+  INPUT_STATE="$("$HOME/.local/bin/index-input" state 2>/dev/null || true)"
+  INPUT_OK="${INPUT_STATE%%$'\t'*}"
+  [[ "$INPUT_OK" == 1 ]] && ok "labwc input backend available" || { bad "labwc input backend unavailable"; FAIL=1; }
 fi
 (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
