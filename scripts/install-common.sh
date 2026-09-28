@@ -45,12 +45,15 @@ cp -f "$INDEX_ROOT/labwc/config/fontconfig/fonts.conf" "$CFG/fontconfig/fonts.co
 fc-cache -f >/dev/null
 
 say "configuring icon and cursor themes..."
-ICON_THEME="Papirus-Dark"; CURSOR_THEME="capitaine-cursors"; CURSOR_SIZE=24
+ICON_THEME="Papirus-Dark"; CURSOR_THEME="Adwaita"; CURSOR_SIZE=24
 [[ -f "/usr/share/icons/$ICON_THEME/index.theme" ]] || { bad "icon theme missing after installation: $ICON_THEME"; exit 1; }
 [[ -d "$INDEX_CURSOR_ROOT/cursors" ]] || { bad "cursor theme missing after installation: $INDEX_CURSOR_ROOT"; exit 1; }
-if [[ "${INDEX_REQUIRE_CURSOR_INDEX:-0}" == 1 ]]; then [[ -f "$INDEX_CURSOR_ROOT/index.theme" ]] || { bad "Capitaine cursor theme missing after installation"; exit 1; }; fi
+if [[ "${INDEX_REQUIRE_CURSOR_INDEX:-0}" == 1 ]]; then [[ -f "$INDEX_CURSOR_ROOT/index.theme" ]] || { bad "cursor theme index missing after installation: $INDEX_CURSOR_ROOT/index.theme"; exit 1; }; fi
 mkdir -p "$HOME/.local/share/icons/default"
 printf '[Icon Theme]\nInherits=%s\n' "$CURSOR_THEME" > "$HOME/.local/share/icons/default/index.theme"
+if [[ -f "$CFG/the-index/appearance.conf" ]]; then
+  sed -i 's/^CURSOR_THEME=capitaine-cursors$/CURSOR_THEME=Adwaita/' "$CFG/the-index/appearance.conf"
+fi
 
 say "installing labwc configuration..."
 rm -rf "$CFG/labwc"; mkdir -p "$CFG/labwc"
