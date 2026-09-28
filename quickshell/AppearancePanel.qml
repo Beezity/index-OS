@@ -7,7 +7,7 @@ import Quickshell.Io
 Rectangle {
     id: root
     signal requestBack()
-    color: "#0a0e16"
+    color: "transparent"
     readonly property string pixel: "Perfect DOS VGA 437 Universal"
     readonly property color cyan: "#5DADE2"
     readonly property color cyanB: "#85C5E8"
