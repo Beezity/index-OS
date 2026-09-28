@@ -38,6 +38,7 @@ Rectangle {
     property bool inputLoaded: false
     property bool hasLid: false
     property var autostartApps: []
+    property bool appearanceOpen: false
 
     // Build one locked, atomic config write.
     // The old version launched several detached read/temp/move jobs at once, so
@@ -76,8 +77,8 @@ Rectangle {
     }
 
     function applyCursor(): void {
-        var cmd = panel.confWriteCommand([["CURSOR_SIZE", panel.cursorSize]])
-        panel.run(cmd + "; sh \"$HOME/.config/labwc/index-input\"; pkill -HUP labwc")
+        panel.run("$HOME/.local/bin/index-appearance set-cursor-size " + panel.cursorSize)
+        panel.refreshSavedSoon()
     }
 
     signal requestClose()
@@ -101,7 +102,10 @@ Rectangle {
     }
 
     // pull fresh values every time the panel appears
-    onVisibleChanged: if (visible) panel.refresh()
+    onVisibleChanged: {
+        if (visible) panel.refresh()
+        else panel.appearanceOpen = false
+    }
     Component.onCompleted: panel.refresh()
     function refresh(): void {
         volGet.running=true; briGet.running=true; btGet.running=true; netGet.running=true
@@ -205,6 +209,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 14
         spacing: 12
+        visible: !panel.appearanceOpen
 
         // header
         RowLayout {
@@ -520,7 +525,8 @@ Rectangle {
                     { t: "AUDIO",     s: "mixer",   c: "pavucontrol" },
                     { t: "DISPLAY",   s: "outputs", c: "wdisplays || wlr-randr" },
                     { t: "FILES",     s: "manager", c: "thunar" },
-                    { t: "MUTE",      s: "toggle",  c: "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" }
+                    { t: "MUTE",      s: "toggle",  c: "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" },
+                    { t: "APPEARANCE", s: "themes", page: "appearance" }
                 ]
                 delegate: Rectangle {
                     required property var modelData
@@ -541,7 +547,10 @@ Rectangle {
                     MouseArea {
                         id: bma; anchors.fill: parent; hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: { panel.run(modelData.c); panel.requestClose() }
+                        onClicked: {
+                            if (modelData.page === "appearance") panel.appearanceOpen = true
+                            else { panel.run(modelData.c); panel.requestClose() }
+                        }
                     }
                 }
             }
@@ -637,5 +646,11 @@ Rectangle {
                 }
             }
         }
+    }
+
+    AppearancePanel {
+        anchors.fill: parent
+        visible: panel.appearanceOpen
+        onRequestBack: panel.appearanceOpen = false
     }
 }

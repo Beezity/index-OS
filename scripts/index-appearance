@@ -1,0 +1,104 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — appearance preferences
+set -eu
+
+CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/the-index"
+CFG="$CFG_DIR/appearance.conf"
+LABWC="${XDG_CONFIG_HOME:-$HOME/.config}/labwc"
+DEFAULT_WALL="$LABWC/wall.png"
+mkdir -p "$CFG_DIR"
+
+getv() { [ -f "$CFG" ] && sed -n "s/^$1=//p" "$CFG" | tail -1 || true; }
+setv() {
+  key=$1 value=$2
+  tmp=$(mktemp "$CFG_DIR/.appearance.XXXXXX")
+  { [ -f "$CFG" ] && grep -v "^${key}=" "$CFG" || true; printf '%s=%s\n' "$key" "$value"; } > "$tmp"
+  mv "$tmp" "$CFG"
+}
+list_themes() {
+  kind=$1
+  for root in "$HOME/.local/share/icons" "$HOME/.icons" /usr/local/share/icons /usr/share/icons; do
+    [ -d "$root" ] || continue
+    for d in "$root"/*; do
+      [ -d "$d" ] || continue
+      case "$kind" in
+        icons) [ -f "$d/index.theme" ] && [ ! -d "$d/cursors" ] && basename "$d" ;;
+        cursors) [ -d "$d/cursors" ] && basename "$d" ;;
+      esac
+    done
+  done | sort -u
+}
+set_ini_value() {
+  file=$1 key=$2 value=$3
+  [ -f "$file" ] || return 0
+  if grep -q "^${key}=" "$file"; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+  else
+    printf '\n%s=%s\n' "$key" "$value" >> "$file"
+  fi
+}
+sync_input_cursor_size() {
+  size=$1
+  f="$LABWC/index.conf"
+  mkdir -p "$LABWC"
+  touch "$f"
+  t=$(mktemp "$LABWC/index.conf.tmp.XXXXXX")
+  { grep -v '^CURSOR_SIZE=' "$f" || true; printf 'CURSOR_SIZE=%s\n' "$size"; } > "$t"
+  mv "$t" "$f"
+}
+apply_icons() {
+  theme=$1
+  command -v gsettings >/dev/null 2>&1 && gsettings set org.gnome.desktop.interface icon-theme "$theme" >/dev/null 2>&1 || true
+  for gtk in gtk-3.0 gtk-4.0; do
+    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-icon-theme-name "$theme"
+  done
+  for q in qt5ct qt6ct; do
+    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$q/$q.conf" icon_theme "$theme"
+  done
+}
+apply_cursor() {
+  theme=$1 size=${2:-24}
+  case "$size" in ''|*[!0-9]*) echo "invalid cursor size: $size" >&2; exit 2 ;; esac
+  mkdir -p "$HOME/.local/share/icons/default" "$LABWC"
+  printf '[Icon Theme]\nInherits=%s\n' "$theme" > "$HOME/.local/share/icons/default/index.theme"
+  command -v gsettings >/dev/null 2>&1 && {
+    gsettings set org.gnome.desktop.interface cursor-theme "$theme" >/dev/null 2>&1 || true
+    gsettings set org.gnome.desktop.interface cursor-size "$size" >/dev/null 2>&1 || true
+  }
+  for gtk in gtk-3.0 gtk-4.0; do
+    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-cursor-theme-name "$theme"
+    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-cursor-theme-size "$size"
+  done
+  envf="$LABWC/environment"; touch "$envf"
+  sed -i '/^XCURSOR_THEME=/d;/^XCURSOR_SIZE=/d' "$envf"
+  printf 'XCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$theme" "$size" >> "$envf"
+  sync_input_cursor_size "$size"
+  command -v labwc >/dev/null 2>&1 && labwc --reconfigure >/dev/null 2>&1 || true
+}
+apply_wallpaper() {
+  wall=$1
+  [ -f "$wall" ] || wall=$DEFAULT_WALL
+  [ -f "$wall" ] || { echo "Wallpaper not found: $wall" >&2; return 1; }
+  if command -v swaybg >/dev/null 2>&1; then
+    pkill -x swaybg >/dev/null 2>&1 || true
+    setsid swaybg -i "$wall" -m fill >/dev/null 2>&1 &
+  fi
+}
+
+case "${1:-}" in
+  list-icons) list_themes icons ;;
+  list-cursors) list_themes cursors ;;
+  get) getv "$2" ;;
+  set-icons) setv ICON_THEME "$2"; apply_icons "$2" ;;
+  set-cursor) setv CURSOR_THEME "$2"; setv CURSOR_SIZE "${3:-24}"; apply_cursor "$2" "${3:-24}" ;;
+  set-cursor-size) theme=$(getv CURSOR_THEME); [ -n "$theme" ] || theme=capitaine-cursors; setv CURSOR_SIZE "$2"; apply_cursor "$theme" "$2" ;;
+  set-wallpaper) [ -f "$2" ] || { echo "Wallpaper not found: $2" >&2; exit 2; }; setv WALLPAPER "$2"; apply_wallpaper "$2" ;;
+  reset-wallpaper) setv WALLPAPER "$DEFAULT_WALL"; apply_wallpaper "$DEFAULT_WALL" ;;
+  apply)
+    icons=$(getv ICON_THEME); cursor=$(getv CURSOR_THEME); size=$(getv CURSOR_SIZE); wall=$(getv WALLPAPER)
+    [ -n "$icons" ] && apply_icons "$icons" || true
+    [ -n "$cursor" ] && apply_cursor "$cursor" "${size:-24}" || true
+    if [ -n "$wall" ] && [ -f "$wall" ]; then apply_wallpaper "$wall"; else setv WALLPAPER "$DEFAULT_WALL"; apply_wallpaper "$DEFAULT_WALL"; fi
+    ;;
+  *) echo "usage: index-appearance {list-icons|list-cursors|get KEY|set-icons THEME|set-cursor THEME [SIZE]|set-cursor-size SIZE|set-wallpaper FILE|reset-wallpaper|apply}" >&2; exit 2 ;;
+esac

@@ -29,6 +29,7 @@ record(){
 record "$HOME/.config/labwc"
 record "$HOME/.config/quickshell"
 record "$HOME/.config/fastfetch"
+record "$HOME/.config/the-index"
 record "$HOME/.local/share/themes/the-index"
 
 for path in \
@@ -44,7 +45,7 @@ for path in \
   "$HOME/.config/mimeapps.list" "$HOME/.config/user-dirs.dirs" "$HOME/.config/user-dirs.locale" \
   "$HOME/.local/share/icons/default/index.theme" \
   "$HOME/.local/bin/index-default-apps" "$HOME/.local/bin/index-snip" "$HOME/.local/bin/index-doctor" \
-  "$HOME/.local/bin/index-backup" "$HOME/.local/bin/index-restore" \
+  "$HOME/.local/bin/index-backup" "$HOME/.local/bin/index-restore" "$HOME/.local/bin/index-appearance" \
   /usr/share/wayland-sessions/the-index.desktop \
   /etc/apt/sources.list.d/index-os-trixie-backports.sources; do
   record "$path"
