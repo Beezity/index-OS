@@ -27,7 +27,7 @@ MANIFEST="$SRC/manifest"
 
 restore_path(){
   local state="$1" path="$2" saved="$SRC/files/${path#/}"
-  if [[ "$path" == /usr/* ]]; then
+  if [[ "$path" == /usr/* || "$path" == /etc/* ]]; then
     if [[ "$state" == present ]]; then
       sudo rm -rf -- "$path"
       sudo mkdir -p "$(dirname "$path")"
@@ -50,7 +50,10 @@ printf 'Restoring Index backup %s...\n' "$ID"
 while IFS=$'\t' read -r state path; do
   [[ "$state" == present || "$state" == missing ]] || { echo "Invalid manifest entry." >&2; exit 1; }
   [[ -n "$path" ]] || { echo "Invalid empty manifest path." >&2; exit 1; }
-  case "$path" in "$HOME"/*|/usr/share/wayland-sessions/the-index.desktop) ;; *) echo "Refusing unsafe restore path: $path" >&2; exit 1 ;; esac
+  case "$path" in
+    "$HOME"/*|/usr/share/wayland-sessions/the-index.desktop|/etc/apt/sources.list.d/index-os-trixie-backports.sources) ;;
+    *) echo "Refusing unsafe restore path: $path" >&2; exit 1 ;;
+  esac
   if [[ "$state" == present && ! -e "$SRC/files/${path#/}" && ! -L "$SRC/files/${path#/}" ]]; then
     echo "Backup payload missing for: $path" >&2; exit 1
   fi

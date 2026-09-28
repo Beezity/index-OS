@@ -27,9 +27,12 @@ if [[ -r /etc/fedora-release ]] && command -v dnf >/dev/null 2>&1; then
 elif command -v pacman >/dev/null 2>&1 && [[ -r /etc/arch-release ]]; then
   INSTALLER="install.sh"
   DISTRO="Arch Linux"
+elif command -v apt-get >/dev/null 2>&1 && [[ -r /etc/os-release ]] && grep -q '^ID=debian$' /etc/os-release; then
+  INSTALLER="install-debian.sh"
+  DISTRO="Debian"
 else
   echo "index-update: unsupported distribution" >&2
-  echo "Currently supported: Arch Linux and Fedora." >&2
+  echo "Currently supported: Arch Linux, Fedora, Debian 13, and Debian Sid." >&2
   exit 1
 fi
 
