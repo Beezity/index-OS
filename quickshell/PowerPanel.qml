@@ -42,6 +42,14 @@ Rectangle {
         return root.profiles.indexOf(name) >= 0
     }
 
+    function returnToSettings() {
+        // SettingsPanel keeps the compact timeout control visible after this
+        // subpanel closes, so mirror the authoritative value we just changed.
+        if (root.parent && root.parent.screenOffMin !== undefined)
+            root.parent.screenOffMin = Math.round(root.screenSeconds / 60)
+        root.requestBack()
+    }
+
     Component.onCompleted: refresh()
     onVisibleChanged: if (visible) refresh()
 
@@ -93,7 +101,7 @@ Rectangle {
             Text { Layout.fillWidth: true; text: ">_ POWER_"; font.family: root.pixel; font.pixelSize: 17; color: root.cyanB }
             Text {
                 text: "<_ BACK"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanD
-                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.requestBack() }
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.returnToSettings() }
             }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: root.cyanD }
