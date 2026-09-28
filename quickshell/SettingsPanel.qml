@@ -39,6 +39,7 @@ Rectangle {
     property bool hasLid: false
     property var autostartApps: []
     property bool appearanceOpen: false
+    property bool audioOpen: false
 
     // Build one locked, atomic config write.
     // The old version launched several detached read/temp/move jobs at once, so
@@ -104,7 +105,10 @@ Rectangle {
     // pull fresh values every time the panel appears
     onVisibleChanged: {
         if (visible) panel.refresh()
-        else panel.appearanceOpen = false
+        else {
+            panel.appearanceOpen = false
+            panel.audioOpen = false
+        }
     }
     Component.onCompleted: panel.refresh()
     function refresh(): void {
@@ -209,7 +213,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 14
         spacing: 12
-        visible: !panel.appearanceOpen
+        visible: !panel.appearanceOpen && !panel.audioOpen
 
         // header
         RowLayout {
@@ -522,7 +526,7 @@ Rectangle {
                       c: "nm-connection-editor || iwgtk" },
                     { t: "BLUETOOTH", s: panel.btOn ? "on" : "off",
                       c: "blueman-manager || blueberry" },
-                    { t: "AUDIO",     s: "mixer",   c: "pavucontrol" },
+                    { t: "AUDIO",     s: "devices", page: "audio" },
                     { t: "DISPLAY",   s: "outputs", c: "wdisplays || wlr-randr" },
                     { t: "FILES",     s: "manager", c: "thunar" },
                     { t: "MUTE",      s: "toggle",  c: "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" },
@@ -549,6 +553,7 @@ Rectangle {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             if (modelData.page === "appearance") panel.appearanceOpen = true
+                            else if (modelData.page === "audio") panel.audioOpen = true
                             else { panel.run(modelData.c); panel.requestClose() }
                         }
                     }
@@ -652,5 +657,11 @@ Rectangle {
         anchors.fill: parent
         visible: panel.appearanceOpen
         onRequestBack: panel.appearanceOpen = false
+    }
+
+    AudioPanel {
+        anchors.fill: parent
+        visible: panel.audioOpen
+        onRequestBack: panel.audioOpen = false
     }
 }

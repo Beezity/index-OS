@@ -19,14 +19,14 @@ jobs:
       - name: Check installer syntax
         run: |
           bash -n install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh
-          bash -n scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance
+          bash -n scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio
           bash -n scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
           fish -n fish/config.fish
 
       - name: Shellcheck scripts
         run: |
           shellcheck --severity=error install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh \
-            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance \
+            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio \
             scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh \
             labwc/config/autostart labwc/config/index-lock labwc/config/index-idle \
             labwc/config/index-input labwc/config/index-clip \
@@ -44,7 +44,7 @@ jobs:
         run: |
           files=(
             wallpaper/the-index.png
-            quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/Atmosphere.qml quickshell/lock/lock.qml quickshell/prescript.json
+            quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/Atmosphere.qml quickshell/lock/lock.qml quickshell/prescript.json
             labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment
             labwc/config/index-lock labwc/config/index-idle labwc/config/index-input labwc/config/fontconfig/fonts.conf
             labwc/theme/the-index/labwc/themerc labwc/theme/the-index/labwc/close.xbm
@@ -53,7 +53,7 @@ jobs:
             labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf
             labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps
             assets/PerfectDOSVGA437-Universal.ttf install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh
-            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
+            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
           )
           for f in "${files[@]}"; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
 
@@ -79,6 +79,10 @@ jobs:
           }
           grep -q '^AppearancePanel 1\.0 AppearancePanel\.qml$' quickshell/qmldir || {
             echo 'SettingsPanel requires AppearancePanel but it is not registered in qmldir'
+            exit 1
+          }
+          grep -q '^AudioPanel 1\.0 AudioPanel\.qml$' quickshell/qmldir || {
+            echo 'SettingsPanel requires AudioPanel but it is not registered in qmldir'
             exit 1
           }
 

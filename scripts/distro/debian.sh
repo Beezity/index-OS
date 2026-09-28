@@ -122,6 +122,16 @@ POLKIT_AGENT="$(dpkg -L polkit-kde-agent-1 | grep '/polkit-kde-authentication-ag
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service
 sudo systemctl enable gdm3.service
 
+say "enabling PipeWire/WirePlumber user services..."
+if systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service; then
+  ok "PipeWire/WirePlumber user services enabled"
+else
+  bad "could not enable PipeWire/WirePlumber user services for $USER"
+  note "Run this from the target user's login session, then rerun the installer:"
+  note "  systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service"
+  exit 1
+fi
+
 export INDEX_DEX_COMMAND="dex"
 export INDEX_POLKIT_AGENT="$POLKIT_AGENT"
 export INDEX_CURSOR_ROOT="$DATA/icons/capitaine-cursors"
