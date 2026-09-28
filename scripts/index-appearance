@@ -11,7 +11,6 @@ mkdir -p "$CFG_DIR"
 getv() { [ -f "$CFG" ] && sed -n "s/^$1=//p" "$CFG" | tail -1 || true; }
 setv() {
   key=$1 value=$2
-  case "$value" in *"$(printf '\n')"*) echo "invalid multiline appearance value" >&2; exit 2 ;; esac
   tmp=$(mktemp "$CFG_DIR/.appearance.XXXXXX")
   { [ -f "$CFG" ] && grep -v "^${key}=" "$CFG" || true; printf '%s=%s\n' "$key" "$value"; } > "$tmp"
   mv "$tmp" "$CFG"
@@ -37,6 +36,15 @@ set_ini_value() {
   else
     printf '\n%s=%s\n' "$key" "$value" >> "$file"
   fi
+}
+sync_input_cursor_size() {
+  size=$1
+  f="$LABWC/index.conf"
+  mkdir -p "$LABWC"
+  touch "$f"
+  t=$(mktemp "$LABWC/index.conf.tmp.XXXXXX")
+  { grep -v '^CURSOR_SIZE=' "$f" || true; printf 'CURSOR_SIZE=%s\n' "$size"; } > "$t"
+  mv "$t" "$f"
 }
 apply_icons() {
   theme=$1
@@ -64,6 +72,7 @@ apply_cursor() {
   envf="$LABWC/environment"; touch "$envf"
   sed -i '/^XCURSOR_THEME=/d;/^XCURSOR_SIZE=/d' "$envf"
   printf 'XCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$theme" "$size" >> "$envf"
+  sync_input_cursor_size "$size"
 }
 apply_wallpaper() {
   wall=$1
