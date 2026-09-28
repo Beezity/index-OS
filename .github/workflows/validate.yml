@@ -40,6 +40,38 @@ jobs:
           xmllint --noout labwc/config/menu.xml
           xmllint --noout labwc/config/fontconfig/fonts.conf
 
+      - name: Exercise input helper
+        run: |
+          tmp="$(mktemp)"
+          bad="$(mktemp)"
+          cp labwc/config/rc.xml "$tmp"
+          sed -i '/<\/libinput>/i\    <device name="CI Special Mouse">\n      <pointerSpeed>0.77</pointerSpeed>\n      <naturalScroll>no</naturalScroll>\n    </device>' "$tmp"
+
+          state="$(INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input state)"
+          test "$(printf '%s' "$state" | cut -f1)" = 1
+          INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input set-speed 0.25
+          INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input set-natural-scroll yes
+          INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input set-tap no
+          state="$(INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input state)"
+          test "$(printf '%s' "$state" | cut -f2)" = 0.25
+          test "$(printf '%s' "$state" | cut -f3)" = yes
+          test "$(printf '%s' "$state" | cut -f5)" = no
+          grep -q '<pointerSpeed>0.77</pointerSpeed>' "$tmp"
+          grep -q '<naturalScroll>no</naturalScroll>' "$tmp"
+          xmllint --noout "$tmp"
+
+          printf '<labwc_config><libinput/></labwc_config>\n' > "$bad"
+          test "$(INDEX_INPUT_RC="$bad" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input state | cut -f1)" = 0
+          if INDEX_INPUT_RC="$bad" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input set-speed 0.50; then
+            echo 'malformed input backend unexpectedly accepted a write'
+            exit 1
+          fi
+          if INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input set-speed '0.5;echo bad'; then
+            echo 'unsafe pointer speed unexpectedly accepted'
+            exit 1
+          fi
+          rm -f "$tmp" "$bad"
+
       - name: Check required repository assets
         run: |
           files=(
