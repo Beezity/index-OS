@@ -72,13 +72,19 @@ apply_saved() {
   current_natural=$(xml_value "/labwc_config/libinput/device[@category='default']/naturalScroll")
   current_tap=$(xml_value "/labwc_config/libinput/device[@category='touchpad']/tap")
 
-  speed=$(get_saved POINTER_SPEED "${current_speed:-0.00}")
-  natural=$(get_saved NATURAL_SCROLL "${current_natural:-no}")
-  tap=$(get_saved TAP_CLICK "${current_tap:-yes}")
+  valid_speed "${current_speed:-}" || current_speed=0.00
+  valid_bool "${current_natural:-}" || current_natural=no
+  valid_bool "${current_tap:-}" || current_tap=yes
 
-  valid_speed "$speed" || { echo "invalid saved pointer speed: $speed" >&2; exit 1; }
-  valid_bool "$natural" || { echo "invalid saved natural scroll value: $natural" >&2; exit 1; }
-  valid_bool "$tap" || { echo "invalid saved tap value: $tap" >&2; exit 1; }
+  speed=$(get_saved POINTER_SPEED "$current_speed")
+  natural=$(get_saved NATURAL_SCROLL "$current_natural")
+  tap=$(get_saved TAP_CLICK "$current_tap")
+
+  # A manually edited or older malformed preference must not make every input
+  # action fail. Keep the authoritative current labwc value for that one field.
+  valid_speed "$speed" || speed=$current_speed
+  valid_bool "$natural" || natural=$current_natural
+  valid_bool "$tap" || tap=$current_tap
   speed=$(normalize_speed "$speed")
 
   tmp=$(mktemp "$RC.tmp.XXXXXX")
