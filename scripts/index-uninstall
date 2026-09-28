@@ -73,7 +73,8 @@ remove \
   "$HOME/.local/bin/index-audio" \
   "$HOME/.local/bin/index-network" \
   "$HOME/.local/bin/index-bluetooth" \
-  "$HOME/.local/bin/index-power"
+  "$HOME/.local/bin/index-power" \
+  "$HOME/.local/bin/index-input"
 
 rmdir "$HOME/.config/fontconfig" "$HOME/.config/wofi" "$HOME/.config/foot" "$HOME/.config/fish" 2>/dev/null || true
 rmdir "$HOME/.config/xdg-desktop-portal/wlr" "$HOME/.config/xdg-desktop-portal" 2>/dev/null || true

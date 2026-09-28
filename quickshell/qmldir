@@ -11,6 +11,7 @@ AppearancePanel 1.0 AppearancePanel.qml
 AudioPanel 1.0 AudioPanel.qml
 NetworkPanel 1.0 NetworkPanel.qml
 PowerPanel 1.0 PowerPanel.qml
+InputPanel 1.0 InputPanel.qml
 IndexSectionButton 1.0 IndexSectionButton.qml
 AboutSystem 1.0 AboutSystem.qml
 Calendar 1.0 Calendar.qml

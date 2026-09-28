@@ -49,14 +49,11 @@ fi
 # Removable-media automounting.
 command -v udiskie >/dev/null 2>&1 && udiskie --no-notify &
 
-# Restore persisted input/brightness/display state.
+# Restore persisted brightness/display state. Labwc input state is stored
+# directly in rc.xml and therefore does not need a separate session restore.
 [ -f "$HOME/.config/labwc/index.conf" ] && . "$HOME/.config/labwc/index.conf"
 if [ -n "${BRIGHTNESS:-}" ] && command -v brightnessctl >/dev/null 2>&1; then
   brightnessctl set "$BRIGHTNESS%" >/dev/null 2>&1 || true
-fi
-
-if [ -x "$HOME/.config/labwc/index-input" ]; then
-  ( "$HOME/.config/labwc/index-input"; sleep 1; labwc --reconfigure ) >/dev/null 2>&1 &
 fi
 
 [ -x "$HOME/.config/labwc/index-idle" ] && "$HOME/.config/labwc/index-idle" &

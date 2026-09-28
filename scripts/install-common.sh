@@ -57,9 +57,22 @@ fi
 
 say "installing labwc configuration..."
 SAVED_INDEX_CONF=""
+SAVED_LIBINPUT=""
+SAVED_POINTER_SPEED=""; SAVED_NATURAL_SCROLL=""; SAVED_TAP_CLICK=""
+if [[ -f "$CFG/labwc/rc.xml" ]]; then
+  SAVED_LIBINPUT="$(mktemp --suffix=.index-libinput)"
+  sed -n '/<libinput>/,/<\/libinput>/p' "$CFG/labwc/rc.xml" > "$SAVED_LIBINPUT"
+  if ! grep -q '<libinput>' "$SAVED_LIBINPUT" || ! grep -q '</libinput>' "$SAVED_LIBINPUT"; then
+    rm -f "$SAVED_LIBINPUT"
+    SAVED_LIBINPUT=""
+  fi
+fi
 if [[ -f "$CFG/labwc/index.conf" ]]; then
   SAVED_INDEX_CONF="$(mktemp --suffix=.index-conf)"
   cp -f "$CFG/labwc/index.conf" "$SAVED_INDEX_CONF"
+  SAVED_POINTER_SPEED="$(sed -n 's/^POINTER_SPEED=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
+  SAVED_NATURAL_SCROLL="$(sed -n 's/^NATURAL_SCROLL=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
+  SAVED_TAP_CLICK="$(sed -n 's/^TAP_CLICK=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
 fi
 rm -rf "$CFG/labwc"; mkdir -p "$CFG/labwc"
 cp -f "$INDEX_ROOT/labwc/config/rc.xml" "$CFG/labwc/rc.xml"
@@ -67,15 +80,42 @@ cp -f "$INDEX_ROOT/labwc/config/menu.xml" "$CFG/labwc/menu.xml"
 cp -f "$INDEX_ROOT/labwc/config/autostart" "$CFG/labwc/autostart"
 cp -f "$INDEX_ROOT/labwc/config/environment" "$CFG/labwc/environment"
 cp -f "$INDEX_ROOT/wallpaper/the-index.png" "$CFG/labwc/wall.png"
+
+# Labwc rc.xml is the input source of truth. Preserve the complete prior
+# libinput block so advanced per-device overrides survive normal updates. Only
+# fall back to the former index.conf keys when no usable prior block exists.
+if [[ -n "$SAVED_LIBINPUT" && -s "$SAVED_LIBINPUT" ]]; then
+  INPUT_TMP="$(mktemp "$CFG/labwc/.rc.xml.input.XXXXXX")"
+  awk '
+    NR==FNR { block=block $0 ORS; next }
+    !skip && /<libinput>/ { printf "%s", block; skip=1; next }
+    skip { if (/<\/libinput>/) skip=0; next }
+    { print }
+  ' "$SAVED_LIBINPUT" "$CFG/labwc/rc.xml" > "$INPUT_TMP"
+  mv "$INPUT_TMP" "$CFG/labwc/rc.xml"
+  rm -f "$SAVED_LIBINPUT"
+else
+  if [[ "$SAVED_POINTER_SPEED" =~ ^-?(0([.][0-9]+)?|1([.]0+)?)$ ]]; then
+    sed -i "s|<pointerSpeed>[^<]*</pointerSpeed>|<pointerSpeed>$SAVED_POINTER_SPEED</pointerSpeed>|g" "$CFG/labwc/rc.xml"
+  fi
+  case "$SAVED_NATURAL_SCROLL" in
+    yes|no) sed -i "s|<naturalScroll>[^<]*</naturalScroll>|<naturalScroll>$SAVED_NATURAL_SCROLL</naturalScroll>|g" "$CFG/labwc/rc.xml" ;;
+  esac
+  case "$SAVED_TAP_CLICK" in
+    yes|no) sed -i "s|<tap>[^<]*</tap>|<tap>$SAVED_TAP_CLICK</tap>|g" "$CFG/labwc/rc.xml" ;;
+  esac
+fi
+
 if [[ "$INDEX_DEX_COMMAND" != dex ]]; then sed -i -e "s/command -v dex /command -v $INDEX_DEX_COMMAND /" -e "s/dex -a -e labwc/$INDEX_DEX_COMMAND -a -e labwc/" "$CFG/labwc/autostart"; fi
 if [[ "$INDEX_POLKIT_AGENT" != /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]]; then sed -i "s#/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1#$INDEX_POLKIT_AGENT#" "$CFG/labwc/autostart"; fi
 if [[ -n "$SAVED_INDEX_CONF" && -f "$SAVED_INDEX_CONF" ]]; then
   cp -f "$SAVED_INDEX_CONF" "$CFG/labwc/index.conf"
   rm -f "$SAVED_INDEX_CONF"
+  sed -i '/^POINTER_SPEED=/d;/^NATURAL_SCROLL=/d;/^TAP_CLICK=/d;/^CURSOR_SIZE=/d' "$CFG/labwc/index.conf"
 elif [[ -f "$INDEX_ROOT/labwc/config/index.conf" ]]; then
   cp -f "$INDEX_ROOT/labwc/config/index.conf" "$CFG/labwc/index.conf"
 fi
-for script in index-lock index-logout index-display-save index-display-restore index-idle index-input index-clip; do [[ -f "$INDEX_ROOT/labwc/config/$script" ]] || continue; cp -f "$INDEX_ROOT/labwc/config/$script" "$CFG/labwc/$script"; chmod +x "$CFG/labwc/$script"; done
+for script in index-lock index-logout index-display-save index-display-restore index-idle index-clip; do [[ -f "$INDEX_ROOT/labwc/config/$script" ]] || continue; cp -f "$INDEX_ROOT/labwc/config/$script" "$CFG/labwc/$script"; chmod +x "$CFG/labwc/$script"; done
 chmod +x "$CFG/labwc/autostart"
 
 say "installing labwc and GTK themes..."
@@ -125,7 +165,7 @@ QTCONF
 done
 
 [[ -x "$INDEX_ROOT/labwc/app-fixes/apply-browser-fixes.sh" ]] && "$INDEX_ROOT/labwc/app-fixes/apply-browser-fixes.sh"
-mkdir -p "$HOME/.local/bin"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"; install -m755 "$INDEX_ROOT/scripts/index-doctor" "$HOME/.local/bin/index-doctor"; install -m755 "$INDEX_ROOT/scripts/index-backup" "$HOME/.local/bin/index-backup"; install -m755 "$INDEX_ROOT/scripts/index-restore" "$HOME/.local/bin/index-restore"; install -m755 "$INDEX_ROOT/scripts/index-uninstall" "$HOME/.local/bin/index-uninstall"; install -m755 "$INDEX_ROOT/scripts/index-update" "$HOME/.local/bin/index-update"; install -m755 "$INDEX_ROOT/scripts/index-appearance" "$HOME/.local/bin/index-appearance"; install -m755 "$INDEX_ROOT/scripts/index-audio" "$HOME/.local/bin/index-audio"; install -m755 "$INDEX_ROOT/scripts/index-network" "$HOME/.local/bin/index-network"; install -m755 "$INDEX_ROOT/scripts/index-bluetooth" "$HOME/.local/bin/index-bluetooth"; install -m755 "$INDEX_ROOT/scripts/index-power" "$HOME/.local/bin/index-power"; xdg-user-dirs-update; mkdir -p "$HOME/Pictures"
+mkdir -p "$HOME/.local/bin"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"; install -m755 "$INDEX_ROOT/scripts/index-doctor" "$HOME/.local/bin/index-doctor"; install -m755 "$INDEX_ROOT/scripts/index-backup" "$HOME/.local/bin/index-backup"; install -m755 "$INDEX_ROOT/scripts/index-restore" "$HOME/.local/bin/index-restore"; install -m755 "$INDEX_ROOT/scripts/index-uninstall" "$HOME/.local/bin/index-uninstall"; install -m755 "$INDEX_ROOT/scripts/index-update" "$HOME/.local/bin/index-update"; install -m755 "$INDEX_ROOT/scripts/index-appearance" "$HOME/.local/bin/index-appearance"; install -m755 "$INDEX_ROOT/scripts/index-audio" "$HOME/.local/bin/index-audio"; install -m755 "$INDEX_ROOT/scripts/index-network" "$HOME/.local/bin/index-network"; install -m755 "$INDEX_ROOT/scripts/index-bluetooth" "$HOME/.local/bin/index-bluetooth"; install -m755 "$INDEX_ROOT/scripts/index-power" "$HOME/.local/bin/index-power"; install -m755 "$INDEX_ROOT/scripts/index-input" "$HOME/.local/bin/index-input"; xdg-user-dirs-update; mkdir -p "$HOME/Pictures"
 setdef(){ local bin="$1" desktop="$2"; shift 2; command -v "$bin" >/dev/null || return 0; local m; for m in "$@"; do xdg-mime default "$desktop" "$m"; done; }
 setdef thunar thunar.desktop inode/directory; setdef foot foot.desktop text/plain text/x-shellscript application/x-shellscript; setdef imv imv.desktop image/png image/jpeg image/gif image/webp image/bmp image/tiff; setdef mpv mpv.desktop video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo audio/mpeg audio/flac audio/ogg audio/wav audio/x-wav; setdef zathura org.pwmt.zathura.desktop application/pdf application/epub+zip; setdef file-roller "$INDEX_FILE_ROLLER_DESKTOP" application/zip application/x-tar application/gzip application/x-7z-compressed application/vnd.rar; unset -f setdef
 

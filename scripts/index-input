@@ -1,0 +1,138 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — labwc input settings helper
+set -eu
+
+RC="${INDEX_INPUT_RC:-${XDG_CONFIG_HOME:-$HOME/.config}/labwc/rc.xml}"
+LOCK="${RC}.input.lock"
+
+sanitize() { printf '%s' "$1" | tr '\t\r\n' '   '; }
+valid_speed() { printf '%s\n' "$1" | grep -Eq '^-?(0([.][0-9]+)?|1([.]0+)?)$'; }
+
+need_backend() {
+  [ -f "$RC" ] || { echo "input backend unavailable: $RC" >&2; exit 1; }
+}
+
+managed_value() {
+  tag=$1 scope=$2
+  awk -v tag="$tag" -v scope="$scope" '
+    /<device[^>]*category="default"[^>]*>/ { managed=(scope == "pointer") }
+    /<device[^>]*category="touchpad"[^>]*>/ { managed=1 }
+    managed {
+      openTag="<" tag ">"; closeTag="</" tag ">"
+      if (index($0, openTag)) {
+        line=$0
+        sub(".*" openTag, "", line)
+        sub(closeTag ".*", "", line)
+        print line
+        exit
+      }
+    }
+    /<\/device>/ { managed=0 }
+  ' "$RC" 2>/dev/null | head -n1
+}
+
+touchpad_present() {
+  for f in /sys/class/input/event*/device/name /sys/class/input/input*/name; do
+    [ -r "$f" ] || continue
+    name=$(cat "$f" 2>/dev/null || true)
+    printf '%s\n' "$name" | grep -Eqi 'touchpad|trackpad' && { printf '1'; return; }
+  done
+  grep -Eqi 'touchpad|trackpad' /proc/bus/input/devices 2>/dev/null && printf '1' || printf '0'
+}
+
+reload_labwc() {
+  [ "${INDEX_INPUT_NO_RELOAD:-0}" = 1 ] && return 0
+  command -v labwc >/dev/null 2>&1 || return 0
+  labwc --reconfigure >/dev/null 2>&1 || true
+}
+
+replace_managed_unlocked() {
+  tag=$1 value=$2 scope=$3
+  dir=$(dirname "$RC")
+  tmp=$(mktemp "$dir/.rc.xml.input.XXXXXX")
+  trap 'rm -f "$tmp"' EXIT HUP INT TERM
+  awk -v tag="$tag" -v value="$value" -v scope="$scope" '
+    BEGIN { found=0; managed=0 }
+    /<device[^>]*category="default"[^>]*>/ { managed=(scope == "pointer") }
+    /<device[^>]*category="touchpad"[^>]*>/ { managed=1 }
+    managed {
+      openTag="<" tag ">"; closeTag="</" tag ">"
+      if (index($0, openTag)) {
+        found++
+        pattern=openTag "[^<]*" closeTag
+        replacement=openTag value closeTag
+        gsub(pattern, replacement)
+      }
+    }
+    { print }
+    /<\/device>/ { managed=0 }
+    END { if (found == 0) exit 3 }
+  ' "$RC" > "$tmp" || {
+    status=$?
+    rm -f "$tmp"
+    trap - EXIT HUP INT TERM
+    [ "$status" -eq 3 ] && echo "input setting missing from managed Labwc device categories: $tag" >&2
+    return "$status"
+  }
+  if cmp -s "$RC" "$tmp"; then
+    rm -f "$tmp"
+    trap - EXIT HUP INT TERM
+    return 0
+  fi
+  chmod --reference="$RC" "$tmp" 2>/dev/null || true
+  mv "$tmp" "$RC"
+  trap - EXIT HUP INT TERM
+}
+
+replace_managed() {
+  need_backend
+  tag=$1 value=$2 scope=$3
+  if command -v flock >/dev/null 2>&1; then
+    ( flock -x 9; replace_managed_unlocked "$tag" "$value" "$scope" ) 9>"$LOCK"
+  else
+    replace_managed_unlocked "$tag" "$value" "$scope"
+  fi
+  reload_labwc
+}
+
+state() {
+  if [ ! -f "$RC" ]; then
+    printf '0\t0.00\tno\t0\tyes\n'
+    return 0
+  fi
+  speed=$(managed_value pointerSpeed pointer || true)
+  natural=$(managed_value naturalScroll pointer || true)
+  tap=$(managed_value tap touchpad || true)
+  touchpad=$(touchpad_present)
+  valid=1
+  if ! valid_speed "$speed"; then speed=0.00; valid=0; fi
+  case "$natural" in yes|no) ;; *) natural=no; valid=0 ;; esac
+  case "$tap" in yes|no) ;; *) tap=yes; [ "$touchpad" = 1 ] && valid=0 ;; esac
+  printf '%s\t%s\t%s\t%s\t%s\n' "$valid" "$(sanitize "$speed")" "$natural" "$touchpad" "$tap"
+}
+
+case "${1:-}" in
+  state)
+    [ "$#" -eq 1 ] || exit 2
+    state
+    ;;
+  set-speed)
+    [ "$#" -eq 2 ] || exit 2
+    valid_speed "$2" || { echo "invalid pointer speed: $2" >&2; exit 2; }
+    replace_managed pointerSpeed "$2" pointer
+    ;;
+  set-natural-scroll)
+    [ "$#" -eq 2 ] || exit 2
+    case "$2" in yes|no) ;; *) echo "invalid natural-scroll value: $2" >&2; exit 2 ;; esac
+    replace_managed naturalScroll "$2" pointer
+    ;;
+  set-tap)
+    [ "$#" -eq 2 ] || exit 2
+    case "$2" in yes|no) ;; *) echo "invalid tap value: $2" >&2; exit 2 ;; esac
+    replace_managed tap "$2" touchpad
+    ;;
+  *)
+    echo "usage: index-input {state|set-speed VALUE|set-natural-scroll yes|no|set-tap yes|no}" >&2
+    exit 2
+    ;;
+esac
