@@ -11,7 +11,9 @@ if [[ "${INDEX_VALIDATE_CURSOR_ROOT:-0}" == 1 ]]; then chk "$INDEX_CURSOR_ROOT/c
 chk "$DATA/icons/default/index.theme" "default cursor theme"; chk "/usr/share/wayland-sessions/the-index.desktop" "GDM THE INDEX session"
 GDM_SERVICE="${INDEX_GDM_SERVICE:-gdm.service}"
 systemctl is-enabled --quiet "$GDM_SERVICE" && ok "GDM enabled" || { bad "GDM is not enabled ($GDM_SERVICE)"; FAIL=1; }
-if [[ -n "${INDEX_POWER_PROFILE_SERVICE:-}" ]]; then
-  systemctl is-active --quiet "$INDEX_POWER_PROFILE_SERVICE" && ok "power profile backend active" || { bad "power profile backend is not active ($INDEX_POWER_PROFILE_SERVICE)"; FAIL=1; }
+if [[ -x "$HOME/.local/bin/index-power" ]]; then
+  POWER_STATE="$("$HOME/.local/bin/index-power" state 2>/dev/null || true)"
+  POWER_PROFILE_OK="${POWER_STATE%%$'\t'*}"
+  [[ "$POWER_PROFILE_OK" == 1 ]] && ok "power profile backend available" || { bad "power profile backend unavailable"; FAIL=1; }
 fi
 (( FAIL == 0 )) || { bad "installation verification failed"; exit 1; }
