@@ -2,15 +2,37 @@
 
 ![WILL OF THE CITY :: THE INDEX](preview/desktop.png)
 
-A labwc desktop environment themed after *The Index* from Project Moon. labwc is the compositor and Quickshell 0.3+ provides the bar, menus, notifications, widgets and session lock.
+THE INDEX is a Project Moon-inspired Wayland desktop built around [labwc](https://github.com/labwc/labwc) and [Quickshell](https://quickshell.org/). It provides a complete themed session with a custom top bar, settings panels, notifications, clipboard history, launcher, lock screen, GTK/Qt theming, and supporting helper tools.
+
+The project currently targets **Arch Linux / Arch-based systems**, **Fedora Linux**, **Debian 13 (Trixie)**, and **Debian Sid**.
+
+## Desktop overview
+
+THE INDEX keeps a compact cyan/DOS-style interface while relying on standard Linux backends wherever possible.
+
+- **labwc** compositor with THE INDEX server-side window decorations
+- **Quickshell** top bar, menus, notifications, settings, clipboard popup, and session lock
+- centered clock, workspaces, task buttons, notification history, battery status, system tray, and `SET` control in the bar
+- native Settings panels for **Network**, **Bluetooth**, **Audio**, **Appearance**, **Power**, and **Notifications**
+- pointer/touchpad controls integrated into Settings
+- searchable clipboard history with `Super+V`, backed by `cliphist`
+- configurable notification sounds, popup duration, Do Not Disturb, notification actions, and in-session history
+- Wi-Fi management through NetworkManager with advanced configuration delegated to `nm-connection-editor`
+- Bluetooth pairing/connection controls backed by BlueZ, with Blueman available for advanced management
+- PipeWire/WirePlumber audio controls with `pavucontrol` available for advanced mixing
+- power profiles, battery information, brightness, screen timeout, and lid behavior
+- GTK3/GTK4, Qt, Wofi, Foot, Fastfetch, icon, cursor, and bundled font theming
+- Thunar as the default file manager with THE INDEX GTK styling
+- screenshot workflow using grim/slurp/swappy
+- GDM Wayland session entry
 
 ## Install
 
-THE INDEX currently supports Arch Linux/Arch-based systems, Fedora Linux, Debian 13 (Trixie), and Debian Sid. All installers configure the same labwc/Quickshell desktop while using distribution-appropriate packages and setup.
+The installers are intended for a normal systemd-based installation. They install the required packages, configure THE INDEX, create a backup of relevant existing user configuration, and register the Wayland session with GDM.
 
 ### Arch Linux
 
-Target: a fresh Arch Linux or Arch-based installation using pacman and systemd.
+Target: Arch Linux or an Arch-based system using pacman and systemd.
 
 ```bash
 sudo pacman -S --needed git base-devel
@@ -23,7 +45,7 @@ bash ./setup.sh
 
 ### Fedora Linux
 
-Target: Fedora 43 or newer using dnf and systemd. Fedora 44 has been tested successfully.
+Target: Fedora 43 or newer. Fedora 44 has been tested successfully.
 
 ```bash
 sudo dnf install -y git
@@ -32,11 +54,11 @@ cd ~/index-OS
 bash ./install-fedora.sh
 ```
 
-The Fedora installer uses Fedora packages where available. Quickshell is installed from the `nett00n/hyprland` COPR because it is not currently provided by the official Fedora repositories. The Adwaita cursor theme is installed from Fedora's official packages.
+Quickshell is installed from the `nett00n/hyprland` COPR because it is not currently provided by Fedora's official repositories.
 
 ### Debian 13 / Sid
 
-Target: Debian 13 (Trixie) stable or Debian Sid using APT and systemd.
+Target: Debian 13 (Trixie) stable or Debian Sid.
 
 ```bash
 sudo apt update
@@ -46,52 +68,46 @@ cd ~/index-OS
 bash ./install-debian.sh
 ```
 
-On Debian 13, Quickshell 0.3+ is installed from `trixie-backports`; if that suite is not already configured, the installer adds `/etc/apt/sources.list.d/index-os-trixie-backports.sources`. Debian Sid installs Quickshell from Sid directly. The Adwaita cursor theme is installed from Debian's official packages.
+On Debian 13, Quickshell 0.3+ is installed from `trixie-backports`. If that suite is not already configured, the installer adds `/etc/apt/sources.list.d/index-os-trixie-backports.sources`. Debian Sid installs Quickshell directly from Sid.
 
-All supported installers install and enable GDM and register THE INDEX as a Wayland session. Reboot after installation, choose THE INDEX from GDM's session menu, and sign in normally.
+## Starting THE INDEX
 
-You can also start THE INDEX manually from a TTY with:
+After installation, log out or reboot and choose **THE INDEX** from GDM's session menu.
+
+You can also start a session manually from a TTY:
 
 ```bash
 dbus-run-session labwc
 ```
 
-On an existing Fedora GNOME installation, you can switch to TTY3 from a terminal with:
+On an existing Fedora GNOME installation, you can switch to TTY3 with:
 
 ```bash
 sudo chvt 3
 ```
 
-If you want to test Index without GDM retaining the graphical session, save your work first and stop GDM from the TTY. On Arch/Fedora use `gdm`; on Debian use `gdm3`.
-
-If you installed the earlier experimental greetd/ReGreet login on Arch, remove its active system configuration with:
+If you installed the earlier experimental greetd/ReGreet setup, remove that old display-manager configuration with:
 
 ```bash
 bash ./remove-display-manager.sh
 sudo reboot
 ```
 
-The cleanup disables greetd and removes the Index-specific greeter/session files without touching the labwc/Quickshell desktop.
+## Settings
 
-## VMware guests
+Open Settings with the `SET` control on the right side of the top bar.
 
-VMware SVGA3D can provide working Mesa/OpenGL while Qt Quick's Wayland EGL path still fails. Index detects VMware guests and uses `QT_QUICK_BACKEND=software` for Quickshell and the Quickshell lock only; labwc keeps using the normal graphics stack.
+| Area | Main controls |
+|---|---|
+| Network | current connection, networking/Wi-Fi radios, Wi-Fi selection, disconnect, advanced NetworkManager settings |
+| Bluetooth | adapter power, discovery, pairing, connect/disconnect, advanced Blueman settings |
+| Audio | output/input state and volume controls, advanced PipeWire mixer |
+| Appearance | wallpaper, icon theme, cursor theme and cursor size |
+| Power | power profile, battery state, brightness, suspend, screen timeout and lid behavior |
+| Notifications | Do Not Disturb, notification sounds, popup duration, history controls and test notification |
+| Input | pointer speed, natural scrolling and touchpad tap-to-click where supported |
 
-For VMware guest integration, install the appropriate open-vm-tools package for your distribution separately.
-
-## What you get
-
-- Index-themed labwc server-side decorations
-- Quickshell bar with workspaces, taskbar, battery, tray and clock
-- Bluetooth, notification-history and settings panels
-- THE INDEX clipboard history popup with search and cached image previews
-- Quickshell `ext-session-lock-v1` lock screen with PAM authentication
-- Prescript and atmosphere desktop layers
-- UI sound/animation controls
-- grim/slurp/swappy screen capture
-- wlroots/GTK portal configuration
-- Papirus-Dark application icons and Adwaita cursors
-- GDM session entry for THE INDEX
+Advanced system configuration stays in the relevant external tool rather than being reimplemented completely in QML.
 
 ## Main shortcuts
 
@@ -103,19 +119,96 @@ For VMware guest integration, install the appropriate open-vm-tools package for 
 | `Super+F` | Toggle maximize |
 | `Super+L` | Lock session |
 | `Super+1` … `Super+5` | Switch workspace |
-| `Super+V` | Open clipboard history popup |
+| `Super+V` | Open clipboard history |
 | `Super+Shift+S` | Region screenshot/editor |
 | `Print` | Full screenshot |
 
+## Updating
+
+Installed systems include an update helper:
+
+```bash
+index-update
+```
+
+`index-update` downloads the latest `main` branch, creates a normal pre-install backup, and reapplies the correct installer for the detected supported distribution.
+
+After updating, log out and back in before judging session, theme, or Quickshell changes.
+
+## Diagnostics
+
+Run:
+
+```bash
+index-doctor
+```
+
+The doctor checks the installed THE INDEX files, helpers, fonts, themes, Quickshell configuration, and other expected desktop components.
+
+## Backup and restore
+
+The installer automatically creates a backup before applying THE INDEX. You can also create one manually:
+
+```bash
+index-backup
+```
+
+Restore the newest backup with:
+
+```bash
+index-restore latest
+```
+
+List available backups with:
+
+```bash
+index-restore --list
+```
+
+Backups are stored under `${XDG_STATE_HOME:-~/.local/state}/index-os/backups`.
+
+## Uninstall
+
+Remove THE INDEX-managed configuration with:
+
+```bash
+index-uninstall
+```
+
+For non-interactive confirmation:
+
+```bash
+index-uninstall --yes
+```
+
+The uninstaller removes THE INDEX configuration, themes, bundled fonts, helper files, caches, and session registration. It intentionally leaves distro packages and saved backups installed so a previous configuration can still be restored afterward.
+
+## VMware guests
+
+VMware SVGA3D can provide working Mesa/OpenGL while Qt Quick's Wayland EGL path still fails. THE INDEX detects VMware guests and uses `QT_QUICK_BACKEND=software` for Quickshell and the Quickshell lock only; labwc continues using the normal graphics stack.
+
+Install the appropriate `open-vm-tools` package separately if you want VMware guest integration.
+
 ## Optional assets
 
-Drop optional assets in `assets/`, then rerun the installer for your distribution (`bash ./setup.sh` on Arch, `bash ./install-fedora.sh` on Fedora, or `bash ./install-debian.sh` on Debian).
+Drop optional replacements into `assets/`, then rerun the installer for your distribution.
 
 | File | What it changes |
 |---|---|
-| `assets/intro.mp4` | lock intro video |
+| `assets/intro.mp4` | lock-screen intro video |
 | `assets/sounds/bg.mp3` | lock-screen music |
 | `assets/DefaultProfile.jpg` | lock-screen profile picture |
+
+## Project structure
+
+The main implementation is split between:
+
+- `quickshell/` — bar, settings panels, notifications, clipboard UI, lock screen and other QML components
+- `labwc/` — compositor configuration, session scripts, GTK theme and desktop defaults
+- `scripts/` — shared helpers, installer logic, diagnostics, backup/restore, update and uninstall tools
+- `scripts/distro/` — Arch, Fedora and Debian package/setup adapters
+- `assets/` — bundled fonts, sounds and optional media
+- `preview/` — repository screenshots
 
 ## Licence
 
