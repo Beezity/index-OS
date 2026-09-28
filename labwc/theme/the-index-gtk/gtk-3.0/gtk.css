@@ -4,14 +4,143 @@
 @define-color index_cyan_bright #85C5E8;
 @define-color index_cyan_dim #3A7CA5;
 @define-color index_warn #FF6B6B;
-* { font-family: "Perfect DOS VGA 437 Universal", monospace; border-radius: 0; box-shadow: none; }
-window, dialog, .background, popover, menu, .menu { background-color: @index_bg; color: @index_cyan_bright; }
-headerbar, .titlebar { background-color: #05080d; color: @index_cyan_bright; border-bottom: 1px solid @index_cyan_dim; }
-button, entry, spinbutton, combobox, dropdown { background-color: @index_bg_alt; color: @index_cyan_bright; border: 1px solid @index_cyan_dim; }
-button:hover, row:hover, menuitem:hover { background-color: #143245; border-color: @index_cyan; }
-button:checked, button:active, selection, text selection { background-color: @index_cyan; color: #04141c; }
-entry:focus, spinbutton:focus { border-color: @index_cyan; }
-scrollbar slider { background-color: @index_cyan_dim; min-width: 6px; min-height: 6px; }
-scrollbar slider:hover { background-color: @index_cyan; }
-separator { background-color: @index_cyan_dim; min-width: 1px; min-height: 1px; }
-tooltip { background-color: #05080d; color: @index_cyan_bright; border: 1px solid @index_cyan; }
+
+* {
+  font-family: "Perfect DOS VGA 437 Universal", monospace;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+window, dialog, .background, popover, menu, .menu {
+  background-color: @index_bg;
+  color: @index_cyan_bright;
+}
+
+headerbar, .titlebar {
+  background-color: #05080d;
+  color: @index_cyan_bright;
+  border-bottom: 1px solid @index_cyan_dim;
+}
+
+menubar {
+  background-color: #05080d;
+  color: @index_cyan_bright;
+  border-bottom: 1px solid @index_cyan_dim;
+  padding: 0 2px;
+}
+
+menubar > menuitem {
+  padding: 3px 7px;
+}
+
+menu menuitem, .menu menuitem {
+  padding: 4px 8px;
+}
+
+toolbar {
+  background-color: @index_bg;
+  color: @index_cyan_bright;
+  border-bottom: 1px solid @index_cyan_dim;
+  padding: 2px 3px;
+}
+
+toolbar button {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 1px 3px;
+  margin: 0 1px;
+}
+
+toolbar entry {
+  min-height: 24px;
+  padding: 2px 6px;
+}
+
+button, entry, spinbutton, combobox, dropdown {
+  background-color: @index_bg_alt;
+  color: @index_cyan_bright;
+  border: 1px solid @index_cyan_dim;
+}
+
+button:hover, row:hover, menuitem:hover {
+  background-color: #143245;
+  border-color: @index_cyan;
+}
+
+button:checked, button:active, selection, text selection {
+  background-color: @index_cyan;
+  color: #04141c;
+}
+
+entry:focus, spinbutton:focus {
+  border-color: @index_cyan;
+}
+
+scrollbar slider {
+  background-color: @index_cyan_dim;
+  min-width: 6px;
+  min-height: 6px;
+}
+
+scrollbar slider:hover {
+  background-color: @index_cyan;
+}
+
+separator {
+  background-color: @index_cyan_dim;
+  min-width: 1px;
+  min-height: 1px;
+}
+
+statusbar {
+  padding: 2px 6px;
+}
+
+tooltip {
+  background-color: #05080d;
+  color: @index_cyan_bright;
+  border: 1px solid @index_cyan;
+}
+
+/* Thunar exposes stable GTK3 style classes for its main window and chrome.
+ * Keep these rules scoped so the compact file-manager layout does not force
+ * the same density onto unrelated GTK applications. */
+.thunar menubar > menuitem {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.thunar toolbar {
+  padding: 2px 4px;
+}
+
+.thunar toolbar button {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 1px 2px;
+}
+
+.thunar toolbar button image {
+  -gtk-icon-transform: scale(0.80);
+}
+
+.thunar .path-bar button,
+.thunar .location-button {
+  min-height: 22px;
+  padding: 2px 5px;
+}
+
+.thunar .shortcuts-pane {
+  background-color: @index_bg;
+  border-right: 1px solid @index_cyan_dim;
+}
+
+.thunar .shortcuts-pane treeview,
+.thunar .standard-view {
+  background-color: @index_bg;
+}
+
+.thunar statusbar {
+  border-top: 1px solid @index_cyan_dim;
+  padding: 2px 6px;
+}

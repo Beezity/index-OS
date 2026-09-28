@@ -4,14 +4,73 @@
 @define-color index_cyan_bright #85C5E8;
 @define-color index_cyan_dim #3A7CA5;
 @define-color index_warn #FF6B6B;
-* { font-family: "Perfect DOS VGA 437 Universal", monospace; border-radius: 0; box-shadow: none; }
-window, dialog, .background, popover, menu, .menu { background-color: @index_bg; color: @index_cyan_bright; }
-headerbar, .titlebar { background-color: #05080d; color: @index_cyan_bright; border-bottom: 1px solid @index_cyan_dim; }
-button, entry, spinbutton, combobox, dropdown { background-color: @index_bg_alt; color: @index_cyan_bright; border: 1px solid @index_cyan_dim; }
-button:hover, row:hover, menuitem:hover { background-color: #143245; border-color: @index_cyan; }
-button:checked, button:active, selection, text selection { background-color: @index_cyan; color: #04141c; }
-entry:focus, spinbutton:focus { border-color: @index_cyan; }
-scrollbar slider { background-color: @index_cyan_dim; min-width: 6px; min-height: 6px; }
-scrollbar slider:hover { background-color: @index_cyan; }
-separator { background-color: @index_cyan_dim; min-width: 1px; min-height: 1px; }
-tooltip { background-color: #05080d; color: @index_cyan_bright; border: 1px solid @index_cyan; }
+
+* {
+  font-family: "Perfect DOS VGA 437 Universal", monospace;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+window, dialog, .background, popover, menu, .menu {
+  background-color: @index_bg;
+  color: @index_cyan_bright;
+}
+
+headerbar, .titlebar {
+  background-color: #05080d;
+  color: @index_cyan_bright;
+  border-bottom: 1px solid @index_cyan_dim;
+  padding: 2px 4px;
+}
+
+headerbar button {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px 4px;
+}
+
+popover menuitem {
+  padding: 4px 8px;
+}
+
+button, entry, spinbutton, combobox, dropdown {
+  background-color: @index_bg_alt;
+  color: @index_cyan_bright;
+  border: 1px solid @index_cyan_dim;
+}
+
+button:hover, row:hover, menuitem:hover {
+  background-color: #143245;
+  border-color: @index_cyan;
+}
+
+button:checked, button:active, selection, text selection {
+  background-color: @index_cyan;
+  color: #04141c;
+}
+
+entry:focus, spinbutton:focus {
+  border-color: @index_cyan;
+}
+
+scrollbar slider {
+  background-color: @index_cyan_dim;
+  min-width: 6px;
+  min-height: 6px;
+}
+
+scrollbar slider:hover {
+  background-color: @index_cyan;
+}
+
+separator {
+  background-color: @index_cyan_dim;
+  min-width: 1px;
+  min-height: 1px;
+}
+
+tooltip {
+  background-color: #05080d;
+  color: @index_cyan_bright;
+  border: 1px solid @index_cyan;
+}

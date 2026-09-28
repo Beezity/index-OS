@@ -13,8 +13,8 @@
   <theme>
     <name>the-index</name>
     <titlebar><layout>icon:iconify,max,close</layout></titlebar>
-    <font place="ActiveWindow"><name>Perfect DOS VGA 437 Universal</name><size>10</size></font>
-    <font place="InactiveWindow"><name>Perfect DOS VGA 437 Universal</name><size>10</size></font>
+    <font place="ActiveWindow"><name>Perfect DOS VGA 437</name><size>10</size></font>
+    <font place="InactiveWindow"><name>Perfect DOS VGA 437</name><size>10</size></font>
   </theme>
   <desktops>
     <number>5</number>
