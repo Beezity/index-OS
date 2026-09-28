@@ -7,8 +7,12 @@ import "."
 PanelWindow {
     id: launcher
     anchors { top: true; right: true }
-    margins { top: 0; right: 96 }
-    implicitWidth: 24
+    // labwc reserves the 32px bar as an exclusive top zone. Pull this small
+    // overlay back into that zone so the icon is visually part of the bar,
+    // rather than floating in the desktop below it. The right margin leaves
+    // breathing room between the icon and the date block.
+    margins { top: -32; right: 96 }
+    implicitWidth: 26
     implicitHeight: 32
     color: "transparent"
     exclusiveZone: 0
