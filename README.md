@@ -82,7 +82,7 @@ For VMware guest integration, install the appropriate open-vm-tools package for 
 ## What you get
 
 - Index-themed labwc server-side decorations
-- Quickshell bar with workspaces, taskbar, network, Bluetooth, battery, volume, tray, date and clock
+- Quickshell bar with workspaces, taskbar, battery, tray and clock
 - Bluetooth, notification-history and settings panels
 - THE INDEX clipboard history popup with search and cached image previews
 - Quickshell `ext-session-lock-v1` lock screen with PAM authentication
