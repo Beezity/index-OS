@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# WILL OF THE CITY :: THE INDEX — notification preferences backend
+set -Eeuo pipefail
+
+CONFIG="${INDEX_NOTIFICATIONS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/the-index/notifications.conf}"
+LOCK_FILE="${CONFIG}.lock"
+
+DEFAULT_DND=no
+DEFAULT_SOUNDS=yes
+DEFAULT_TIMEOUT_MS=6000
+
+DND="$DEFAULT_DND"
+SOUNDS="$DEFAULT_SOUNDS"
+TIMEOUT_MS="$DEFAULT_TIMEOUT_MS"
+
+valid_bool() {
+  [[ "$1" == yes || "$1" == no ]]
+}
+
+valid_timeout() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9]+$ ]] || return 1
+  (( value == 0 || (value >= 1000 && value <= 60000) ))
+}
+
+load_state() {
+  local key value
+  DND="$DEFAULT_DND"
+  SOUNDS="$DEFAULT_SOUNDS"
+  TIMEOUT_MS="$DEFAULT_TIMEOUT_MS"
+
+  [[ -e "$CONFIG" ]] || return 0
+  [[ -r "$CONFIG" ]] || return 1
+
+  while IFS='=' read -r key value || [[ -n "$key$value" ]]; do
+    case "$key" in
+      DND)
+        valid_bool "$value" && DND="$value"
+        ;;
+      SOUNDS)
+        valid_bool "$value" && SOUNDS="$value"
+        ;;
+      TIMEOUT_MS)
+        valid_timeout "$value" && TIMEOUT_MS="$value"
+        ;;
+      ''|'#'*) ;;
+      *) ;;
+    esac
+  done < "$CONFIG"
+}
+
+save_state() {
+  local dir tmp
+  dir="$(dirname "$CONFIG")"
+  mkdir -p "$dir"
+  chmod 700 "$dir" 2>/dev/null || true
+  umask 077
+  tmp="$(mktemp "$dir/.notifications.conf.XXXXXX")"
+  trap 'rm -f -- "$tmp"' RETURN
+  printf 'DND=%s\nSOUNDS=%s\nTIMEOUT_MS=%s\n' "$DND" "$SOUNDS" "$TIMEOUT_MS" > "$tmp"
+  chmod 600 "$tmp" 2>/dev/null || true
+  mv -f -- "$tmp" "$CONFIG"
+  trap - RETURN
+}
+
+write_setting_unlocked() {
+  local key="$1" value="$2"
+  load_state || { echo "notification settings are not readable" >&2; return 1; }
+  case "$key" in
+    DND) DND="$value" ;;
+    SOUNDS) SOUNDS="$value" ;;
+    TIMEOUT_MS) TIMEOUT_MS="$value" ;;
+    *) return 2 ;;
+  esac
+  save_state
+}
+
+write_setting() {
+  local key="$1" value="$2" dir
+  dir="$(dirname "$CONFIG")"
+  mkdir -p "$dir"
+  if command -v flock >/dev/null 2>&1; then
+    (
+      flock -x 9
+      write_setting_unlocked "$key" "$value"
+    ) 9>"$LOCK_FILE"
+  else
+    write_setting_unlocked "$key" "$value"
+  fi
+}
+
+print_state() {
+  if load_state; then
+    printf '1\t%s\t%s\t%s\n' "$DND" "$SOUNDS" "$TIMEOUT_MS"
+  else
+    printf '0\t%s\t%s\t%s\n' "$DEFAULT_DND" "$DEFAULT_SOUNDS" "$DEFAULT_TIMEOUT_MS"
+  fi
+}
+
+case "${1:-}" in
+  state)
+    [[ $# -eq 1 ]] || exit 2
+    print_state
+    ;;
+  set-dnd)
+    [[ $# -eq 2 ]] || exit 2
+    valid_bool "$2" || { echo "invalid DND value" >&2; exit 2; }
+    write_setting DND "$2"
+    ;;
+  set-sounds)
+    [[ $# -eq 2 ]] || exit 2
+    valid_bool "$2" || { echo "invalid sounds value" >&2; exit 2; }
+    write_setting SOUNDS "$2"
+    ;;
+  set-timeout)
+    [[ $# -eq 2 ]] || exit 2
+    valid_timeout "$2" || { echo "invalid timeout" >&2; exit 2; }
+    write_setting TIMEOUT_MS "$2"
+    ;;
+  *)
+    echo "usage: index-notifications {state|set-dnd yes|no|set-sounds yes|no|set-timeout MS}" >&2
+    exit 2
+    ;;
+esac
