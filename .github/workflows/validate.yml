@@ -130,10 +130,15 @@ jobs:
           chmod +x "$tmp/bin/cliphist" "$tmp/bin/wl-copy" "$tmp/bin/ffmpeg"
 
           run_clip() { env PATH="$tmp/bin:$PATH" XDG_CACHE_HOME="$tmp/cache" bash scripts/index-clipboard "$@"; }
-          for i in $(seq 1 55); do printf 'entry %s' "$i" | run_clip store text; done
+
+          # Preload 51 fake entries and verify pruning leaves the newest 50.
+          for i in $(seq 51 -1 1); do printf '%s\tentry %s\n' "$i" "$i" >> "$FAKE_CLIPHIST_DB"; done
+          printf '51\n' > "$FAKE_CLIPHIST_SEQ"
+          run_clip prune
           dump="$(run_clip dump)"
           test "$(printf '%s\n' "$dump" | head -n1 | cut -f2)" = 1
           test "$(printf '%s\n' "$dump" | head -n1 | cut -f3)" = 50
+          ! grep -q $'^1\t' "$FAKE_CLIPHIST_DB"
 
           printf 'fake-image-data' | run_clip store image
           dump="$(run_clip dump)"
@@ -141,6 +146,12 @@ jobs:
           test -f "$tmp/cache/the-index/clipboard/previews/$newest_id.png"
           run_clip select "$newest_id"
           test "$(cat "$FAKE_WLCOPY_OUT")" = fake-image-data
+
+          if run_clip select '1;echo bad'; then
+            echo 'unsafe clipboard id unexpectedly accepted'
+            exit 1
+          fi
+
           run_clip clear
           test "$(run_clip dump | head -n1 | cut -f3)" = 0
           test -z "$(find "$tmp/cache/the-index/clipboard/previews" -type f -name '*.png' -print -quit)"
