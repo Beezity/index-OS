@@ -1,6 +1,7 @@
 // WILL OF THE CITY :: THE INDEX — standalone About/System popup
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 
 PanelWindow {
