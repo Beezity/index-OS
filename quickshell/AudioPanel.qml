@@ -21,7 +21,10 @@ Rectangle {
     property bool inputMuted: false
     property string outputName: "NO OUTPUT"
     property string inputName: "NO INPUT"
+    property bool serviceOnline: false
     property bool ready: false
+    readonly property bool outputAvailable: serviceOnline && outputName !== "NO OUTPUT"
+    readonly property bool inputAvailable: serviceOnline && inputName !== "NO INPUT"
 
     function run(cmd) { Quickshell.execDetached(["sh", "-c", cmd]) }
     function refresh() { if (!stateGet.running) stateGet.running = true }
@@ -40,17 +43,22 @@ Rectangle {
         stdout: StdioCollector {
             onStreamFinished: {
                 var f = text.trim().split("\t")
-                if (f.length >= 4) {
-                    var outState = f[0].split("|")
-                    var inState = f[1].split("|")
+                if (f.length >= 5) {
+                    root.serviceOnline = f[0] === "1"
+                    var outState = f[1].split("|")
+                    var inState = f[2].split("|")
                     var ov = parseInt(outState[0]); if (!isNaN(ov)) root.outputVolume = ov
                     root.outputMuted = outState[1] === "1"
                     var iv = parseInt(inState[0]); if (!isNaN(iv)) root.inputVolume = iv
                     root.inputMuted = inState[1] === "1"
-                    root.outputName = f[2] || "NO OUTPUT"
-                    root.inputName = f.slice(3).join("\t") || "NO INPUT"
-                    root.ready = true
+                    root.outputName = f[3] || "NO OUTPUT"
+                    root.inputName = f.slice(4).join("\t") || "NO INPUT"
+                } else {
+                    root.serviceOnline = false
+                    root.outputName = "NO OUTPUT"
+                    root.inputName = "NO INPUT"
                 }
+                root.ready = true
             }
         }
     }
@@ -90,6 +98,14 @@ Rectangle {
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: root.cyanD }
 
+        Text {
+            visible: !root.ready || !root.serviceOnline
+            Layout.fillWidth: true
+            text: !root.ready ? "CHECKING AUDIO..." : "PIPEWIRE / WIREPLUMBER UNAVAILABLE"
+            font.family: root.pixel; font.pixelSize: 10
+            color: root.ready ? root.warn : root.cyanD
+        }
+
         Text { text: "OUTPUT"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB }
         Text {
             Layout.fillWidth: true
@@ -102,16 +118,19 @@ Rectangle {
             Layout.fillWidth: true; spacing: 6
             Rectangle {
                 Layout.fillWidth: true; height: 32
+                opacity: root.serviceOnline ? 1.0 : 0.45
                 color: outDevArea.containsMouse ? "#143245" : "#0c1620"
                 border.color: root.cyanD; border.width: 1
                 Text { anchors.centerIn: parent; text: "CHANGE OUTPUT"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
                 MouseArea {
                     id: outDevArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    enabled: root.serviceOnline
                     onClicked: { root.run("$HOME/.local/bin/index-audio choose-output"); delayedRefresh.restart() }
                 }
             }
             Rectangle {
                 width: 82; height: 32
+                opacity: root.outputAvailable ? 1.0 : 0.45
                 color: root.outputMuted ? root.warn : "transparent"
                 border.color: root.outputMuted ? root.warn : root.cyanD; border.width: 1
                 Text {
@@ -122,6 +141,7 @@ Rectangle {
                 }
                 MouseArea {
                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    enabled: root.outputAvailable
                     onClicked: { root.run("$HOME/.local/bin/index-audio toggle-output-mute"); root.outputMuted = !root.outputMuted; delayedRefresh.restart() }
                 }
             }
@@ -133,6 +153,7 @@ Rectangle {
         }
         Rectangle {
             Layout.fillWidth: true; height: 18
+            opacity: root.outputAvailable ? 1.0 : 0.45
             color: "#04141c"; border.color: root.cyanD; border.width: 1
             Rectangle {
                 anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
@@ -142,6 +163,7 @@ Rectangle {
             }
             MouseArea {
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                enabled: root.outputAvailable
                 function setFromX(mx) {
                     root.outputVolume = Math.max(0, Math.min(100, Math.round(mx / width * 100)))
                     root.run("$HOME/.local/bin/index-audio set-output-volume " + root.outputVolume)
@@ -169,16 +191,19 @@ Rectangle {
             Layout.fillWidth: true; spacing: 6
             Rectangle {
                 Layout.fillWidth: true; height: 32
+                opacity: root.serviceOnline ? 1.0 : 0.45
                 color: inDevArea.containsMouse ? "#143245" : "#0c1620"
                 border.color: root.cyanD; border.width: 1
                 Text { anchors.centerIn: parent; text: "CHANGE INPUT"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
                 MouseArea {
                     id: inDevArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    enabled: root.serviceOnline
                     onClicked: { root.run("$HOME/.local/bin/index-audio choose-input"); delayedRefresh.restart() }
                 }
             }
             Rectangle {
                 width: 82; height: 32
+                opacity: root.inputAvailable ? 1.0 : 0.45
                 color: root.inputMuted ? root.warn : "transparent"
                 border.color: root.inputMuted ? root.warn : root.cyanD; border.width: 1
                 Text {
@@ -189,6 +214,7 @@ Rectangle {
                 }
                 MouseArea {
                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    enabled: root.inputAvailable
                     onClicked: { root.run("$HOME/.local/bin/index-audio toggle-input-mute"); root.inputMuted = !root.inputMuted; delayedRefresh.restart() }
                 }
             }
@@ -200,6 +226,7 @@ Rectangle {
         }
         Rectangle {
             Layout.fillWidth: true; height: 18
+            opacity: root.inputAvailable ? 1.0 : 0.45
             color: "#04141c"; border.color: root.cyanD; border.width: 1
             Rectangle {
                 anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
@@ -209,6 +236,7 @@ Rectangle {
             }
             MouseArea {
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                enabled: root.inputAvailable
                 function setFromX(mx) {
                     root.inputVolume = Math.max(0, Math.min(100, Math.round(mx / width * 100)))
                     root.run("$HOME/.local/bin/index-audio set-input-volume " + root.inputVolume)
