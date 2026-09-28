@@ -32,7 +32,7 @@ cd ~/index-OS
 bash ./install-fedora.sh
 ```
 
-The Fedora installer uses Fedora packages where available. Quickshell is installed from the `nett00n/hyprland` COPR because it is not currently provided by the official Fedora repositories. The Capitaine cursor theme is built from its upstream source and installed for the current user.
+The Fedora installer uses Fedora packages where available. Quickshell is installed from the `nett00n/hyprland` COPR because it is not currently provided by the official Fedora repositories. The Adwaita cursor theme is installed from Fedora's official packages.
 
 ### Debian 13 / Sid
 
@@ -46,7 +46,7 @@ cd ~/index-OS
 bash ./install-debian.sh
 ```
 
-On Debian 13, Quickshell 0.3+ is installed from `trixie-backports`; if that suite is not already configured, the installer adds `/etc/apt/sources.list.d/index-os-trixie-backports.sources`. Debian Sid installs Quickshell from Sid directly. Capitaine is built from upstream source and installed for the current user.
+On Debian 13, Quickshell 0.3+ is installed from `trixie-backports`; if that suite is not already configured, the installer adds `/etc/apt/sources.list.d/index-os-trixie-backports.sources`. Debian Sid installs Quickshell from Sid directly. The Adwaita cursor theme is installed from Debian's official packages.
 
 All supported installers install and enable GDM and register THE INDEX as a Wayland session. Reboot after installation, choose THE INDEX from GDM's session menu, and sign in normally.
 
@@ -89,7 +89,7 @@ For VMware guest integration, install the appropriate open-vm-tools package for 
 - UI sound/animation controls
 - grim/slurp/swappy screen capture
 - wlroots/GTK portal configuration
-- Papirus-Dark application icons and Capitaine cursors
+- Papirus-Dark application icons and Adwaita cursors
 - GDM session entry for THE INDEX
 
 ## Main shortcuts
