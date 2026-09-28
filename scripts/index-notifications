@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # WILL OF THE CITY :: THE INDEX — notification preferences backend
 set -Eeuo pipefail
+umask 077
 
 CONFIG="${INDEX_NOTIFICATIONS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/the-index/notifications.conf}"
 LOCK_FILE="${CONFIG}.lock"
@@ -30,7 +31,7 @@ load_state() {
   TIMEOUT_MS="$DEFAULT_TIMEOUT_MS"
 
   [[ -e "$CONFIG" ]] || return 0
-  [[ -r "$CONFIG" ]] || return 1
+  [[ -f "$CONFIG" && -r "$CONFIG" ]] || return 1
 
   while IFS='=' read -r key value || [[ -n "$key$value" ]]; do
     case "$key" in
@@ -54,7 +55,6 @@ save_state() {
   dir="$(dirname "$CONFIG")"
   mkdir -p "$dir"
   chmod 700 "$dir" 2>/dev/null || true
-  umask 077
   tmp="$(mktemp "$dir/.notifications.conf.XXXXXX")"
   trap 'rm -f -- "$tmp"' RETURN
   printf 'DND=%s\nSOUNDS=%s\nTIMEOUT_MS=%s\n' "$DND" "$SOUNDS" "$TIMEOUT_MS" > "$tmp"
@@ -79,6 +79,7 @@ write_setting() {
   local key="$1" value="$2" dir
   dir="$(dirname "$CONFIG")"
   mkdir -p "$dir"
+  chmod 700 "$dir" 2>/dev/null || true
   if command -v flock >/dev/null 2>&1; then
     (
       flock -x 9
