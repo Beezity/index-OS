@@ -84,6 +84,7 @@ For VMware guest integration, install the appropriate open-vm-tools package for 
 - Index-themed labwc server-side decorations
 - Quickshell bar with workspaces, taskbar, network, Bluetooth, battery, volume, tray, date and clock
 - Bluetooth, notification-history and settings panels
+- THE INDEX clipboard history popup with search and cached image previews
 - Quickshell `ext-session-lock-v1` lock screen with PAM authentication
 - Prescript and atmosphere desktop layers
 - UI sound/animation controls
@@ -102,7 +103,7 @@ For VMware guest integration, install the appropriate open-vm-tools package for 
 | `Super+F` | Toggle maximize |
 | `Super+L` | Lock session |
 | `Super+1` … `Super+5` | Switch workspace |
-| `Super+V` | Clipboard history |
+| `Super+V` | Open clipboard history popup |
 | `Super+Shift+S` | Region screenshot/editor |
 | `Print` | Full screenshot |
 
