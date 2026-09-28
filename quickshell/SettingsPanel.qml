@@ -39,6 +39,7 @@ Rectangle {
     property bool bluetoothOpen: false
     property bool powerOpen: false
     property bool inputOpen: false
+    property bool notificationOpen: false
 
     // Build one locked, atomic config write.
     // The old version launched several detached read/temp/move jobs at once, so
@@ -93,6 +94,7 @@ Rectangle {
             panel.bluetoothOpen = false
             panel.powerOpen = false
             panel.inputOpen = false
+            panel.notificationOpen = false
         }
     }
     Component.onCompleted: panel.refresh()
@@ -179,7 +181,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 14
         spacing: 12
-        visible: !panel.appearanceOpen && !panel.audioOpen && !panel.networkOpen && !panel.bluetoothOpen && !panel.powerOpen && !panel.inputOpen
+        visible: !panel.appearanceOpen && !panel.audioOpen && !panel.networkOpen && !panel.bluetoothOpen && !panel.powerOpen && !panel.inputOpen && !panel.notificationOpen
 
         // header
         RowLayout {
@@ -415,7 +417,8 @@ Rectangle {
                     { t: "FILES",     s: "manager", c: "thunar" },
                     { t: "MUTE",      s: "toggle",  c: "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" },
                     { t: "APPEARANCE", s: "themes", page: "appearance" },
-                    { t: "POWER",      s: "profiles", page: "power" }
+                    { t: "POWER",      s: "profiles", page: "power" },
+                    { t: "NOTIFICATIONS", s: NotificationPrefs.dnd ? "DND" : "popups", page: "notifications" }
                 ]
                 delegate: Rectangle {
                     required property var modelData
@@ -442,6 +445,7 @@ Rectangle {
                             else if (modelData.page === "network") panel.networkOpen = true
                             else if (modelData.page === "bluetooth") panel.bluetoothOpen = true
                             else if (modelData.page === "power") panel.powerOpen = true
+                            else if (modelData.page === "notifications") panel.notificationOpen = true
                             else { panel.run(modelData.c); panel.requestClose() }
                         }
                     }
@@ -576,5 +580,11 @@ Rectangle {
         anchors.fill: parent
         visible: panel.inputOpen
         onRequestBack: panel.inputOpen = false
+    }
+
+    NotificationPanel {
+        anchors.fill: parent
+        visible: panel.notificationOpen
+        onRequestBack: panel.notificationOpen = false
     }
 }
