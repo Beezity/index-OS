@@ -25,6 +25,7 @@ PanelWindow {
     function showPopup() {
         open = true
         query = ""
+        searchInput.text = ""
         refresh()
         Qt.callLater(function() { searchInput.forceActiveFocus() })
         Sfx.play("menu")
@@ -33,6 +34,7 @@ PanelWindow {
     function hidePopup() {
         open = false
         query = ""
+        searchInput.text = ""
     }
 
     function togglePopup() {
@@ -127,8 +129,8 @@ PanelWindow {
     Rectangle {
         id: panel
         anchors.centerIn: parent
-        width: 460
-        height: 520
+        width: Math.min(460, Math.max(320, popup.width - 24))
+        height: Math.min(520, Math.max(320, popup.height - 24))
         color: IndexTheme.background
         border.color: IndexTheme.cyan
         border.width: IndexTheme.panelBorderWidth
@@ -182,12 +184,9 @@ PanelWindow {
                     font.family: IndexTheme.pixel
                     font.pixelSize: IndexTheme.smallSize
                     clip: true
-                    text: popup.query
                     onTextChanged: {
-                        if (popup.query !== text) {
-                            popup.query = text
-                            popup.rebuild()
-                        }
+                        popup.query = text
+                        popup.rebuild()
                     }
                     Keys.onPressed: function(event) {
                         if (event.key === Qt.Key_Down) {
@@ -253,15 +252,17 @@ PanelWindow {
                 boundsBehavior: Flickable.StopAtBounds
 
                 delegate: Rectangle {
+                    id: itemDelegate
                     required property string itemId
                     required property string kind
                     required property string mime
                     required property string preview
                     required property string thumbnail
+                    readonly property bool selected: ListView.isCurrentItem
 
                     width: ListView.view.width
                     height: 66
-                    color: ListView.isCurrentItem ? IndexTheme.cyan : (itemMouse.containsMouse ? IndexTheme.surfaceHover : IndexTheme.surface)
+                    color: selected ? IndexTheme.cyan : (itemMouse.containsMouse ? IndexTheme.surfaceHover : IndexTheme.surface)
                     border.color: IndexTheme.cyanDark
                     border.width: 1
 
@@ -273,16 +274,16 @@ PanelWindow {
                         Rectangle {
                             Layout.preferredWidth: 52
                             Layout.preferredHeight: 52
-                            color: parent.parent.ListView.isCurrentItem ? IndexTheme.cyanBright : IndexTheme.backgroundDeep
-                            border.color: parent.parent.ListView.isCurrentItem ? IndexTheme.ink : IndexTheme.cyanDark
+                            color: itemDelegate.selected ? IndexTheme.cyanBright : IndexTheme.backgroundDeep
+                            border.color: itemDelegate.selected ? IndexTheme.ink : IndexTheme.cyanDark
                             border.width: 1
                             clip: true
 
                             Image {
                                 anchors.fill: parent
                                 anchors.margins: 2
-                                visible: kind === "image" && thumbnail.length > 0
-                                source: thumbnail
+                                visible: itemDelegate.kind === "image" && itemDelegate.thumbnail.length > 0
+                                source: itemDelegate.thumbnail
                                 asynchronous: true
                                 cache: true
                                 fillMode: Image.PreserveAspectFit
@@ -290,11 +291,11 @@ PanelWindow {
 
                             Text {
                                 anchors.centerIn: parent
-                                visible: kind !== "image" || thumbnail.length === 0
-                                text: kind === "image" ? "IMG" : "TXT"
+                                visible: itemDelegate.kind !== "image" || itemDelegate.thumbnail.length === 0
+                                text: itemDelegate.kind === "image" ? "IMG" : "TXT"
                                 font.family: IndexTheme.pixel
                                 font.pixelSize: IndexTheme.tinySize
-                                color: parent.parent.parent.ListView.isCurrentItem ? IndexTheme.ink : IndexTheme.cyanDark
+                                color: itemDelegate.selected ? IndexTheme.ink : IndexTheme.cyanDark
                             }
                         }
 
@@ -303,21 +304,21 @@ PanelWindow {
                             spacing: 3
                             Text {
                                 Layout.fillWidth: true
-                                text: preview
+                                text: itemDelegate.preview
                                 maximumLineCount: 2
                                 wrapMode: Text.Wrap
                                 elide: Text.ElideRight
                                 font.family: IndexTheme.pixel
                                 font.pixelSize: IndexTheme.smallSize
-                                color: parent.parent.parent.ListView.isCurrentItem ? IndexTheme.ink : IndexTheme.cyanBright
+                                color: itemDelegate.selected ? IndexTheme.ink : IndexTheme.cyanBright
                             }
                             Text {
                                 Layout.fillWidth: true
-                                text: kind.toUpperCase() + (mime.length > 0 ? "  " + mime : "")
+                                text: itemDelegate.kind.toUpperCase() + (itemDelegate.mime.length > 0 ? "  " + itemDelegate.mime : "")
                                 elide: Text.ElideRight
                                 font.family: IndexTheme.pixel
                                 font.pixelSize: IndexTheme.tinySize
-                                color: parent.parent.parent.ListView.isCurrentItem ? IndexTheme.ink : IndexTheme.cyanDark
+                                color: itemDelegate.selected ? IndexTheme.ink : IndexTheme.cyanDark
                             }
                         }
                     }
@@ -345,6 +346,7 @@ PanelWindow {
                 Rectangle {
                     Layout.preferredWidth: 120
                     height: 28
+                    opacity: clearMouse.enabled ? 1.0 : 0.45
                     color: clearMouse.containsMouse ? IndexTheme.surfaceHover : "transparent"
                     border.color: IndexTheme.cyanDark
                     border.width: 1
