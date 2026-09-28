@@ -7,7 +7,6 @@ Notifications 1.0 Notifications.qml
 Osd 1.0 Osd.qml
 BluetoothMenu 1.0 BluetoothMenu.qml
 SettingsPanel 1.0 SettingsPanel.qml
-SettingsLauncher 1.0 SettingsLauncher.qml
 AppearancePanel 1.0 AppearancePanel.qml
 IndexSectionButton 1.0 IndexSectionButton.qml
 AboutSystem 1.0 AboutSystem.qml
