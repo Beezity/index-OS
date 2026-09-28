@@ -37,15 +37,6 @@ set_ini_value() {
     printf '\n%s=%s\n' "$key" "$value" >> "$file"
   fi
 }
-sync_input_cursor_size() {
-  size=$1
-  f="$LABWC/index.conf"
-  mkdir -p "$LABWC"
-  touch "$f"
-  t=$(mktemp "$LABWC/index.conf.tmp.XXXXXX")
-  { grep -v '^CURSOR_SIZE=' "$f" || true; printf 'CURSOR_SIZE=%s\n' "$size"; } > "$t"
-  mv "$t" "$f"
-}
 apply_icons() {
   theme=$1
   command -v gsettings >/dev/null 2>&1 && gsettings set org.gnome.desktop.interface icon-theme "$theme" >/dev/null 2>&1 || true
@@ -72,7 +63,6 @@ apply_cursor() {
   envf="$LABWC/environment"; touch "$envf"
   sed -i '/^XCURSOR_THEME=/d;/^XCURSOR_SIZE=/d' "$envf"
   printf 'XCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$theme" "$size" >> "$envf"
-  sync_input_cursor_size "$size"
   command -v labwc >/dev/null 2>&1 && labwc --reconfigure >/dev/null 2>&1 || true
 }
 apply_wallpaper() {
