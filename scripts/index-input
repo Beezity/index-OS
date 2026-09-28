@@ -99,11 +99,12 @@ state() {
   speed=$(managed_value pointerSpeed pointer || true)
   natural=$(managed_value naturalScroll pointer || true)
   tap=$(managed_value tap touchpad || true)
+  touchpad=$(touchpad_present)
   valid=1
   if ! valid_speed "$speed"; then speed=0.00; valid=0; fi
   case "$natural" in yes|no) ;; *) natural=no; valid=0 ;; esac
-  case "$tap" in yes|no) ;; *) tap=yes; valid=0 ;; esac
-  printf '%s\t%s\t%s\t%s\t%s\n' "$valid" "$(sanitize "$speed")" "$natural" "$(touchpad_present)" "$tap"
+  case "$tap" in yes|no) ;; *) tap=yes; [ "$touchpad" = 1 ] && valid=0 ;; esac
+  printf '%s\t%s\t%s\t%s\t%s\n' "$valid" "$(sanitize "$speed")" "$natural" "$touchpad" "$tap"
 }
 
 case "${1:-}" in
