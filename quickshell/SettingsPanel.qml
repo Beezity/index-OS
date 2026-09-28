@@ -42,6 +42,7 @@ Rectangle {
     property bool audioOpen: false
     property bool networkOpen: false
     property bool bluetoothOpen: false
+    property bool powerOpen: false
 
     // Build one locked, atomic config write.
     // The old version launched several detached read/temp/move jobs at once, so
@@ -112,6 +113,7 @@ Rectangle {
             panel.audioOpen = false
             panel.networkOpen = false
             panel.bluetoothOpen = false
+            panel.powerOpen = false
         }
     }
     Component.onCompleted: panel.refresh()
@@ -217,7 +219,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 14
         spacing: 12
-        visible: !panel.appearanceOpen && !panel.audioOpen && !panel.networkOpen && !panel.bluetoothOpen
+        visible: !panel.appearanceOpen && !panel.audioOpen && !panel.networkOpen && !panel.bluetoothOpen && !panel.powerOpen
 
         // header
         RowLayout {
@@ -273,7 +275,7 @@ Rectangle {
                 text: ">_ power settings _<"
                 font.family: panel.pixel; font.pixelSize: 10; color: panel.cyanD
                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                    onClicked: panel.run("xfce4-power-manager-settings || gnome-power-statistics || true") }
+                    onClicked: panel.powerOpen = true }
             }
         }
 
@@ -532,7 +534,8 @@ Rectangle {
                     { t: "DISPLAY",   s: "outputs", c: "wdisplays || wlr-randr" },
                     { t: "FILES",     s: "manager", c: "thunar" },
                     { t: "MUTE",      s: "toggle",  c: "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" },
-                    { t: "APPEARANCE", s: "themes", page: "appearance" }
+                    { t: "APPEARANCE", s: "themes", page: "appearance" },
+                    { t: "POWER",      s: "profiles", page: "power" }
                 ]
                 delegate: Rectangle {
                     required property var modelData
@@ -558,6 +561,7 @@ Rectangle {
                             else if (modelData.page === "audio") panel.audioOpen = true
                             else if (modelData.page === "network") panel.networkOpen = true
                             else if (modelData.page === "bluetooth") panel.bluetoothOpen = true
+                            else if (modelData.page === "power") panel.powerOpen = true
                             else { panel.run(modelData.c); panel.requestClose() }
                         }
                     }
@@ -680,5 +684,11 @@ Rectangle {
         embedded: true
         visible: panel.bluetoothOpen
         onRequestBack: panel.bluetoothOpen = false
+    }
+
+    PowerPanel {
+        anchors.fill: parent
+        visible: panel.powerOpen
+        onRequestBack: panel.powerOpen = false
     }
 }
