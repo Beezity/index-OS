@@ -15,7 +15,7 @@ require_command(){ command -v "$1" >/dev/null 2>&1 || { bad "required command mi
 require_file(){ [[ -f "$INDEX_ROOT/$1" ]] || { bad "repository file missing: $1"; return 1; }; }
 
 INDEX_REQUIRED_FILES=(
-  wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/BluetoothMenu.qml quickshell/PowerPanel.qml quickshell/InputPanel.qml quickshell/lock/lock.qml quickshell/prescript.json
+  wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/BluetoothMenu.qml quickshell/PowerPanel.qml quickshell/InputPanel.qml quickshell/ClipboardPopup.qml quickshell/lock/lock.qml quickshell/prescript.json
   labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment
   labwc/config/index-lock labwc/config/index-idle labwc/config/index-clip
   labwc/config/fontconfig/fonts.conf labwc/config/gtk/settings.ini
@@ -24,7 +24,7 @@ INDEX_REQUIRED_FILES=(
   labwc/theme/the-index/labwc/themerc
   labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme
   labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps labwc/session/the-index.desktop
-  fish/config.fish install-fish.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input
+  fish/config.fish install-fish.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard
 )
 validate_repository_layout(){
   local rel
