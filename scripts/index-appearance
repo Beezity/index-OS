@@ -90,6 +90,7 @@ case "${1:-}" in
   get) getv "$2" ;;
   set-icons) setv ICON_THEME "$2"; apply_icons "$2" ;;
   set-cursor) setv CURSOR_THEME "$2"; setv CURSOR_SIZE "${3:-24}"; apply_cursor "$2" "${3:-24}" ;;
+  set-cursor-size) theme=$(getv CURSOR_THEME); [ -n "$theme" ] || theme=capitaine-cursors; setv CURSOR_SIZE "$2"; apply_cursor "$theme" "$2" ;;
   set-wallpaper) [ -f "$2" ] || { echo "Wallpaper not found: $2" >&2; exit 2; }; setv WALLPAPER "$2"; apply_wallpaper "$2" ;;
   reset-wallpaper) setv WALLPAPER "$DEFAULT_WALL"; apply_wallpaper "$DEFAULT_WALL" ;;
   apply)
@@ -98,5 +99,5 @@ case "${1:-}" in
     [ -n "$cursor" ] && apply_cursor "$cursor" "${size:-24}" || true
     if [ -n "$wall" ] && [ -f "$wall" ]; then apply_wallpaper "$wall"; else setv WALLPAPER "$DEFAULT_WALL"; apply_wallpaper "$DEFAULT_WALL"; fi
     ;;
-  *) echo "usage: index-appearance {list-icons|list-cursors|get KEY|set-icons THEME|set-cursor THEME [SIZE]|set-wallpaper FILE|reset-wallpaper|apply}" >&2; exit 2 ;;
+  *) echo "usage: index-appearance {list-icons|list-cursors|get KEY|set-icons THEME|set-cursor THEME [SIZE]|set-cursor-size SIZE|set-wallpaper FILE|reset-wallpaper|apply}" >&2; exit 2 ;;
 esac
