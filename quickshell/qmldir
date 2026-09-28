@@ -1,6 +1,7 @@
 singleton NotifHistory 1.0 NotifHistory.qml
 singleton IndexTheme 1.0 IndexTheme.qml
 Bar 1.0 Bar.qml
+AboutPopup 1.0 AboutPopup.qml
 Atmosphere 1.0 Atmosphere.qml
 Notifications 1.0 Notifications.qml
 Osd 1.0 Osd.qml
