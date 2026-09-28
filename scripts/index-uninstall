@@ -33,6 +33,7 @@ remove \
   "$HOME/.config/labwc" \
   "$HOME/.config/quickshell" \
   "$HOME/.config/fastfetch" \
+  "$HOME/.config/the-index" \
   "$HOME/.local/share/themes/the-index"
 
 remove \
@@ -67,7 +68,8 @@ fi
 remove \
   "$HOME/.local/bin/index-default-apps" \
   "$HOME/.local/bin/index-snip" \
-  "$HOME/.local/bin/index-doctor"
+  "$HOME/.local/bin/index-doctor" \
+  "$HOME/.local/bin/index-appearance"
 
 rmdir "$HOME/.config/fontconfig" "$HOME/.config/wofi" "$HOME/.config/foot" "$HOME/.config/fish" 2>/dev/null || true
 rmdir "$HOME/.config/xdg-desktop-portal/wlr" "$HOME/.config/xdg-desktop-portal" 2>/dev/null || true
