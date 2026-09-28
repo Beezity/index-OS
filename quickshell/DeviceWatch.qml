@@ -18,11 +18,16 @@ Item {
 
     Timer { id: unmute; interval: 1200; repeat: false; onTriggered: Sfx.muteNotify = false }
 
+    function playCue(name) {
+        if (!NotificationPrefs.dnd && NotificationPrefs.sounds)
+            Sfx.play(name)
+    }
+
     function notify(title, body) {
         Sfx.muteNotify = true; unmute.restart()
-        Quickshell.execDetached(["sh","-c",
-            "notify-send -a 'THE INDEX :: DEVICE' " +
-            "\"" + title.replace(/"/g,"") + "\" \"" + body.replace(/"/g,"") + "\" 2>/dev/null"])
+        // Device names can originate from external hardware. Pass them as
+        // argv instead of interpolating them into a shell command.
+        Quickshell.execDetached(["notify-send", "-a", "THE INDEX :: DEVICE", String(title), String(body)])
     }
 
     function settle() {
@@ -45,8 +50,8 @@ Item {
                 var newL = v.split(" ").filter(function(x){return x !== ""})
                 var added = newL.filter(function(x){ return oldL.indexOf(x) < 0 })
                 var gone  = oldL.filter(function(x){ return newL.indexOf(x) < 0 })
-                if (added.length) { Sfx.play("connect");    dev.notify("USB CONNECTED", "/dev/" + added.join(", /dev/")) }
-                if (gone.length)  { Sfx.play("disconnect"); dev.notify("USB REMOVED",   "/dev/" + gone.join(", /dev/")) }
+                if (added.length) { dev.playCue("connect");    dev.notify("USB CONNECTED", "/dev/" + added.join(", /dev/")) }
+                if (gone.length)  { dev.playCue("disconnect"); dev.notify("USB REMOVED",   "/dev/" + gone.join(", /dev/")) }
             }
             dev.usbList = v
             dev.settle()
@@ -84,7 +89,7 @@ Item {
         var eq = record.indexOf("=")
         var name = eq > 0 ? record.substring(eq + 1) : record
         Sfx.muteNotify = true; unmute.restart()
-        Sfx.play(connected ? "connect" : "disconnect")
+        dev.playCue(connected ? "connect" : "disconnect")
         dev.notify(connected ? "BLUETOOTH CONNECTED" : "BLUETOOTH DISCONNECTED", name)
     }
 
@@ -104,7 +109,7 @@ Item {
                 var was = dev.sinkList.split("|").filter(function(x){return x !== ""}).length
                 var now = v.split("|").filter(function(x){return x !== ""}).length
                 if (now !== was) {
-                    Sfx.play(now > was ? "connect" : "disconnect")
+                    dev.playCue(now > was ? "connect" : "disconnect")
                     dev.notify(now > was ? "AUDIO DEVICE CONNECTED" : "AUDIO DEVICE REMOVED",
                                now + " output" + (now === 1 ? "" : "s") + " available")
                 }
@@ -122,7 +127,7 @@ Item {
         stdout: StdioCollector { onStreamFinished: {
             var v = text.trim()
             if (dev.primed && v !== "" && v !== dev.acState) {
-                Sfx.play(v === "1" ? "connect" : "disconnect")
+                dev.playCue(v === "1" ? "connect" : "disconnect")
                 dev.notify(v === "1" ? "CHARGER CONNECTED" : "ON BATTERY",
                            v === "1" ? "power restored" : "running on battery")
             }

@@ -170,7 +170,6 @@ PanelWindow {
                     font.family: bar.pixel; font.pixelSize: 13
                     color: ssid ? bar.cyanD : bar.warn
                     elide: Text.ElideRight; Layout.maximumWidth: 150
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { bar.settingsOpen = !bar.settingsOpen; Sfx.play("menu") } }
                 }
                 Process {
                     id: netProc
@@ -319,9 +318,9 @@ PanelWindow {
                         Column {
                             id: notifCol
                             anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 7; anchors.verticalCenter: parent.verticalCenter; spacing: 2
-                            Text { text: modelData.time + "  " + modelData.app; font.family: bar.pixel; font.pixelSize: 9; color: bar.cyanD }
-                            Text { width: parent.width; text: modelData.summary; font.family: bar.pixel; font.pixelSize: 13; color: modelData.critical ? bar.warn : bar.cyanB; wrapMode: Text.WordWrap }
-                            Text { width: parent.width; visible: (modelData.body || "") !== ""; text: modelData.body; font.family: bar.pixel; font.pixelSize: 11; color: bar.cyan; wrapMode: Text.WordWrap; maximumLineCount: 3; elide: Text.ElideRight }
+                            Text { text: modelData.time + "  " + modelData.app; textFormat: Text.PlainText; font.family: bar.pixel; font.pixelSize: 9; color: bar.cyanD }
+                            Text { width: parent.width; text: modelData.summary; textFormat: Text.PlainText; font.family: bar.pixel; font.pixelSize: 13; color: modelData.critical ? bar.warn : bar.cyanB; wrapMode: Text.WordWrap }
+                            Text { width: parent.width; visible: (modelData.body || "") !== ""; text: modelData.body; textFormat: Text.PlainText; font.family: bar.pixel; font.pixelSize: 11; color: bar.cyan; wrapMode: Text.WordWrap; maximumLineCount: 3; elide: Text.ElideRight }
                         }
                     }
                 }

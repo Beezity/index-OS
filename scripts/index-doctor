@@ -52,6 +52,15 @@ if [[ -x "$HOME/.local/bin/index-clipboard" ]]; then
   CLIP_STATE="$("$HOME/.local/bin/index-clipboard" dump 2>/dev/null | head -n1 || true)"
   [[ "$CLIP_STATE" == $'@status\t1\t'* ]] && ok "clipboard backend readable" || fail "clipboard backend unavailable"
 fi
+check_file "$HOME/.config/quickshell/Notifications.qml" "Notification server UI"
+check_file "$HOME/.config/quickshell/NotifHistory.qml" "Notification history"
+check_file "$HOME/.config/quickshell/NotificationPrefs.qml" "Notification preferences state"
+check_file "$HOME/.config/quickshell/NotificationPanel.qml" "Notification settings panel"
+check_file "$HOME/.local/bin/index-notifications" "Notification preferences helper"
+if [[ -x "$HOME/.local/bin/index-notifications" ]]; then
+  NOTIFY_STATE="$("$HOME/.local/bin/index-notifications" state 2>/dev/null || true)"
+  [[ "$NOTIFY_STATE" == $'1\t'* ]] && ok "notification preferences readable" || fail "notification preferences unavailable"
+fi
 check_file "$HOME/.config/quickshell/BluetoothMenu.qml" "Bluetooth panel"
 check_file "$HOME/.local/bin/index-bluetooth" "Bluetooth helper"
 check_file "$HOME/.config/quickshell/PowerPanel.qml" "Power panel"
@@ -73,7 +82,7 @@ if [[ -d /usr/share/icons/Adwaita/cursors ]]; then ok "Adwaita cursor theme"; el
 if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA font available"; else warn "Perfect DOS VGA font could not be confirmed"; fi
 
 section "DESKTOP SERVICES"
-for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist ffmpeg playerctl upower brightnessctl; do check_cmd "$cmd"; done
+for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist ffmpeg notify-send playerctl upower brightnessctl; do check_cmd "$cmd"; done
 if has systemctl; then
   for svc in NetworkManager bluetooth cups; do
     if systemctl is-enabled --quiet "$svc.service" 2>/dev/null; then ok "$svc enabled"; else warn "$svc not enabled"; fi

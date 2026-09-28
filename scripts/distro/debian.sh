@@ -82,7 +82,7 @@ else
 fi
 ok "Quickshell installed"
 
-for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy wl-paste cliphist ffmpeg nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics powerprofilesctl flock fc-cache xmllint; do
+for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy wl-paste cliphist ffmpeg notify-send nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics powerprofilesctl flock fc-cache xmllint; do
   require_command "$cmd"
 done
 
