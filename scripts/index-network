@@ -84,6 +84,17 @@ saved_wifi_profile() {
   return 1
 }
 
+scan_wifi() {
+  dev=$(wifi_device || true)
+  [ -n "$dev" ] || return 0
+  [ "$(nmcli networking 2>/dev/null || true)" = "enabled" ] || return 0
+  [ "$(nmcli radio wifi 2>/dev/null || true)" = "enabled" ] || return 0
+
+  # This is the only forced scan path. QML runs it separately when the
+  # Network panel opens so the chooser itself never waits on a radio scan.
+  nmcli device wifi list ifname "$dev" --rescan yes >/dev/null 2>&1 || true
+}
+
 choose_wifi() {
   command -v wofi >/dev/null 2>&1 || {
     echo "wofi is required for Wi-Fi selection" >&2
@@ -96,10 +107,19 @@ choose_wifi() {
     exit 1
   }
 
-  nmcli networking on
-  nmcli radio wifi on
-  ssids=$(nmcli --escape no -g SSID device wifi list ifname "$dev" --rescan yes 2>/dev/null | awk 'NF && !seen[$0]++')
-  [ -n "$ssids" ] || exit 0
+  # Do not silently turn radios back on from a chooser. The panel exposes the
+  # authoritative NetworkManager radio state and only enables this action when
+  # networking and Wi-Fi are already enabled.
+  [ "$(nmcli networking 2>/dev/null || true)" = "enabled" ] || exit 0
+  [ "$(nmcli radio wifi 2>/dev/null || true)" = "enabled" ] || exit 0
+
+  ssids=$(nmcli --escape no -g SSID device wifi list ifname "$dev" --rescan no 2>/dev/null | awk 'NF && !seen[$0]++')
+  if [ -z "$ssids" ]; then
+    command -v notify-send >/dev/null 2>&1 && \
+      notify-send 'THE INDEX' 'No cached Wi-Fi networks yet. Wait for the background scan and try again.' || true
+    exit 0
+  fi
+
   selected=$(printf '%s\n' "$ssids" | wofi --dmenu -p 'Wi-Fi network' || true)
   [ -n "$selected" ] || exit 0
 
@@ -119,7 +139,8 @@ choose_wifi() {
   password=$(wofi --dmenu --password -p "Password: $selected" || true)
   [ -n "$password" ] || exit 0
   if ! printf '%s\n' "$password" | nmcli --ask device wifi connect "$selected" ifname "$dev"; then
-    command -v notify-send >/dev/null 2>&1 && notify-send 'THE INDEX' 'Could not connect. Use Advanced Network Settings for enterprise or custom authentication.' || true
+    command -v notify-send >/dev/null 2>&1 && \
+      notify-send 'THE INDEX' 'Could not connect. Use Advanced Network Settings for enterprise or custom authentication.' || true
     exit 1
   fi
 }
@@ -128,6 +149,7 @@ require_nmcli
 
 case "${1:-}" in
   state) state ;;
+  scan-wifi) scan_wifi ;;
   networking-on) nmcli networking on ;;
   networking-off) nmcli networking off ;;
   toggle-networking)
@@ -144,7 +166,7 @@ case "${1:-}" in
     [ -n "$dev" ] && nmcli device disconnect "$dev" || true
     ;;
   *)
-    echo "usage: index-network {state|networking-on|networking-off|toggle-networking|wifi-on|wifi-off|toggle-wifi|choose-wifi|disconnect}" >&2
+    echo "usage: index-network {state|scan-wifi|networking-on|networking-off|toggle-networking|wifi-on|wifi-off|toggle-wifi|choose-wifi|disconnect}" >&2
     exit 2
     ;;
 esac

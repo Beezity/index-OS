@@ -273,8 +273,13 @@ PanelWindow {
                 }
 
                 Timer {
-                    interval: 5000; running: true; repeat: true; triggeredOnStart: true
-                    onTriggered: { netProc.running = true; btProc.running = true; batProc.running = true; volProc.running = true }
+                    interval: 5000; running: !bar.settingsOpen; repeat: true; triggeredOnStart: true
+                    onTriggered: {
+                        if (!netProc.running) netProc.running = true
+                        if (!btProc.running) btProc.running = true
+                        if (!batProc.running) batProc.running = true
+                        if (!volProc.running) volProc.running = true
+                    }
                 }
             }
         }

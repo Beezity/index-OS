@@ -41,53 +41,22 @@ Rectangle {
     property bool inputOpen: false
     property bool notificationOpen: false
 
-    // Build one locked, atomic config write.
-    // The old version launched several detached read/temp/move jobs at once, so
-    // two quick setting changes could overwrite each other.
-    function confWriteCommand(pairs) {
-        var filter = "", adds = ""
-        for (var i = 0; i < pairs.length; i++) {
-            var k = pairs[i][0], v = pairs[i][1]
-            filter += " | grep -v '^" + k + "='"
-            adds   += "printf '%s\\n' '" + k + "=" + v + "' >> \"$t\"; "
-        }
-
-        return "mkdir -p \"$HOME/.config/labwc\"; " +
-               "f=\"$HOME/.config/labwc/index.conf\"; lock=\"$f.lock\"; " +
-               "( flock -x 9; " +
-               "touch \"$f\"; t=$(mktemp \"$f.tmp.XXXXXX\") || exit 1; " +
-               "cat \"$f\"" + filter + " > \"$t\" 2>/dev/null; " +
-               adds +
-               "tac \"$t\" | awk -F= '!seen[$1]++' | tac > \"$t.d\" 2>/dev/null && mv \"$t.d\" \"$t\"; " +
-               "mv -f \"$t\" \"$f\"; " +
-               ") 9>\"$lock\""
-    }
-
-    function saveConf(pairs) {
-        panel.run(panel.confWriteCommand(pairs))
-    }
+    readonly property bool subpanelOpen: appearanceOpen || audioOpen || networkOpen || bluetoothOpen || powerOpen || inputOpen || notificationOpen
+    readonly property string settingsHelper: Quickshell.env("HOME") + "/.local/bin/index-settings"
+    readonly property string powerHelper: Quickshell.env("HOME") + "/.local/bin/index-power"
 
     signal requestClose()
 
-    function run(cmd) { Quickshell.execDetached(["sh","-c",cmd]) }
+    function run(cmd) { Quickshell.execDetached(["sh", "-c", cmd]) }
+    function startProcess(proc) { if (!proc.running) proc.running = true }
+    function runPower(args) { Quickshell.execDetached([panel.powerHelper].concat(args)) }
 
-    // Re-read persisted timeout shortly after a write finishes so the compact
-    // control reflects what is actually stored in index.conf.
-    function refreshSavedSoon(): void {
-        savedRefresh.restart()
-    }
-
-    Timer {
-        id: savedRefresh
-        interval: 250
-        repeat: false
-        onTriggered: idleGet.running = true
-    }
-
-    // Pull fresh values every time the panel appears.
+    // Pull fresh values every time the root settings page appears.
     onVisibleChanged: {
-        if (visible) panel.refresh()
-        else {
+        if (visible) {
+            panel.refresh()
+            panel.startProcess(settingsWarm)
+        } else {
             panel.appearanceOpen = false
             panel.audioOpen = false
             panel.networkOpen = false
@@ -97,11 +66,12 @@ Rectangle {
             panel.notificationOpen = false
         }
     }
-    Component.onCompleted: panel.refresh()
+    onSubpanelOpenChanged: if (panel.visible && !panel.subpanelOpen) panel.refresh()
+    Component.onCompleted: if (panel.visible) panel.refresh()
     function refresh(): void {
-        volGet.running=true; briGet.running=true; btGet.running=true; netGet.running=true
-        batGet.running=true; batTimeGet.running=true; lidGet.running=true; lidDetect.running=true
-        autostartGet.running=true; idleGet.running=true
+        panel.startProcess(volGet); panel.startProcess(briGet); panel.startProcess(btGet); panel.startProcess(netGet)
+        panel.startProcess(batGet); panel.startProcess(batTimeGet); panel.startProcess(lidGet); panel.startProcess(lidDetect)
+        panel.startProcess(autostartGet); panel.startProcess(idleGet)
     }
 
     // ---- pollers ----
@@ -148,14 +118,32 @@ Rectangle {
         } }
     }
     Process {
+        id: settingsWarm
+        command: [panel.settingsHelper, "prepare"]
+        stdout: StdioCollector {}
+    }
+    Process {
+        id: autostartChooseProc
+        property bool started: false
+        command: [panel.settingsHelper, "autostart-choose"]
+        stdout: StdioCollector {}
+        onRunningChanged: {
+            if (running) started = true
+            else if (started) {
+                started = false
+                panel.startProcess(autostartGet)
+            }
+        }
+    }
+    Process {
         id: autostartGet
-        command: ["sh","-c","d=$HOME/.config/autostart; mkdir -p $d; for f in $d/*.desktop; do [ -f \"$f\" ] || continue; n=$(grep -m1 '^Name=' \"$f\" | cut -d= -f2); printf '%s|%s\\n' \"$(basename \"$f\")\" \"$n\"; done"]
+        command: [panel.settingsHelper, "autostart-list"]
         stdout: StdioCollector { onStreamFinished: {
             var out=[], lines=text.trim().split("\n")
             for (var i=0;i<lines.length;i++){
                 if(!lines[i]) continue
-                var f=lines[i].split("|")
-                out.push({ file: f[0], name: f[1] || f[0].replace(".desktop","") })
+                var f=lines[i].split("\t")
+                out.push({ file: f[0], name: f.slice(1).join("\t") || f[0].replace(".desktop","") })
             }
             panel.autostartApps = out
         } }
@@ -171,10 +159,13 @@ Rectangle {
         stdout: StdioCollector { onStreamFinished: { var v=text.trim(); if(v) panel.lidAction = (v==="suspend"?"suspend":(v==="lock"?"lock":"ignore")) } }
     }
     Timer {
-        interval: 4000; running: panel.visible; repeat: true; triggeredOnStart: true
-        onTriggered: { volGet.running=true; briGet.running=true; btGet.running=true; netGet.running=true;
-                       batGet.running=true; batTimeGet.running=true; lidGet.running=true;
-                       lidDetect.running=true; autostartGet.running=true }
+        interval: 6000
+        running: panel.visible && !panel.subpanelOpen
+        repeat: true
+        onTriggered: {
+            panel.startProcess(volGet); panel.startProcess(briGet); panel.startProcess(btGet); panel.startProcess(netGet)
+            panel.startProcess(batGet); panel.startProcess(batTimeGet)
+        }
     }
 
     ColumnLayout {
@@ -302,7 +293,7 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 panel.lidAction = modelData.id
-                                panel.run("pkexec sh -c 'mkdir -p /etc/systemd/logind.conf.d; printf \"[Login]\\nHandleLidSwitch=" + modelData.id + "\\nHandleLidSwitchExternalPower=" + modelData.id + "\\nHandleLidSwitchDocked=" + modelData.id + "\\n\" > /etc/systemd/logind.conf.d/90-index.conf'")
+                                panel.runPower(["set-lid-action", modelData.id])
                             }
                         }
                     }
@@ -335,9 +326,7 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 panel.screenOffMin = modelData.m
-                                // SAVE it, then restart the idle daemon from the saved value
-                                var cmd = panel.confWriteCommand([["SCREEN_OFF_SEC", (modelData.m * 60)]])
-                                panel.run(cmd + "; setsid sh \"$HOME/.config/labwc/index-idle\" >/dev/null 2>&1 &"); panel.refreshSavedSoon()
+                                panel.runPower(["set-screen-seconds", String(modelData.m * 60)])
                             }
                         }
                     }
@@ -363,11 +352,11 @@ Rectangle {
                     anchors.fill: parent
                     onClicked: function(m) {
                         panel.volume = Math.round(m.x/width*100)
-                        panel.run("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + (panel.volume/100).toFixed(2))
+                        Quickshell.execDetached(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", (panel.volume/100).toFixed(2)])
                     }
                     onWheel: function(w) {
                         panel.volume = Math.max(0, Math.min(100, panel.volume + (w.angleDelta.y>0?5:-5)))
-                        panel.run("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + (panel.volume/100).toFixed(2))
+                        Quickshell.execDetached(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", (panel.volume/100).toFixed(2)])
                     }
                 }
             }
@@ -391,11 +380,11 @@ Rectangle {
                     anchors.fill: parent
                     onClicked: function(m) {
                         panel.brightness = Math.max(5, Math.round(m.x/width*100))
-                        panel.run("brightnessctl set " + panel.brightness + "%; " + panel.confWriteCommand([["BRIGHTNESS", panel.brightness]]))
+                        panel.runPower(["set-brightness", String(panel.brightness)])
                     }
                     onWheel: function(w) {
                         panel.brightness = Math.max(5, Math.min(100, panel.brightness + (w.angleDelta.y>0?5:-5)))
-                        panel.run("brightnessctl set " + panel.brightness + "%; " + panel.confWriteCommand([["BRIGHTNESS", panel.brightness]]))
+                        panel.runPower(["set-brightness", String(panel.brightness)])
                     }
                 }
             }
@@ -473,8 +462,8 @@ Rectangle {
                         font.family: panel.pixel; font.pixelSize: 10; color: panel.warn
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                panel.run("rm -f \"$HOME/.config/autostart/" + modelData.file + "\"")
-                                autostartGet.running = true
+                                Quickshell.execDetached([panel.settingsHelper, "autostart-remove", modelData.file])
+                                autostartRefresh.restart()
                             } }
                     }
                 }
@@ -489,13 +478,11 @@ Rectangle {
                 font.family: panel.pixel; font.pixelSize: 10; color: panel.cyanD
                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        // pick any installed .desktop with wofi, copy it into ~/.config/autostart
-                        panel.run("f=$(ls /usr/share/applications/*.desktop ~/.local/share/applications/*.desktop 2>/dev/null | xargs -n1 basename | sort -u | wofi --dmenu -p 'start at login'); [ -n \"$f\" ] && { mkdir -p ~/.config/autostart; cp -f \"$(ls /usr/share/applications/$f ~/.local/share/applications/$f 2>/dev/null | head -1)\" ~/.config/autostart/; }")
-                        autostartRefresh.restart()
+                        if (!autostartChooseProc.running) autostartChooseProc.running = true
                     } }
             }
-            Timer { id: autostartRefresh; interval: 2500; repeat: false
-                onTriggered: autostartGet.running = true }
+            Timer { id: autostartRefresh; interval: 250; repeat: false
+                onTriggered: panel.startProcess(autostartGet) }
         }
 
         // ---- printers ----
@@ -507,7 +494,7 @@ Rectangle {
                 text: ">_ manage _<"
                 font.family: panel.pixel; font.pixelSize: 10; color: panel.cyanD
                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                    onClicked: panel.run("system-config-printer || xdg-open http://localhost:631 || true") }
+                    onClicked: Quickshell.execDetached([panel.settingsHelper, "open-printers"]) }
             }
         }
 

@@ -19,14 +19,14 @@ jobs:
       - name: Check installer syntax
         run: |
           bash -n install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh
-          bash -n scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications
+          bash -n scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications scripts/index-settings
           bash -n scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
           fish -n fish/config.fish
 
       - name: Shellcheck scripts
         run: |
           shellcheck --severity=error install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh \
-            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications \
+            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications scripts/index-settings \
             scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh \
             labwc/config/autostart labwc/config/index-lock labwc/config/index-idle \
             labwc/config/index-clip \
@@ -219,9 +219,57 @@ jobs:
             labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf
             labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps
             assets/PerfectDOSVGA437-Universal.ttf install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh
-            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
+            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications scripts/index-settings scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
           )
           for f in "${files[@]}"; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
+
+      - name: Exercise settings utility helper
+        run: |
+          tmp="$(mktemp -d)"
+          mkdir -p "$tmp/home/.local/share/applications" "$tmp/bin"
+          cat > "$tmp/home/.local/share/applications/demo.desktop" <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Demo App
+          Exec=true
+          EOF
+          cat > "$tmp/bin/wofi" <<'EOF'
+          #!/bin/sh
+          head -n1
+          EOF
+          cat > "$tmp/bin/system-config-printer" <<'EOF'
+          #!/bin/sh
+          printf 'printer-opened\n' > "$INDEX_SETTINGS_PRINTER_MARKER"
+          EOF
+          chmod +x "$tmp/bin/wofi" "$tmp/bin/system-config-printer"
+          run_settings() {
+            env HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/config" XDG_CACHE_HOME="$tmp/cache" INDEX_SETTINGS_PRINTER_MARKER="$tmp/printer" PATH="$tmp/bin:/usr/bin:/bin" sh scripts/index-settings "$@"
+          }
+          run_settings prepare
+          test -s "$tmp/cache/the-index/settings/applications.tsv"
+          run_settings autostart-choose
+          test -f "$tmp/config/autostart/demo.desktop"
+          run_settings autostart-list | grep -q $'^demo.desktop\tDemo App$'
+          if run_settings autostart-remove '../escape.desktop'; then echo 'unsafe autostart filename unexpectedly accepted'; exit 1; fi
+          run_settings autostart-remove demo.desktop
+          test ! -e "$tmp/config/autostart/demo.desktop"
+          run_settings open-printers
+          test "$(cat "$tmp/printer")" = printer-opened
+          rm -rf "$tmp"
+
+      - name: Check settings performance regressions
+        run: |
+          grep -q 'running: panel.visible && !panel.subpanelOpen' quickshell/SettingsPanel.qml
+          grep -q 'running: !bar.settingsOpen' quickshell/Bar.qml
+          grep -q 'interval: 5000' quickshell/AudioPanel.qml
+          grep -q 'interval: 6000' quickshell/NetworkPanel.qml
+          grep -q 'scan-wifi) scan_wifi' scripts/index-network
+          grep -q -- '--rescan no' scripts/index-network
+          grep -q 'refresh-choices) refresh_choices' scripts/index-appearance
+          if grep -RE 'pavucontrol .*&|nm-connection-editor .*&|system-config-printer \|\|' quickshell; then
+            echo 'shell-wrapped external settings launcher was reintroduced'
+            exit 1
+          fi
 
       - name: Reject network status click action
         run: |

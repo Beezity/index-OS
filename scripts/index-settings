@@ -1,0 +1,134 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — shared settings utility
+set -eu
+
+AUTOSTART_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
+CACHE_DIR="${INDEX_SETTINGS_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/the-index/settings}"
+APP_CACHE="$CACHE_DIR/applications.tsv"
+
+sanitize_label() {
+  printf '%s' "$1" | tr '\t\r\n' '   '
+}
+
+valid_desktop_file() {
+  case "$1" in
+    ''|.|..|*/*) return 1 ;;
+  esac
+  case "$1" in
+    *.desktop) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+desktop_name() {
+  file=$1
+  name=''
+  while IFS= read -r line; do
+    case "$line" in
+      Name=*) name=${line#Name=}; break ;;
+    esac
+  done < "$file"
+  base=${file##*/}
+  [ -n "$name" ] || name=${base%.desktop}
+  sanitize_label "$name"
+}
+
+autostart_list() {
+  [ -d "$AUTOSTART_DIR" ] || return 0
+  for file in "$AUTOSTART_DIR"/*.desktop; do
+    [ -f "$file" ] || continue
+    base=${file##*/}
+    printf '%s\t%s\n' "$base" "$(desktop_name "$file")"
+  done | LC_ALL=C sort -f -k2,2
+}
+
+build_app_cache() {
+  mkdir -p "$CACHE_DIR"
+  umask 077
+  tmp=$(mktemp "$CACHE_DIR/.applications.XXXXXX")
+  : > "$tmp"
+  id=0
+  for root in "$HOME/.local/share/applications" /usr/local/share/applications /usr/share/applications; do
+    [ -d "$root" ] || continue
+    for file in "$root"/*.desktop; do
+      [ -f "$file" ] || continue
+      id=$((id + 1))
+      base=${file##*/}
+      name=$(desktop_name "$file")
+      printf '%s\t%s\t%s\t%s\n' "$id" "$base" "$name" "$file" >> "$tmp"
+    done
+  done
+  mv "$tmp" "$APP_CACHE"
+}
+
+cache_stale() {
+  [ -f "$APP_CACHE" ] || return 0
+  find "$APP_CACHE" -mmin +4 -print -quit 2>/dev/null | grep -q .
+}
+
+ensure_app_cache() {
+  cache_stale && build_app_cache || true
+}
+
+autostart_choose() {
+  command -v wofi >/dev/null 2>&1 || {
+    echo "wofi is required" >&2
+    exit 1
+  }
+  ensure_app_cache
+  [ -s "$APP_CACHE" ] || return 0
+
+  selected=$(awk -F '\t' '{printf "%s  [%s]\n", $3, $1}' "$APP_CACHE" | wofi --dmenu -p 'start at login' || true)
+  [ -n "$selected" ] || return 0
+  id=$(printf '%s\n' "$selected" | sed -n 's/.*\[\([0-9][0-9]*\)\]$/\1/p')
+  [ -n "$id" ] || return 0
+
+  row=$(awk -F '\t' -v id="$id" '$1 == id { print; exit }' "$APP_CACHE")
+  [ -n "$row" ] || return 0
+  base=$(printf '%s\n' "$row" | cut -f2)
+  file=$(printf '%s\n' "$row" | cut -f4-)
+  valid_desktop_file "$base" || {
+    echo "invalid desktop file name" >&2
+    exit 2
+  }
+  [ -f "$file" ] || {
+    echo "desktop entry disappeared: $file" >&2
+    exit 1
+  }
+
+  mkdir -p "$AUTOSTART_DIR"
+  cp -f -- "$file" "$AUTOSTART_DIR/$base"
+}
+
+autostart_remove() {
+  [ "$#" -eq 1 ] || exit 2
+  base=$1
+  valid_desktop_file "$base" || {
+    echo "invalid desktop file name" >&2
+    exit 2
+  }
+  rm -f -- "$AUTOSTART_DIR/$base"
+}
+
+open_printers() {
+  if command -v system-config-printer >/dev/null 2>&1; then
+    exec system-config-printer
+  fi
+  if command -v xdg-open >/dev/null 2>&1; then
+    exec xdg-open http://localhost:631
+  fi
+  echo "no printer settings frontend is available" >&2
+  exit 1
+}
+
+case "${1:-}" in
+  prepare) ensure_app_cache ;;
+  autostart-list) autostart_list ;;
+  autostart-choose) autostart_choose ;;
+  autostart-remove) shift; autostart_remove "$@" ;;
+  open-printers) open_printers ;;
+  *)
+    echo "usage: index-settings {prepare|autostart-list|autostart-choose|autostart-remove FILE|open-printers}" >&2
+    exit 2
+    ;;
+esac

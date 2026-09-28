@@ -12,26 +12,52 @@ Rectangle {
     readonly property color cyan: "#5DADE2"
     readonly property color cyanB: "#85C5E8"
     readonly property color cyanD: "#3A7CA5"
+    readonly property string helper: Quickshell.env("HOME") + "/.local/bin/index-appearance"
     property string iconTheme: "Papirus-Dark"
     property string cursorTheme: "Adwaita"
     property int cursorSize: 24
     property string wallpaper: ""
 
-    function run(cmd) { Quickshell.execDetached(["sh", "-c", cmd]) }
-    function refresh() { stateGet.running = true }
-    Component.onCompleted: refresh()
-    onVisibleChanged: if (visible) refresh()
+    function refresh() { if (!stateGet.running) stateGet.running = true }
+    function direct(args) { Quickshell.execDetached([root.helper].concat(args)) }
+    Component.onCompleted: if (visible) { refresh(); choiceWarm.running = true }
+    onVisibleChanged: if (visible) {
+        refresh()
+        if (!choiceWarm.running) choiceWarm.running = true
+    }
 
     Process {
         id: stateGet
-        command: ["sh","-c","a=$HOME/.local/bin/index-appearance; printf '%s|%s|%s|%s' \"$($a get ICON_THEME 2>/dev/null)\" \"$($a get CURSOR_THEME 2>/dev/null)\" \"$($a get CURSOR_SIZE 2>/dev/null)\" \"$($a get WALLPAPER 2>/dev/null)\""]
+        command: [root.helper, "state"]
         stdout: StdioCollector { onStreamFinished: {
-            var f=text.trim().split("|")
+            var f=text.replace(/[\r\n]+$/, "").split("\t")
             if(f[0]) root.iconTheme=f[0]
             if(f[1]) root.cursorTheme=f[1]
             var s=parseInt(f[2]); if(!isNaN(s)) root.cursorSize=s
-            root.wallpaper=f[3] || ""
+            root.wallpaper=f.slice(3).join("\t") || ""
         } }
+    }
+    Process { id: choiceWarm; command: [root.helper, "refresh-choices"]; stdout: StdioCollector {} }
+    Process {
+        id: wallpaperChooser
+        property bool started: false
+        command: [root.helper, "choose-wallpaper"]
+        stdout: StdioCollector {}
+        onRunningChanged: { if (running) started = true; else if (started) { started = false; root.refresh() } }
+    }
+    Process {
+        id: iconChooser
+        property bool started: false
+        command: [root.helper, "choose-icons"]
+        stdout: StdioCollector {}
+        onRunningChanged: { if (running) started = true; else if (started) { started = false; root.refresh() } }
+    }
+    Process {
+        id: cursorChooser
+        property bool started: false
+        command: [root.helper, "choose-cursor", String(root.cursorSize)]
+        stdout: StdioCollector {}
+        onRunningChanged: { if (running) started = true; else if (started) { started = false; root.refresh() } }
     }
 
     ColumnLayout {
@@ -51,24 +77,28 @@ Rectangle {
             elide: Text.ElideMiddle; font.family: root.pixel; font.pixelSize: 10; color: root.cyanD
         }
         RowLayout { Layout.fillWidth: true; spacing: 6
-            Repeater { model: [{t:"CHOOSE",c:"f=$(find \"$HOME/Pictures\" -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \\) 2>/dev/null | wofi --dmenu -p 'wallpaper'); [ -n \"$f\" ] && $HOME/.local/bin/index-appearance set-wallpaper \"$f\""},{t:"DEFAULT",c:"$HOME/.local/bin/index-appearance reset-wallpaper"}]
-                delegate: Rectangle { required property var modelData; Layout.fillWidth: true; height: 30; color: wma.containsMouse ? "#143245" : "transparent"; border.color: root.cyanD
-                    Text { anchors.centerIn: parent; text: modelData.t; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
-                    MouseArea { id:wma; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor; onClicked:{root.run(modelData.c); refreshTimer.restart()} }
-                }
+            Rectangle {
+                Layout.fillWidth: true; height: 30; color: wallpaperArea.containsMouse ? "#143245" : "transparent"; border.color: root.cyanD
+                Text { anchors.centerIn: parent; text: choiceWarm.running ? "PREPARING..." : (wallpaperChooser.running ? "CHOOSING..." : "CHOOSE"); font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
+                MouseArea { id: wallpaperArea; anchors.fill: parent; hoverEnabled: true; cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor; enabled: !choiceWarm.running && !wallpaperChooser.running; onClicked: wallpaperChooser.running = true }
+            }
+            Rectangle {
+                Layout.fillWidth: true; height: 30; color: defaultArea.containsMouse ? "#143245" : "transparent"; border.color: root.cyanD
+                Text { anchors.centerIn: parent; text: "DEFAULT"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
+                MouseArea { id: defaultArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.direct(["reset-wallpaper"]); refreshTimer.restart() } }
             }
         }
 
         Text { text: "APP ICONS"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB }
         Rectangle { Layout.fillWidth:true; height:34; color:"#0c1620"; border.color:root.cyanD
-            Text { anchors.centerIn:parent; text:root.iconTheme + "  [CHANGE]"; font.family:root.pixel; font.pixelSize:11; color:root.cyanB }
-            MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor; onClicked:{root.run("t=$($HOME/.local/bin/index-appearance list-icons | wofi --dmenu -p 'icon theme'); [ -n \"$t\" ] && $HOME/.local/bin/index-appearance set-icons \"$t\""); refreshTimer.restart()} }
+            Text { anchors.centerIn:parent; text:root.iconTheme + (choiceWarm.running ? "  [PREPARING]" : (iconChooser.running ? "  [LOADING]" : "  [CHANGE]")); font.family:root.pixel; font.pixelSize:11; color:root.cyanB }
+            MouseArea { anchors.fill:parent; cursorShape:enabled ? Qt.PointingHandCursor : Qt.ArrowCursor; enabled:!choiceWarm.running && !iconChooser.running; onClicked:iconChooser.running=true }
         }
 
         Text { text: "CURSOR THEME"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB }
         Rectangle { Layout.fillWidth:true; height:34; color:"#0c1620"; border.color:root.cyanD
-            Text { anchors.centerIn:parent; text:root.cursorTheme + "  [CHANGE]"; font.family:root.pixel; font.pixelSize:11; color:root.cyanB }
-            MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor; onClicked:{root.run("t=$($HOME/.local/bin/index-appearance list-cursors | wofi --dmenu -p 'cursor theme'); [ -n \"$t\" ] && $HOME/.local/bin/index-appearance set-cursor \"$t\" " + root.cursorSize); refreshTimer.restart()} }
+            Text { anchors.centerIn:parent; text:root.cursorTheme + (choiceWarm.running ? "  [PREPARING]" : (cursorChooser.running ? "  [LOADING]" : "  [CHANGE]")); font.family:root.pixel; font.pixelSize:11; color:root.cyanB }
+            MouseArea { anchors.fill:parent; cursorShape:enabled ? Qt.PointingHandCursor : Qt.ArrowCursor; enabled:!choiceWarm.running && !cursorChooser.running; onClicked:cursorChooser.running=true }
         }
 
         Text { text: "CURSOR SIZE"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB }
@@ -76,7 +106,7 @@ Rectangle {
             Repeater { model:[16,24,32,48]
                 delegate: Rectangle { required property int modelData; Layout.fillWidth:true; height:28; readonly property bool on:root.cursorSize===modelData; color:on?root.cyan:"transparent"; border.color:root.cyanD
                     Text { anchors.centerIn:parent; text:modelData; font.family:root.pixel; font.pixelSize:11; color:parent.on?"#04141c":root.cyanB }
-                    MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor; onClicked:{root.cursorSize=modelData; root.run("$HOME/.local/bin/index-appearance set-cursor-size "+modelData)} }
+                    MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor; onClicked:{root.cursorSize=modelData; root.direct(["set-cursor-size", String(modelData)])} }
                 }
             }
         }

@@ -14,6 +14,7 @@ Rectangle {
     readonly property color cyanB: "#85C5E8"
     readonly property color cyanD: "#3A7CA5"
     readonly property color warn: "#FF6B6B"
+    readonly property string helper: Quickshell.env("HOME") + "/.local/bin/index-audio"
 
     property int outputVolume: 50
     property bool outputMuted: false
@@ -26,7 +27,7 @@ Rectangle {
     readonly property bool outputAvailable: serviceOnline && outputName !== "NO OUTPUT"
     readonly property bool inputAvailable: serviceOnline && inputName !== "NO INPUT"
 
-    function run(cmd) { Quickshell.execDetached(["sh", "-c", cmd]) }
+    function run(args) { Quickshell.execDetached([root.helper].concat(args)) }
     function refresh() { if (!stateGet.running) stateGet.running = true }
 
     onVisibleChanged: {
@@ -39,7 +40,7 @@ Rectangle {
 
     Process {
         id: stateGet
-        command: ["sh", "-c", "$HOME/.local/bin/index-audio state 2>/dev/null"]
+        command: [root.helper, "state"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var f = text.trim().split("\t")
@@ -63,9 +64,30 @@ Rectangle {
         }
     }
 
+    Process {
+        id: outputChooser
+        property bool started: false
+        command: [root.helper, "choose-output"]
+        stdout: StdioCollector {}
+        onRunningChanged: {
+            if (running) started = true
+            else if (started) { started = false; root.refresh() }
+        }
+    }
+    Process {
+        id: inputChooser
+        property bool started: false
+        command: [root.helper, "choose-input"]
+        stdout: StdioCollector {}
+        onRunningChanged: {
+            if (running) started = true
+            else if (started) { started = false; root.refresh() }
+        }
+    }
+
     Timer {
         id: refreshTimer
-        interval: 1800
+        interval: 5000
         repeat: true
         running: root.visible
         triggeredOnStart: false
@@ -125,7 +147,7 @@ Rectangle {
                 MouseArea {
                     id: outDevArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     enabled: root.serviceOnline
-                    onClicked: { root.run("$HOME/.local/bin/index-audio choose-output"); delayedRefresh.restart() }
+                    onClicked: if (!outputChooser.running) outputChooser.running = true
                 }
             }
             Rectangle {
@@ -142,7 +164,7 @@ Rectangle {
                 MouseArea {
                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                     enabled: root.outputAvailable
-                    onClicked: { root.run("$HOME/.local/bin/index-audio toggle-output-mute"); root.outputMuted = !root.outputMuted; delayedRefresh.restart() }
+                    onClicked: { root.run(["toggle-output-mute"]); root.outputMuted = !root.outputMuted; delayedRefresh.restart() }
                 }
             }
         }
@@ -166,13 +188,14 @@ Rectangle {
                 enabled: root.outputAvailable
                 function setFromX(mx) {
                     root.outputVolume = Math.max(0, Math.min(100, Math.round(mx / width * 100)))
-                    root.run("$HOME/.local/bin/index-audio set-output-volume " + root.outputVolume)
                 }
                 onPressed: function(m) { setFromX(m.x) }
                 onPositionChanged: function(m) { if (pressed) setFromX(m.x) }
+                onReleased: { root.run(["set-output-volume", String(root.outputVolume)]); delayedRefresh.restart() }
                 onWheel: function(w) {
                     root.outputVolume = Math.max(0, Math.min(100, root.outputVolume + (w.angleDelta.y > 0 ? 5 : -5)))
-                    root.run("$HOME/.local/bin/index-audio set-output-volume " + root.outputVolume)
+                    root.run(["set-output-volume", String(root.outputVolume)])
+                    delayedRefresh.restart()
                 }
             }
         }
@@ -198,7 +221,7 @@ Rectangle {
                 MouseArea {
                     id: inDevArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     enabled: root.serviceOnline
-                    onClicked: { root.run("$HOME/.local/bin/index-audio choose-input"); delayedRefresh.restart() }
+                    onClicked: if (!inputChooser.running) inputChooser.running = true
                 }
             }
             Rectangle {
@@ -215,7 +238,7 @@ Rectangle {
                 MouseArea {
                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                     enabled: root.inputAvailable
-                    onClicked: { root.run("$HOME/.local/bin/index-audio toggle-input-mute"); root.inputMuted = !root.inputMuted; delayedRefresh.restart() }
+                    onClicked: { root.run(["toggle-input-mute"]); root.inputMuted = !root.inputMuted; delayedRefresh.restart() }
                 }
             }
         }
@@ -239,13 +262,14 @@ Rectangle {
                 enabled: root.inputAvailable
                 function setFromX(mx) {
                     root.inputVolume = Math.max(0, Math.min(100, Math.round(mx / width * 100)))
-                    root.run("$HOME/.local/bin/index-audio set-input-volume " + root.inputVolume)
                 }
                 onPressed: function(m) { setFromX(m.x) }
                 onPositionChanged: function(m) { if (pressed) setFromX(m.x) }
+                onReleased: { root.run(["set-input-volume", String(root.inputVolume)]); delayedRefresh.restart() }
                 onWheel: function(w) {
                     root.inputVolume = Math.max(0, Math.min(100, root.inputVolume + (w.angleDelta.y > 0 ? 5 : -5)))
-                    root.run("$HOME/.local/bin/index-audio set-input-volume " + root.inputVolume)
+                    root.run(["set-input-volume", String(root.inputVolume)])
+                    delayedRefresh.restart()
                 }
             }
         }
@@ -259,7 +283,7 @@ Rectangle {
             Text { anchors.centerIn: parent; text: "OPEN ADVANCED MIXER"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
             MouseArea {
                 id: advancedArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                onClicked: root.run("pavucontrol >/dev/null 2>&1 &")
+                onClicked: Quickshell.execDetached(["pavucontrol"])
             }
         }
 
