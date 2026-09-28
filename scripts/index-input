@@ -33,14 +33,22 @@ reload_labwc() {
 
 replace_tag_all_unlocked() {
   tag=$1 value=$2
+  grep -q "<${tag}>[^<]*</${tag}>" "$RC" || {
+    echo "input setting missing from Labwc config: $tag" >&2
+    return 1
+  }
   dir=$(dirname "$RC")
   tmp=$(mktemp "$dir/.rc.xml.input.XXXXXX")
+  trap 'rm -f "$tmp"' EXIT HUP INT TERM
   sed "s|<${tag}>[^<]*</${tag}>|<${tag}>${value}</${tag}>|g" "$RC" > "$tmp"
   if cmp -s "$RC" "$tmp"; then
     rm -f "$tmp"
+    trap - EXIT HUP INT TERM
     return 0
   fi
+  chmod --reference="$RC" "$tmp" 2>/dev/null || true
   mv "$tmp" "$RC"
+  trap - EXIT HUP INT TERM
 }
 
 replace_tag_all() {
@@ -62,13 +70,14 @@ state() {
   speed=$(first_tag pointerSpeed || true)
   natural=$(first_tag naturalScroll || true)
   tap=$(first_tag tap || true)
+  valid=1
   case "$speed" in
     -1|-1.0|-1.00|0|0.0|0.00|1|1.0|1.00|-0.[0-9]|-0.[0-9][0-9]|0.[0-9]|0.[0-9][0-9]) ;;
-    *) speed=0.00 ;;
+    *) speed=0.00; valid=0 ;;
   esac
-  case "$natural" in yes|no) ;; *) natural=no ;; esac
-  case "$tap" in yes|no) ;; *) tap=yes ;; esac
-  printf '1\t%s\t%s\t%s\t%s\n' "$(sanitize "$speed")" "$natural" "$(touchpad_present)" "$tap"
+  case "$natural" in yes|no) ;; *) natural=no; valid=0 ;; esac
+  case "$tap" in yes|no) ;; *) tap=yes; valid=0 ;; esac
+  printf '%s\t%s\t%s\t%s\t%s\n' "$valid" "$(sanitize "$speed")" "$natural" "$(touchpad_present)" "$tap"
 }
 
 case "${1:-}" in
