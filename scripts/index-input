@@ -52,22 +52,21 @@ replace_managed_unlocked() {
   tmp=$(mktemp "$dir/.rc.xml.input.XXXXXX")
   trap 'rm -f "$tmp"' EXIT HUP INT TERM
   awk -v tag="$tag" -v value="$value" -v scope="$scope" '
-    BEGIN { changed=0; managed=0 }
+    BEGIN { found=0; managed=0 }
     /<device[^>]*category="default"[^>]*>/ { managed=(scope == "pointer") }
     /<device[^>]*category="touchpad"[^>]*>/ { managed=1 }
     managed {
       open="<" tag ">"; close="</" tag ">"
       if (index($0, open)) {
-        before=$0
+        found++
         pattern=open "[^<]*" close
         replacement=open value close
         gsub(pattern, replacement)
-        if ($0 != before) changed++
       }
     }
     { print }
     /<\/device>/ { managed=0 }
-    END { if (changed == 0) exit 3 }
+    END { if (found == 0) exit 3 }
   ' "$RC" > "$tmp" || {
     status=$?
     rm -f "$tmp"
@@ -75,6 +74,11 @@ replace_managed_unlocked() {
     [ "$status" -eq 3 ] && echo "input setting missing from managed Labwc device categories: $tag" >&2
     return "$status"
   }
+  if cmp -s "$RC" "$tmp"; then
+    rm -f "$tmp"
+    trap - EXIT HUP INT TERM
+    return 0
+  fi
   chmod --reference="$RC" "$tmp" 2>/dev/null || true
   mv "$tmp" "$RC"
   trap - EXIT HUP INT TERM
