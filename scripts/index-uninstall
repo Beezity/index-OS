@@ -70,7 +70,8 @@ remove \
   "$HOME/.local/bin/index-snip" \
   "$HOME/.local/bin/index-doctor" \
   "$HOME/.local/bin/index-appearance" \
-  "$HOME/.local/bin/index-audio"
+  "$HOME/.local/bin/index-audio" \
+  "$HOME/.local/bin/index-network"
 
 rmdir "$HOME/.config/fontconfig" "$HOME/.config/wofi" "$HOME/.config/foot" "$HOME/.config/fish" 2>/dev/null || true
 rmdir "$HOME/.config/xdg-desktop-portal/wlr" "$HOME/.config/xdg-desktop-portal" 2>/dev/null || true
