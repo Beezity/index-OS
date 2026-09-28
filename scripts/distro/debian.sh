@@ -93,7 +93,7 @@ if ! git clone --depth=1 https://github.com/keeferrourke/capitaine-cursors.git "
 fi
 CAPITAINE_SRC="$CAPITAINE_TMP/capitaine-cursors"
 for cmd in inkscape xcursorgen bc; do require_command "$cmd"; done
-( cd "$CAPITAINE_SRC"; ./build.sh -p unix -t dark -d tv )
+( cd "$CAPITAINE_SRC"; NO_AT_BRIDGE=1 ./build.sh -p unix -t dark -d tv )
 CAPITAINE_BUILD="$CAPITAINE_SRC/dist/dark"
 [[ -d "$CAPITAINE_BUILD/cursors" && -f "$CAPITAINE_BUILD/index.theme" ]] || { bad "Capitaine build completed without producing dist/dark cursor theme"; exit 1; }
 mkdir -p "$DATA/icons"
