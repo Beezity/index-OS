@@ -1,0 +1,163 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — input settings helper
+set -eu
+
+CFG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONF="$CFG_ROOT/labwc/index.conf"
+RC="$CFG_ROOT/labwc/rc.xml"
+
+require_backend() {
+  command -v xmllint >/dev/null 2>&1 || { echo "xmllint is required" >&2; exit 1; }
+  [ -f "$RC" ] || { echo "labwc configuration unavailable: $RC" >&2; exit 1; }
+  xmllint --noout "$RC" >/dev/null 2>&1 || { echo "labwc configuration is malformed" >&2; exit 1; }
+}
+
+valid_speed() {
+  awk -v v="$1" 'BEGIN { if (v ~ /^-?[0-9]+([.][0-9]+)?$/ && v >= -1 && v <= 1) exit 0; exit 1 }'
+}
+
+normalize_speed() {
+  awk -v v="$1" 'BEGIN { printf "%.2f", v + 0 }'
+}
+
+valid_bool() {
+  case "$1" in yes|no) return 0 ;; *) return 1 ;; esac
+}
+
+get_saved() {
+  key=$1 fallback=$2
+  value=$(sed -n "s/^${key}=//p" "$CONF" 2>/dev/null | tail -n1 || true)
+  [ -n "$value" ] && printf '%s' "$value" || printf '%s' "$fallback"
+}
+
+write_saved() {
+  key=$1 value=$2
+  mkdir -p "$(dirname "$CONF")"
+  touch "$CONF"
+  lock="$CONF.lock"
+  if command -v flock >/dev/null 2>&1; then
+    (
+      flock -x 9
+      tmp=$(mktemp "$CONF.tmp.XXXXXX")
+      { grep -v "^${key}=" "$CONF" || true; printf '%s=%s\n' "$key" "$value"; } > "$tmp"
+      mv "$tmp" "$CONF"
+    ) 9>"$lock"
+  else
+    tmp=$(mktemp "$CONF.tmp.XXXXXX")
+    { grep -v "^${key}=" "$CONF" || true; printf '%s=%s\n' "$key" "$value"; } > "$tmp"
+    mv "$tmp" "$CONF"
+  fi
+}
+
+xml_value() {
+  xpath=$1
+  xmllint --xpath "string($xpath)" "$RC" 2>/dev/null || true
+}
+
+touchpad_present() {
+  for name in /sys/class/input/event*/device/name; do
+    [ -r "$name" ] || continue
+    value=$(cat "$name" 2>/dev/null || true)
+    case "$value" in
+      *[Tt]ouch[Pp]ad*|*[Tt]rack[Pp]ad*) printf '1'; return ;;
+    esac
+  done
+  printf '0'
+}
+
+apply_saved() {
+  require_backend
+
+  current_speed=$(xml_value "/labwc_config/libinput/device[@category='default']/pointerSpeed")
+  current_natural=$(xml_value "/labwc_config/libinput/device[@category='default']/naturalScroll")
+  current_tap=$(xml_value "/labwc_config/libinput/device[@category='touchpad']/tap")
+
+  speed=$(get_saved POINTER_SPEED "${current_speed:-0.00}")
+  natural=$(get_saved NATURAL_SCROLL "${current_natural:-no}")
+  tap=$(get_saved TAP_CLICK "${current_tap:-yes}")
+
+  valid_speed "$speed" || { echo "invalid saved pointer speed: $speed" >&2; exit 1; }
+  valid_bool "$natural" || { echo "invalid saved natural scroll value: $natural" >&2; exit 1; }
+  valid_bool "$tap" || { echo "invalid saved tap value: $tap" >&2; exit 1; }
+  speed=$(normalize_speed "$speed")
+
+  tmp=$(mktemp "$RC.tmp.XXXXXX")
+  rm -f "$tmp"
+  cp -p "$RC" "$tmp"
+  trap 'rm -f "$tmp"' EXIT HUP INT TERM
+
+  sed -i \
+    -e "s|<pointerSpeed>[^<]*</pointerSpeed>|<pointerSpeed>$speed</pointerSpeed>|g" \
+    -e "s|<naturalScroll>[^<]*</naturalScroll>|<naturalScroll>$natural</naturalScroll>|g" \
+    -e "s|<tap>[^<]*</tap>|<tap>$tap</tap>|g" \
+    "$tmp"
+
+  xmllint --noout "$tmp" >/dev/null 2>&1 || { echo "refusing to write malformed labwc input configuration" >&2; exit 1; }
+  mv "$tmp" "$RC"
+  trap - EXIT HUP INT TERM
+
+  if command -v labwc >/dev/null 2>&1; then
+    labwc --reconfigure >/dev/null 2>&1 || true
+  fi
+}
+
+state() {
+  if ! command -v xmllint >/dev/null 2>&1 || [ ! -f "$RC" ] || ! xmllint --noout "$RC" >/dev/null 2>&1; then
+    printf '0\t0.00\tno\tyes\t%s\n' "$(touchpad_present)"
+    return
+  fi
+
+  speed=$(xml_value "/labwc_config/libinput/device[@category='default']/pointerSpeed")
+  natural=$(xml_value "/labwc_config/libinput/device[@category='default']/naturalScroll")
+  tap=$(xml_value "/labwc_config/libinput/device[@category='touchpad']/tap")
+
+  valid_speed "${speed:-}" || speed=0.00
+  valid_bool "${natural:-}" || natural=no
+  valid_bool "${tap:-}" || tap=yes
+  speed=$(normalize_speed "$speed")
+
+  printf '1\t%s\t%s\t%s\t%s\n' "$speed" "$natural" "$tap" "$(touchpad_present)"
+}
+
+case "${1:-}" in
+  state)
+    state
+    ;;
+  apply)
+    [ "$#" -eq 1 ] || exit 2
+    apply_saved
+    ;;
+  set-pointer-speed)
+    [ "$#" -eq 2 ] || exit 2
+    valid_speed "$2" || { echo "pointer speed must be between -1 and 1" >&2; exit 2; }
+    require_backend
+    write_saved POINTER_SPEED "$(normalize_speed "$2")"
+    apply_saved
+    ;;
+  set-natural-scroll)
+    [ "$#" -eq 2 ] || exit 2
+    valid_bool "$2" || { echo "natural scroll must be yes or no" >&2; exit 2; }
+    require_backend
+    write_saved NATURAL_SCROLL "$2"
+    apply_saved
+    ;;
+  set-tap)
+    [ "$#" -eq 2 ] || exit 2
+    valid_bool "$2" || { echo "tap must be yes or no" >&2; exit 2; }
+    require_backend
+    write_saved TAP_CLICK "$2"
+    apply_saved
+    ;;
+  reset)
+    [ "$#" -eq 1 ] || exit 2
+    require_backend
+    write_saved POINTER_SPEED 0.00
+    write_saved NATURAL_SCROLL no
+    write_saved TAP_CLICK yes
+    apply_saved
+    ;;
+  *)
+    echo "usage: index-input {state|apply|set-pointer-speed VALUE|set-natural-scroll yes|no|set-tap yes|no|reset}" >&2
+    exit 2
+    ;;
+esac
