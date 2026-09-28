@@ -403,7 +403,7 @@ Rectangle {
 
         Rectangle { Layout.fillWidth: true; height: 1; color: panel.cyanD }
 
-        // ---- toggles / shortcuts ----
+        // ---- settings routes ----
         GridLayout {
             Layout.fillWidth: true
             columns: 2; rowSpacing: 8; columnSpacing: 8
@@ -413,9 +413,6 @@ Rectangle {
                     { t: "NETWORK",   s: panel.netName === "" ? "offline" : panel.netName, page: "network" },
                     { t: "BLUETOOTH", s: panel.btOn ? "on" : "off", page: "bluetooth" },
                     { t: "AUDIO",     s: "devices", page: "audio" },
-                    { t: "DISPLAY",   s: "outputs", c: "wdisplays || wlr-randr" },
-                    { t: "FILES",     s: "manager", c: "thunar" },
-                    { t: "MUTE",      s: "toggle",  c: "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" },
                     { t: "APPEARANCE", s: "themes", page: "appearance" },
                     { t: "POWER",      s: "profiles", page: "power" },
                     { t: "NOTIFICATIONS", s: NotificationPrefs.dnd ? "DND" : "popups", page: "notifications" }
@@ -446,7 +443,6 @@ Rectangle {
                             else if (modelData.page === "bluetooth") panel.bluetoothOpen = true
                             else if (modelData.page === "power") panel.powerOpen = true
                             else if (modelData.page === "notifications") panel.notificationOpen = true
-                            else { panel.run(modelData.c); panel.requestClose() }
                         }
                     }
                 }
