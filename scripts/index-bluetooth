@@ -18,10 +18,15 @@ valid_mac() {
 }
 
 service_online() {
-  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet bluetooth.service 2>/dev/null; then
-    return 0
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl is-active --quiet bluetooth.service 2>/dev/null
+    return
   fi
-  bluetoothctl list >/dev/null 2>&1
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 3 bluetoothctl list >/dev/null 2>&1
+  else
+    bluetoothctl list >/dev/null 2>&1
+  fi
 }
 
 state() {
