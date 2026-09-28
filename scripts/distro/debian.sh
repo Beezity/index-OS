@@ -44,10 +44,9 @@ PACKAGES=(
   qt6-wayland qt6ct qt5ct qml6-module-qtcore qml6-module-qtmultimedia
   brightnessctl upower gammastep gnome-power-manager
   fonts-dejavu fonts-liberation2 fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji fonts-noto-extra
-  papirus-icon-theme
+  papirus-icon-theme adwaita-icon-theme
   cups printer-driver-cups-pdf system-config-printer
   flatpak git pciutils libxml2-utils util-linux
-  inkscape x11-apps bc
 )
 
 say "checking Debian package availability..."
@@ -83,28 +82,6 @@ else
 fi
 ok "Quickshell installed"
 
-say "building Capitaine cursor theme..."
-CAPITAINE_TMP="$(mktemp -d)"
-cleanup_capitaine(){ [[ -n "${CAPITAINE_TMP:-}" ]] && rm -rf "$CAPITAINE_TMP"; }
-trap 'cleanup_capitaine; bad "installation failed at line $LINENO"; exit 1' ERR
-if ! git clone --depth=1 https://github.com/keeferrourke/capitaine-cursors.git "$CAPITAINE_TMP/capitaine-cursors"; then
-  bad "could not download Capitaine from its upstream repository"
-  exit 1
-fi
-CAPITAINE_SRC="$CAPITAINE_TMP/capitaine-cursors"
-for cmd in inkscape xcursorgen bc; do require_command "$cmd"; done
-( cd "$CAPITAINE_SRC"; NO_AT_BRIDGE=1 ./build.sh -p unix -t dark -d tv )
-CAPITAINE_BUILD="$CAPITAINE_SRC/dist/dark"
-[[ -d "$CAPITAINE_BUILD/cursors" && -f "$CAPITAINE_BUILD/index.theme" ]] || { bad "Capitaine build completed without producing dist/dark cursor theme"; exit 1; }
-mkdir -p "$DATA/icons"
-rm -rf "$DATA/icons/capitaine-cursors"
-mkdir -p "$DATA/icons/capitaine-cursors"
-cp -a "$CAPITAINE_BUILD/." "$DATA/icons/capitaine-cursors/"
-cleanup_capitaine
-CAPITAINE_TMP=""
-trap 'bad "installation failed at line $LINENO"; exit 1' ERR
-ok "Capitaine built and installed from upstream"
-
 for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do
   require_command "$cmd"
 done
@@ -124,7 +101,7 @@ sudo systemctl enable gdm3.service
 
 export INDEX_DEX_COMMAND="dex"
 export INDEX_POLKIT_AGENT="$POLKIT_AGENT"
-export INDEX_CURSOR_ROOT="$DATA/icons/capitaine-cursors"
+export INDEX_CURSOR_ROOT="/usr/share/icons/Adwaita"
 export INDEX_FILE_ROLLER_DESKTOP="org.gnome.FileRoller.desktop"
 export INDEX_REQUIRE_CURSOR_INDEX=1 INDEX_VALIDATE_CURSOR_ROOT=1 INDEX_VALIDATE_TITLEBAR_BUTTONS=0
 export INDEX_GDM_SERVICE="gdm3.service"
