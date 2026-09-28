@@ -25,7 +25,7 @@ Rectangle {
     property string deviceName: ""
     property string connectivity: "unknown"
     property int signalStrength: 0
-    property string ipv4Address: ""
+    property string ipv4Address: "--"
 
     readonly property bool connected: serviceOnline && deviceName !== "" && connectionName !== "NO CONNECTION"
     readonly property bool wifiConnected: connected && connectionType === "wifi"
@@ -57,7 +57,7 @@ Rectangle {
                     root.deviceName = f[6] || ""
                     root.connectivity = f[7] || "unknown"
                     var s = parseInt(f[8]); root.signalStrength = isNaN(s) ? 0 : s
-                    root.ipv4Address = f.slice(9).join("\t") || ""
+                    root.ipv4Address = f.slice(9).join("\t") || "--"
                 } else {
                     root.serviceOnline = false
                     root.networkingEnabled = false
@@ -68,7 +68,7 @@ Rectangle {
                     root.deviceName = ""
                     root.connectivity = "unknown"
                     root.signalStrength = 0
-                    root.ipv4Address = ""
+                    root.ipv4Address = "--"
                 }
                 root.ready = true
             }
@@ -116,6 +116,43 @@ Rectangle {
             color: root.ready ? root.warn : root.cyanD
         }
 
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                Layout.fillWidth: true
+                text: "NETWORKING"
+                font.family: root.pixel; font.pixelSize: 13; color: root.cyanB
+            }
+            Rectangle {
+                width: 78; height: 28
+                opacity: root.serviceOnline ? 1.0 : 0.45
+                color: root.networkingEnabled ? root.cyan : "transparent"
+                border.color: root.cyanD; border.width: 1
+                Text {
+                    anchors.centerIn: parent
+                    text: root.networkingEnabled ? "ON" : "OFF"
+                    font.family: root.pixel; font.pixelSize: 11
+                    color: root.networkingEnabled ? "#04141c" : root.cyanB
+                }
+                MouseArea {
+                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    enabled: root.serviceOnline
+                    onClicked: {
+                        root.networkingEnabled = !root.networkingEnabled
+                        root.run("$HOME/.local/bin/index-network toggle-networking")
+                        delayedRefresh.restart()
+                    }
+                }
+            }
+        }
+
+        Text {
+            visible: root.serviceOnline && !root.networkingEnabled
+            Layout.fillWidth: true
+            text: "NETWORKING IS DISABLED"
+            font.family: root.pixel; font.pixelSize: 10; color: root.warn
+        }
+
         Text { text: "CONNECTION"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB }
         Text {
             Layout.fillWidth: true
@@ -136,7 +173,7 @@ Rectangle {
             Text { text: "STATUS"; font.family: root.pixel; font.pixelSize: 10; color: root.cyanD }
             Text { Layout.fillWidth: true; text: root.connectivity.toUpperCase(); font.family: root.pixel; font.pixelSize: 10; color: root.connectivity === "full" ? root.cyanB : root.cyanD; horizontalAlignment: Text.AlignRight }
             Text { text: "IPv4"; font.family: root.pixel; font.pixelSize: 10; color: root.cyanD }
-            Text { Layout.fillWidth: true; text: root.ipv4Address || "--"; font.family: root.pixel; font.pixelSize: 10; color: root.cyanB; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+            Text { Layout.fillWidth: true; text: root.ipv4Address; font.family: root.pixel; font.pixelSize: 10; color: root.cyanB; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
         }
 
         ColumnLayout {
@@ -171,7 +208,7 @@ Rectangle {
             }
             Rectangle {
                 width: 78; height: 28
-                opacity: root.serviceOnline ? 1.0 : 0.45
+                opacity: root.serviceOnline && root.networkingEnabled ? 1.0 : 0.45
                 color: root.wifiEnabled ? root.cyan : "transparent"
                 border.color: root.cyanD; border.width: 1
                 Text {
@@ -182,7 +219,7 @@ Rectangle {
                 }
                 MouseArea {
                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                    enabled: root.serviceOnline
+                    enabled: root.serviceOnline && root.networkingEnabled
                     onClicked: {
                         root.wifiEnabled = !root.wifiEnabled
                         root.run("$HOME/.local/bin/index-network toggle-wifi")
@@ -197,25 +234,25 @@ Rectangle {
             visible: root.wifiAvailable
             Rectangle {
                 Layout.fillWidth: true; height: 34
-                opacity: root.serviceOnline && root.wifiEnabled ? 1.0 : 0.45
+                opacity: root.serviceOnline && root.networkingEnabled && root.wifiEnabled ? 1.0 : 0.45
                 color: wifiArea.containsMouse ? "#143245" : "#0c1620"
                 border.color: root.cyanD; border.width: 1
                 Text { anchors.centerIn: parent; text: root.wifiConnected ? "CHANGE WI-FI" : "CONNECT WI-FI"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
                 MouseArea {
                     id: wifiArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    enabled: root.serviceOnline && root.wifiEnabled
+                    enabled: root.serviceOnline && root.networkingEnabled && root.wifiEnabled
                     onClicked: { root.run("$HOME/.local/bin/index-network choose-wifi"); delayedRefresh.restart() }
                 }
             }
             Rectangle {
                 width: 96; height: 34
-                opacity: root.connected ? 1.0 : 0.45
+                opacity: root.wifiConnected ? 1.0 : 0.45
                 color: disconnectArea.containsMouse ? "#143245" : "transparent"
                 border.color: root.cyanD; border.width: 1
                 Text { anchors.centerIn: parent; text: "DISCONNECT"; font.family: root.pixel; font.pixelSize: 10; color: root.cyanB }
                 MouseArea {
                     id: disconnectArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    enabled: root.connected
+                    enabled: root.wifiConnected
                     onClicked: { root.run("$HOME/.local/bin/index-network disconnect"); delayedRefresh.restart() }
                 }
             }
