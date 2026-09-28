@@ -19,14 +19,14 @@ jobs:
       - name: Check installer syntax
         run: |
           bash -n install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh
-          bash -n scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input
+          bash -n scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard
           bash -n scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
           fish -n fish/config.fish
 
       - name: Shellcheck scripts
         run: |
           shellcheck --severity=error install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh \
-            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input \
+            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard \
             scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh \
             labwc/config/autostart labwc/config/index-lock labwc/config/index-idle \
             labwc/config/index-clip \
@@ -73,11 +73,106 @@ jobs:
           fi
           rm -f "$tmp" "$bad"
 
+      - name: Exercise clipboard helper
+        run: |
+          tmp="$(mktemp -d)"
+          mkdir -p "$tmp/bin" "$tmp/cache"
+          export FAKE_CLIPHIST_DB="$tmp/history" FAKE_CLIPHIST_SEQ="$tmp/seq" FAKE_CLIPHIST_PAYLOAD="$tmp/payload" FAKE_WLCOPY_OUT="$tmp/copied"
+          : > "$FAKE_CLIPHIST_DB"
+          printf '0\n' > "$FAKE_CLIPHIST_SEQ"
+
+          cat > "$tmp/bin/cliphist" <<'EOF'
+          #!/usr/bin/env bash
+          set -Eeuo pipefail
+          case "${1:-}" in
+            store)
+              cat > "$FAKE_CLIPHIST_PAYLOAD"
+              id=$(( $(cat "$FAKE_CLIPHIST_SEQ") + 1 ))
+              printf '%s\n' "$id" > "$FAKE_CLIPHIST_SEQ"
+              preview="$(tr '\t\r\n' '   ' < "$FAKE_CLIPHIST_PAYLOAD" | head -c 60)"
+              { printf '%s\t%s\n' "$id" "${preview:-item}"; cat "$FAKE_CLIPHIST_DB"; } > "$FAKE_CLIPHIST_DB.tmp"
+              mv "$FAKE_CLIPHIST_DB.tmp" "$FAKE_CLIPHIST_DB"
+              ;;
+            list)
+              if [[ "${2:-}" == -fields ]]; then
+                [[ "${FAKE_CLIPHIST_NO_FIELDS:-0}" != 1 ]] || exit 2
+                while IFS=$'\t' read -r id preview; do
+                  [[ -n "$id" ]] && printf '%s\ttext/plain\t%s\n' "$id" "$preview"
+                done < "$FAKE_CLIPHIST_DB"
+              else
+                cat "$FAKE_CLIPHIST_DB"
+              fi
+              ;;
+            delete)
+              IFS= read -r selected || true
+              id="${selected%%$'\t'*}"
+              awk -F '\t' -v id="$id" '$1 != id' "$FAKE_CLIPHIST_DB" > "$FAKE_CLIPHIST_DB.tmp"
+              mv "$FAKE_CLIPHIST_DB.tmp" "$FAKE_CLIPHIST_DB"
+              ;;
+            decode)
+              IFS= read -r _id || true
+              cat "$FAKE_CLIPHIST_PAYLOAD"
+              ;;
+            wipe)
+              : > "$FAKE_CLIPHIST_DB"
+              ;;
+            *) exit 2 ;;
+          esac
+          EOF
+          cat > "$tmp/bin/wl-copy" <<'EOF'
+          #!/usr/bin/env bash
+          cat > "$FAKE_WLCOPY_OUT"
+          EOF
+          cat > "$tmp/bin/ffmpeg" <<'EOF'
+          #!/usr/bin/env bash
+          out="${!#}"
+          printf 'cached-thumbnail\n' > "$out"
+          EOF
+          chmod +x "$tmp/bin/cliphist" "$tmp/bin/wl-copy" "$tmp/bin/ffmpeg"
+
+          run_clip() { env PATH="$tmp/bin:$PATH" XDG_CACHE_HOME="$tmp/cache" bash scripts/index-clipboard "$@"; }
+
+          # Preload 51 fake entries and verify pruning leaves the newest 50.
+          for i in $(seq 51 -1 1); do printf '%s\tentry %s\n' "$i" "$i" >> "$FAKE_CLIPHIST_DB"; done
+          printf '51\n' > "$FAKE_CLIPHIST_SEQ"
+          run_clip prune
+          dump="$(run_clip dump)"
+          test "$(printf '%s\n' "$dump" | head -n1 | cut -f2)" = 1
+          test "$(printf '%s\n' "$dump" | head -n1 | cut -f3)" = 50
+          ! grep -q $'^1\t' "$FAKE_CLIPHIST_DB"
+
+          # Debian's packaged cliphist is older and lacks list -fields. Exercise
+          # the default id/preview fallback explicitly.
+          export FAKE_CLIPHIST_NO_FIELDS=1
+          fallback="$(run_clip dump)"
+          test "$(printf '%s\n' "$fallback" | head -n1 | cut -f2)" = 1
+          test "$(printf '%s\n' "$fallback" | head -n1 | cut -f3)" = 50
+          unset FAKE_CLIPHIST_NO_FIELDS
+
+          printf 'fake-image-data' | run_clip store image
+          dump="$(run_clip dump)"
+          newest_id="$(printf '%s\n' "$dump" | sed -n '2s/\t.*//p')"
+          test -f "$tmp/cache/the-index/clipboard/previews/$newest_id.png"
+          run_clip select "$newest_id"
+          test "$(cat "$FAKE_WLCOPY_OUT")" = fake-image-data
+
+          if run_clip select '1;echo bad'; then
+            echo 'unsafe clipboard id unexpectedly accepted'
+            exit 1
+          fi
+
+          run_clip clear
+          test "$(run_clip dump | head -n1 | cut -f3)" = 0
+          test -z "$(find "$tmp/cache/the-index/clipboard/previews" -type f -name '*.png' -print -quit)"
+          grep -q '^MAX_ITEMS=50$' scripts/index-clipboard
+          grep -q '^MAX_BYTES=.*100' scripts/index-clipboard
+          rm -rf "$tmp"
+
       - name: Check required repository assets
         run: |
           files=(
             wallpaper/the-index.png
-            quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/BluetoothMenu.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/PowerPanel.qml quickshell/InputPanel.qml quickshell/Atmosphere.qml quickshell/lock/lock.qml quickshell/prescript.json
+            quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/BluetoothMenu.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/PowerPanel.qml quickshell/InputPanel.qml quickshell/ClipboardPopup.qml quickshell/Atmosphere.qml quickshell/lock/lock.qml quickshell/prescript.json
             labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment
             labwc/config/index-lock labwc/config/index-idle labwc/config/index-clip labwc/config/fontconfig/fonts.conf
             labwc/theme/the-index/labwc/themerc labwc/theme/the-index/labwc/close.xbm
@@ -86,7 +181,7 @@ jobs:
             labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf
             labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps
             assets/PerfectDOSVGA437-Universal.ttf install.sh install-fedora.sh install-debian.sh install-fish.sh setup.sh remove-display-manager.sh
-            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
+            scripts/common.sh scripts/install-common.sh scripts/validate.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/distro/arch.sh scripts/distro/fedora.sh scripts/distro/debian.sh
           )
           for f in "${files[@]}"; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
 
@@ -132,6 +227,10 @@ jobs:
           }
           grep -q '^InputPanel 1\.0 InputPanel\.qml$' quickshell/qmldir || {
             echo 'SettingsPanel requires InputPanel but it is not registered in qmldir'
+            exit 1
+          }
+          grep -q '^ClipboardPopup 1\.0 ClipboardPopup\.qml$' quickshell/qmldir || {
+            echo 'shell requires ClipboardPopup but it is not registered in qmldir'
             exit 1
           }
 

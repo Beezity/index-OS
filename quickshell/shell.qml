@@ -10,6 +10,7 @@ import Quickshell
 ShellRoot {
     Bar {}
     AboutPopup {}
+    ClipboardPopup {}
     Atmosphere {}
     Notifications {}
     Osd {}
