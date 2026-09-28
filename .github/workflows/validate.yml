@@ -50,6 +50,7 @@ jobs:
           state="$(INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input state)"
           test "$(printf '%s' "$state" | cut -f1)" = 1
           INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input set-speed 0.25
+          INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input set-speed 0.25
           INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input set-natural-scroll yes
           INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input set-tap no
           state="$(INDEX_INPUT_RC="$tmp" INDEX_INPUT_NO_RELOAD=1 sh scripts/index-input state)"
