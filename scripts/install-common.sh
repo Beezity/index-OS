@@ -57,9 +57,18 @@ fi
 
 say "installing labwc configuration..."
 SAVED_INDEX_CONF=""
+SAVED_POINTER_SPEED=""; SAVED_NATURAL_SCROLL=""; SAVED_TAP_CLICK=""
+if [[ -f "$CFG/labwc/rc.xml" ]]; then
+  SAVED_POINTER_SPEED="$(sed -n 's|.*<pointerSpeed>\([^<]*\)</pointerSpeed>.*|\1|p' "$CFG/labwc/rc.xml" | head -n1 || true)"
+  SAVED_NATURAL_SCROLL="$(sed -n 's|.*<naturalScroll>\([^<]*\)</naturalScroll>.*|\1|p' "$CFG/labwc/rc.xml" | head -n1 || true)"
+  SAVED_TAP_CLICK="$(sed -n 's|.*<tap>\([^<]*\)</tap>.*|\1|p' "$CFG/labwc/rc.xml" | head -n1 || true)"
+fi
 if [[ -f "$CFG/labwc/index.conf" ]]; then
   SAVED_INDEX_CONF="$(mktemp --suffix=.index-conf)"
   cp -f "$CFG/labwc/index.conf" "$SAVED_INDEX_CONF"
+  [[ -n "$SAVED_POINTER_SPEED" ]] || SAVED_POINTER_SPEED="$(sed -n 's/^POINTER_SPEED=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
+  [[ -n "$SAVED_NATURAL_SCROLL" ]] || SAVED_NATURAL_SCROLL="$(sed -n 's/^NATURAL_SCROLL=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
+  [[ -n "$SAVED_TAP_CLICK" ]] || SAVED_TAP_CLICK="$(sed -n 's/^TAP_CLICK=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
 fi
 rm -rf "$CFG/labwc"; mkdir -p "$CFG/labwc"
 cp -f "$INDEX_ROOT/labwc/config/rc.xml" "$CFG/labwc/rc.xml"
@@ -67,15 +76,31 @@ cp -f "$INDEX_ROOT/labwc/config/menu.xml" "$CFG/labwc/menu.xml"
 cp -f "$INDEX_ROOT/labwc/config/autostart" "$CFG/labwc/autostart"
 cp -f "$INDEX_ROOT/labwc/config/environment" "$CFG/labwc/environment"
 cp -f "$INDEX_ROOT/wallpaper/the-index.png" "$CFG/labwc/wall.png"
+
+# Input state is now authoritative in Labwc rc.xml. Preserve existing values
+# across upgrades, including migration from the former index.conf mirror.
+case "$SAVED_POINTER_SPEED" in
+  -1|-1.0|-1.00|0|0.0|0.00|1|1.0|1.00|-0.[0-9]|-0.[0-9][0-9]|0.[0-9]|0.[0-9][0-9])
+    sed -i "s|<pointerSpeed>[^<]*</pointerSpeed>|<pointerSpeed>$SAVED_POINTER_SPEED</pointerSpeed>|g" "$CFG/labwc/rc.xml"
+    ;;
+esac
+case "$SAVED_NATURAL_SCROLL" in
+  yes|no) sed -i "s|<naturalScroll>[^<]*</naturalScroll>|<naturalScroll>$SAVED_NATURAL_SCROLL</naturalScroll>|g" "$CFG/labwc/rc.xml" ;;
+esac
+case "$SAVED_TAP_CLICK" in
+  yes|no) sed -i "s|<tap>[^<]*</tap>|<tap>$SAVED_TAP_CLICK</tap>|g" "$CFG/labwc/rc.xml" ;;
+esac
+
 if [[ "$INDEX_DEX_COMMAND" != dex ]]; then sed -i -e "s/command -v dex /command -v $INDEX_DEX_COMMAND /" -e "s/dex -a -e labwc/$INDEX_DEX_COMMAND -a -e labwc/" "$CFG/labwc/autostart"; fi
 if [[ "$INDEX_POLKIT_AGENT" != /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]]; then sed -i "s#/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1#$INDEX_POLKIT_AGENT#" "$CFG/labwc/autostart"; fi
 if [[ -n "$SAVED_INDEX_CONF" && -f "$SAVED_INDEX_CONF" ]]; then
   cp -f "$SAVED_INDEX_CONF" "$CFG/labwc/index.conf"
   rm -f "$SAVED_INDEX_CONF"
+  sed -i '/^POINTER_SPEED=/d;/^NATURAL_SCROLL=/d;/^TAP_CLICK=/d;/^CURSOR_SIZE=/d' "$CFG/labwc/index.conf"
 elif [[ -f "$INDEX_ROOT/labwc/config/index.conf" ]]; then
   cp -f "$INDEX_ROOT/labwc/config/index.conf" "$CFG/labwc/index.conf"
 fi
-for script in index-lock index-logout index-display-save index-display-restore index-idle index-input index-clip; do [[ -f "$INDEX_ROOT/labwc/config/$script" ]] || continue; cp -f "$INDEX_ROOT/labwc/config/$script" "$CFG/labwc/$script"; chmod +x "$CFG/labwc/$script"; done
+for script in index-lock index-logout index-display-save index-display-restore index-idle index-clip; do [[ -f "$INDEX_ROOT/labwc/config/$script" ]] || continue; cp -f "$INDEX_ROOT/labwc/config/$script" "$CFG/labwc/$script"; chmod +x "$CFG/labwc/$script"; done
 chmod +x "$CFG/labwc/autostart"
 
 say "installing labwc and GTK themes..."
@@ -125,7 +150,7 @@ QTCONF
 done
 
 [[ -x "$INDEX_ROOT/labwc/app-fixes/apply-browser-fixes.sh" ]] && "$INDEX_ROOT/labwc/app-fixes/apply-browser-fixes.sh"
-mkdir -p "$HOME/.local/bin"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"; install -m755 "$INDEX_ROOT/scripts/index-doctor" "$HOME/.local/bin/index-doctor"; install -m755 "$INDEX_ROOT/scripts/index-backup" "$HOME/.local/bin/index-backup"; install -m755 "$INDEX_ROOT/scripts/index-restore" "$HOME/.local/bin/index-restore"; install -m755 "$INDEX_ROOT/scripts/index-uninstall" "$HOME/.local/bin/index-uninstall"; install -m755 "$INDEX_ROOT/scripts/index-update" "$HOME/.local/bin/index-update"; install -m755 "$INDEX_ROOT/scripts/index-appearance" "$HOME/.local/bin/index-appearance"; install -m755 "$INDEX_ROOT/scripts/index-audio" "$HOME/.local/bin/index-audio"; install -m755 "$INDEX_ROOT/scripts/index-network" "$HOME/.local/bin/index-network"; install -m755 "$INDEX_ROOT/scripts/index-bluetooth" "$HOME/.local/bin/index-bluetooth"; install -m755 "$INDEX_ROOT/scripts/index-power" "$HOME/.local/bin/index-power"; xdg-user-dirs-update; mkdir -p "$HOME/Pictures"
+mkdir -p "$HOME/.local/bin"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"; install -m755 "$INDEX_ROOT/scripts/index-doctor" "$HOME/.local/bin/index-doctor"; install -m755 "$INDEX_ROOT/scripts/index-backup" "$HOME/.local/bin/index-backup"; install -m755 "$INDEX_ROOT/scripts/index-restore" "$HOME/.local/bin/index-restore"; install -m755 "$INDEX_ROOT/scripts/index-uninstall" "$HOME/.local/bin/index-uninstall"; install -m755 "$INDEX_ROOT/scripts/index-update" "$HOME/.local/bin/index-update"; install -m755 "$INDEX_ROOT/scripts/index-appearance" "$HOME/.local/bin/index-appearance"; install -m755 "$INDEX_ROOT/scripts/index-audio" "$HOME/.local/bin/index-audio"; install -m755 "$INDEX_ROOT/scripts/index-network" "$HOME/.local/bin/index-network"; install -m755 "$INDEX_ROOT/scripts/index-bluetooth" "$HOME/.local/bin/index-bluetooth"; install -m755 "$INDEX_ROOT/scripts/index-power" "$HOME/.local/bin/index-power"; install -m755 "$INDEX_ROOT/scripts/index-input" "$HOME/.local/bin/index-input"; xdg-user-dirs-update; mkdir -p "$HOME/Pictures"
 setdef(){ local bin="$1" desktop="$2"; shift 2; command -v "$bin" >/dev/null || return 0; local m; for m in "$@"; do xdg-mime default "$desktop" "$m"; done; }
 setdef thunar thunar.desktop inode/directory; setdef foot foot.desktop text/plain text/x-shellscript application/x-shellscript; setdef imv imv.desktop image/png image/jpeg image/gif image/webp image/bmp image/tiff; setdef mpv mpv.desktop video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo audio/mpeg audio/flac audio/ogg audio/wav audio/x-wav; setdef zathura org.pwmt.zathura.desktop application/pdf application/epub+zip; setdef file-roller "$INDEX_FILE_ROLLER_DESKTOP" application/zip application/x-tar application/gzip application/x-7z-compressed application/vnd.rar; unset -f setdef
 
