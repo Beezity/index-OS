@@ -7,8 +7,13 @@ if command -v dbus-update-activation-environment >/dev/null 2>&1; then
   dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE >/dev/null 2>&1 || true
 fi
 
-# Desktop wallpaper.
-swaybg -i "$HOME/.config/labwc/wall.png" -m fill &
+# Desktop wallpaper. The appearance helper owns the persisted selection;
+# fall back to the bundled Index wallpaper on a fresh install.
+if [ -x "$HOME/.local/bin/index-appearance" ] && [ -f "$HOME/.config/the-index/appearance.conf" ]; then
+  "$HOME/.local/bin/index-appearance" apply >/dev/null 2>&1 &
+else
+  swaybg -i "$HOME/.config/labwc/wall.png" -m fill &
+fi
 
 # VMware's SVGA3D + Qt Quick Wayland/EGL path can create an EGL surface and
 # then fail eglSwapBuffers with EGL_BAD_SURFACE/protocol errors. The software
