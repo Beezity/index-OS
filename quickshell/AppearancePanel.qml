@@ -13,7 +13,7 @@ Rectangle {
     readonly property color cyanB: "#85C5E8"
     readonly property color cyanD: "#3A7CA5"
     property string iconTheme: "Papirus-Dark"
-    property string cursorTheme: "capitaine-cursors"
+    property string cursorTheme: "Adwaita"
     property int cursorSize: 24
     property string wallpaper: ""
 

@@ -45,12 +45,15 @@ cp -f "$INDEX_ROOT/labwc/config/fontconfig/fonts.conf" "$CFG/fontconfig/fonts.co
 fc-cache -f >/dev/null
 
 say "configuring icon and cursor themes..."
-ICON_THEME="Papirus-Dark"; CURSOR_THEME="capitaine-cursors"; CURSOR_SIZE=24
+ICON_THEME="Papirus-Dark"; CURSOR_THEME="Adwaita"; CURSOR_SIZE=24
 [[ -f "/usr/share/icons/$ICON_THEME/index.theme" ]] || { bad "icon theme missing after installation: $ICON_THEME"; exit 1; }
 [[ -d "$INDEX_CURSOR_ROOT/cursors" ]] || { bad "cursor theme missing after installation: $INDEX_CURSOR_ROOT"; exit 1; }
-if [[ "${INDEX_REQUIRE_CURSOR_INDEX:-0}" == 1 ]]; then [[ -f "$INDEX_CURSOR_ROOT/index.theme" ]] || { bad "Capitaine cursor theme missing after installation"; exit 1; }; fi
+if [[ "${INDEX_REQUIRE_CURSOR_INDEX:-0}" == 1 ]]; then [[ -f "$INDEX_CURSOR_ROOT/index.theme" ]] || { bad "cursor theme index missing after installation: $INDEX_CURSOR_ROOT/index.theme"; exit 1; }; fi
 mkdir -p "$HOME/.local/share/icons/default"
 printf '[Icon Theme]\nInherits=%s\n' "$CURSOR_THEME" > "$HOME/.local/share/icons/default/index.theme"
+if [[ -f "$CFG/the-index/appearance.conf" ]]; then
+  sed -i 's/^CURSOR_THEME=capitaine-cursors$/CURSOR_THEME=Adwaita/' "$CFG/the-index/appearance.conf"
+fi
 
 say "installing labwc configuration..."
 rm -rf "$CFG/labwc"; mkdir -p "$CFG/labwc"
@@ -112,7 +115,7 @@ QTCONF
 done
 
 [[ -x "$INDEX_ROOT/labwc/app-fixes/apply-browser-fixes.sh" ]] && "$INDEX_ROOT/labwc/app-fixes/apply-browser-fixes.sh"
-mkdir -p "$HOME/.local/bin"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"; install -m755 "$INDEX_ROOT/scripts/index-doctor" "$HOME/.local/bin/index-doctor"; install -m755 "$INDEX_ROOT/scripts/index-backup" "$HOME/.local/bin/index-backup"; install -m755 "$INDEX_ROOT/scripts/index-restore" "$HOME/.local/bin/index-restore"; install -m755 "$INDEX_ROOT/scripts/index-uninstall" "$HOME/.local/bin/index-uninstall"; install -m755 "$INDEX_ROOT/scripts/index-update" "$HOME/.local/bin/index-update"; install -m755 "$INDEX_ROOT/scripts/index-appearance" "$HOME/.local/bin/index-appearance"; install -m755 "$INDEX_ROOT/scripts/index-audio" "$HOME/.local/bin/index-audio"; install -m755 "$INDEX_ROOT/scripts/index-network" "$HOME/.local/bin/index-network"; xdg-user-dirs-update; mkdir -p "$HOME/Pictures"
+mkdir -p "$HOME/.local/bin"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"; install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"; install -m755 "$INDEX_ROOT/scripts/index-doctor" "$HOME/.local/bin/index-doctor"; install -m755 "$INDEX_ROOT/scripts/index-backup" "$HOME/.local/bin/index-backup"; install -m755 "$INDEX_ROOT/scripts/index-restore" "$HOME/.local/bin/index-restore"; install -m755 "$INDEX_ROOT/scripts/index-uninstall" "$HOME/.local/bin/index-uninstall"; install -m755 "$INDEX_ROOT/scripts/index-update" "$HOME/.local/bin/index-update"; install -m755 "$INDEX_ROOT/scripts/index-appearance" "$HOME/.local/bin/index-appearance"; install -m755 "$INDEX_ROOT/scripts/index-audio" "$HOME/.local/bin/index-audio"; install -m755 "$INDEX_ROOT/scripts/index-network" "$HOME/.local/bin/index-network"; install -m755 "$INDEX_ROOT/scripts/index-bluetooth" "$HOME/.local/bin/index-bluetooth"; xdg-user-dirs-update; mkdir -p "$HOME/Pictures"
 setdef(){ local bin="$1" desktop="$2"; shift 2; command -v "$bin" >/dev/null || return 0; local m; for m in "$@"; do xdg-mime default "$desktop" "$m"; done; }
 setdef thunar thunar.desktop inode/directory; setdef foot foot.desktop text/plain text/x-shellscript application/x-shellscript; setdef imv imv.desktop image/png image/jpeg image/gif image/webp image/bmp image/tiff; setdef mpv mpv.desktop video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo audio/mpeg audio/flac audio/ogg audio/wav audio/x-wav; setdef zathura org.pwmt.zathura.desktop application/pdf application/epub+zip; setdef file-roller "$INDEX_FILE_ROLLER_DESKTOP" application/zip application/x-tar application/gzip application/x-7z-compressed application/vnd.rar; unset -f setdef
 

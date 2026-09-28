@@ -46,6 +46,8 @@ check_file "$HOME/.config/labwc/rc.xml" "labwc configuration"
 check_file "$HOME/.config/labwc/autostart" "labwc autostart"
 check_file "$HOME/.config/quickshell/shell.qml" "Quickshell shell"
 check_file "$HOME/.config/quickshell/Bar.qml" "Quickshell top bar"
+check_file "$HOME/.config/quickshell/BluetoothMenu.qml" "Bluetooth panel"
+check_file "$HOME/.local/bin/index-bluetooth" "Bluetooth helper"
 check_file "$HOME/.config/foot/foot.ini" "Foot configuration"
 check_file "$HOME/.config/fish/config.fish" "Fish configuration"
 check_file "$HOME/.config/wofi/config" "Wofi configuration"
@@ -53,11 +55,11 @@ check_file "$HOME/.config/wofi/config" "Wofi configuration"
 section "THEMING"
 check_file "$HOME/.local/share/themes/the-index/labwc/themerc" "Index labwc theme"
 if [[ -f /usr/share/icons/Papirus-Dark/index.theme ]]; then ok "Papirus-Dark icon theme"; else fail "Papirus-Dark icon theme missing"; fi
-if [[ -d /usr/share/icons/capitaine-cursors/cursors || -d "$HOME/.local/share/icons/capitaine-cursors/cursors" ]]; then ok "Capitaine cursor theme"; else fail "Capitaine cursor theme missing"; fi
+if [[ -d /usr/share/icons/Adwaita/cursors ]]; then ok "Adwaita cursor theme"; else fail "Adwaita cursor theme missing"; fi
 if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA font available"; else warn "Perfect DOS VGA font could not be confirmed"; fi
 
 section "DESKTOP SERVICES"
-for cmd in nmcli wpctl wl-copy playerctl; do check_cmd "$cmd"; done
+for cmd in nmcli bluetoothctl wpctl wl-copy playerctl; do check_cmd "$cmd"; done
 if has systemctl; then
   for svc in NetworkManager bluetooth cups; do
     if systemctl is-enabled --quiet "$svc.service" 2>/dev/null; then ok "$svc enabled"; else warn "$svc not enabled"; fi
