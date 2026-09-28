@@ -6,15 +6,25 @@ CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/the-index"
 CFG="$CFG_DIR/appearance.conf"
 LABWC="${XDG_CONFIG_HOME:-$HOME/.config}/labwc"
 DEFAULT_WALL="$LABWC/wall.png"
+CACHE_DIR="${INDEX_APPEARANCE_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/the-index/appearance}"
+PICTURES_DIR="${INDEX_APPEARANCE_PICTURES_DIR:-$HOME/Pictures}"
 mkdir -p "$CFG_DIR"
 
-getv() { [ -f "$CFG" ] && sed -n "s/^$1=//p" "$CFG" | tail -1 || true; }
+getv() {
+  [ -f "$CFG" ] && sed -n "s/^$1=//p" "$CFG" | tail -1 || true
+}
+
 setv() {
   key=$1 value=$2
   tmp=$(mktemp "$CFG_DIR/.appearance.XXXXXX")
   { [ -f "$CFG" ] && grep -v "^${key}=" "$CFG" || true; printf '%s=%s\n' "$key" "$value"; } > "$tmp"
   mv "$tmp" "$CFG"
 }
+
+sanitize_state() {
+  printf '%s' "$1" | tr '\t\r\n' '   '
+}
+
 list_themes() {
   kind=$1
   for root in "$HOME/.local/share/icons" "$HOME/.icons" /usr/local/share/icons /usr/share/icons; do
@@ -28,6 +38,61 @@ list_themes() {
     done
   done | sort -u
 }
+
+list_wallpapers() {
+  [ -d "$PICTURES_DIR" ] || return 0
+  find "$PICTURES_DIR" -type f \
+    \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) \
+    -print 2>/dev/null | LC_ALL=C sort -f
+}
+
+cache_path() {
+  printf '%s/%s.list' "$CACHE_DIR" "$1"
+}
+
+cache_stale() {
+  target=$1
+  [ -f "$target" ] || return 0
+  find "$target" -mmin +4 -print -quit 2>/dev/null | grep -q .
+}
+
+refresh_choice() {
+  kind=$1
+  mkdir -p "$CACHE_DIR"
+  umask 077
+  target=$(cache_path "$kind")
+  tmp=$(mktemp "$CACHE_DIR/.${kind}.XXXXXX")
+  case "$kind" in
+    icons) list_themes icons > "$tmp" ;;
+    cursors) list_themes cursors > "$tmp" ;;
+    wallpapers) list_wallpapers > "$tmp" ;;
+    *) rm -f "$tmp"; return 2 ;;
+  esac
+  mv "$tmp" "$target"
+}
+
+refresh_choices() {
+  for kind in icons cursors wallpapers; do
+    target=$(cache_path "$kind")
+    cache_stale "$target" && refresh_choice "$kind" || true
+  done
+}
+
+ensure_choice() {
+  kind=$1
+  [ -f "$(cache_path "$kind")" ] || refresh_choice "$kind"
+}
+
+choose_value() {
+  kind=$1 prompt=$2
+  command -v wofi >/dev/null 2>&1 || {
+    echo "wofi is required" >&2
+    exit 1
+  }
+  ensure_choice "$kind"
+  wofi --dmenu -p "$prompt" < "$(cache_path "$kind")" || true
+}
+
 set_ini_value() {
   file=$1 key=$2 value=$3
   [ -f "$file" ] || return 0
@@ -37,6 +102,7 @@ set_ini_value() {
     printf '\n%s=%s\n' "$key" "$value" >> "$file"
   fi
 }
+
 apply_icons() {
   theme=$1
   command -v gsettings >/dev/null 2>&1 && gsettings set org.gnome.desktop.interface icon-theme "$theme" >/dev/null 2>&1 || true
@@ -47,6 +113,7 @@ apply_icons() {
     set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$q/$q.conf" icon_theme "$theme"
   done
 }
+
 apply_cursor() {
   theme=$1 size=${2:-24}
   case "$size" in ''|*[!0-9]*) echo "invalid cursor size: $size" >&2; exit 2 ;; esac
@@ -60,11 +127,13 @@ apply_cursor() {
     set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-cursor-theme-name "$theme"
     set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-cursor-theme-size "$size"
   done
-  envf="$LABWC/environment"; touch "$envf"
+  envf="$LABWC/environment"
+  touch "$envf"
   sed -i '/^XCURSOR_THEME=/d;/^XCURSOR_SIZE=/d' "$envf"
   printf 'XCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$theme" "$size" >> "$envf"
   command -v labwc >/dev/null 2>&1 && labwc --reconfigure >/dev/null 2>&1 || true
 }
+
 apply_wallpaper() {
   wall=$1
   [ -f "$wall" ] || wall=$DEFAULT_WALL
@@ -75,14 +144,51 @@ apply_wallpaper() {
   fi
 }
 
+choose_icons() {
+  selected=$(choose_value icons 'icon theme')
+  [ -n "$selected" ] || return 0
+  setv ICON_THEME "$selected"
+  apply_icons "$selected"
+}
+
+choose_cursor() {
+  size=${1:-24}
+  case "$size" in ''|*[!0-9]*) echo "invalid cursor size: $size" >&2; exit 2 ;; esac
+  selected=$(choose_value cursors 'cursor theme')
+  [ -n "$selected" ] || return 0
+  setv CURSOR_THEME "$selected"
+  setv CURSOR_SIZE "$size"
+  apply_cursor "$selected" "$size"
+}
+
+choose_wallpaper() {
+  selected=$(choose_value wallpapers 'wallpaper')
+  [ -n "$selected" ] || return 0
+  [ -f "$selected" ] || { echo "Wallpaper not found: $selected" >&2; exit 1; }
+  setv WALLPAPER "$selected"
+  apply_wallpaper "$selected"
+}
+
 case "${1:-}" in
+  state)
+    printf '%s\t%s\t%s\t%s\n' \
+      "$(sanitize_state "$(getv ICON_THEME)")" \
+      "$(sanitize_state "$(getv CURSOR_THEME)")" \
+      "$(sanitize_state "$(getv CURSOR_SIZE)")" \
+      "$(sanitize_state "$(getv WALLPAPER)")"
+    ;;
   list-icons) list_themes icons ;;
   list-cursors) list_themes cursors ;;
-  get) getv "$2" ;;
-  set-icons) setv ICON_THEME "$2"; apply_icons "$2" ;;
-  set-cursor) setv CURSOR_THEME "$2"; setv CURSOR_SIZE "${3:-24}"; apply_cursor "$2" "${3:-24}" ;;
-  set-cursor-size) theme=$(getv CURSOR_THEME); [ -n "$theme" ] || theme=Adwaita; setv CURSOR_SIZE "$2"; apply_cursor "$theme" "$2" ;;
-  set-wallpaper) [ -f "$2" ] || { echo "Wallpaper not found: $2" >&2; exit 2; }; setv WALLPAPER "$2"; apply_wallpaper "$2" ;;
+  list-wallpapers) list_wallpapers ;;
+  refresh-choices) refresh_choices ;;
+  choose-icons) choose_icons ;;
+  choose-cursor) choose_cursor "${2:-24}" ;;
+  choose-wallpaper) choose_wallpaper ;;
+  get) [ "$#" -eq 2 ] || exit 2; getv "$2" ;;
+  set-icons) [ "$#" -eq 2 ] || exit 2; setv ICON_THEME "$2"; apply_icons "$2" ;;
+  set-cursor) [ "$#" -ge 2 ] && [ "$#" -le 3 ] || exit 2; setv CURSOR_THEME "$2"; setv CURSOR_SIZE "${3:-24}"; apply_cursor "$2" "${3:-24}" ;;
+  set-cursor-size) [ "$#" -eq 2 ] || exit 2; theme=$(getv CURSOR_THEME); [ -n "$theme" ] || theme=Adwaita; setv CURSOR_SIZE "$2"; apply_cursor "$theme" "$2" ;;
+  set-wallpaper) [ "$#" -eq 2 ] || exit 2; [ -f "$2" ] || { echo "Wallpaper not found: $2" >&2; exit 2; }; setv WALLPAPER "$2"; apply_wallpaper "$2" ;;
   reset-wallpaper) setv WALLPAPER "$DEFAULT_WALL"; apply_wallpaper "$DEFAULT_WALL" ;;
   apply)
     icons=$(getv ICON_THEME); cursor=$(getv CURSOR_THEME); size=$(getv CURSOR_SIZE); wall=$(getv WALLPAPER)
@@ -90,5 +196,8 @@ case "${1:-}" in
     [ -n "$cursor" ] && apply_cursor "$cursor" "${size:-24}" || true
     if [ -n "$wall" ] && [ -f "$wall" ]; then apply_wallpaper "$wall"; else setv WALLPAPER "$DEFAULT_WALL"; apply_wallpaper "$DEFAULT_WALL"; fi
     ;;
-  *) echo "usage: index-appearance {list-icons|list-cursors|get KEY|set-icons THEME|set-cursor THEME [SIZE]|set-cursor-size SIZE|set-wallpaper FILE|reset-wallpaper|apply}" >&2; exit 2 ;;
+  *)
+    echo "usage: index-appearance {state|list-icons|list-cursors|list-wallpapers|refresh-choices|choose-icons|choose-cursor [SIZE]|choose-wallpaper|get KEY|set-icons THEME|set-cursor THEME [SIZE]|set-cursor-size SIZE|set-wallpaper FILE|reset-wallpaper|apply}" >&2
+    exit 2
+    ;;
 esac

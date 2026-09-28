@@ -14,6 +14,7 @@ Rectangle {
     readonly property color cyanB: "#85C5E8"
     readonly property color cyanD: "#3A7CA5"
     readonly property color warn: "#FF6B6B"
+    readonly property string helper: Quickshell.env("HOME") + "/.local/bin/index-network"
 
     property bool ready: false
     property bool serviceOnline: false
@@ -26,16 +27,25 @@ Rectangle {
     property string connectivity: "unknown"
     property int signalStrength: 0
     property string ipv4Address: "--"
+    property bool scanRequested: false
+    property bool scanning: false
 
     readonly property bool connected: serviceOnline && deviceName !== "" && connectionName !== "NO CONNECTION"
     readonly property bool wifiConnected: connected && connectionType === "wifi"
 
-    function run(cmd) { Quickshell.execDetached(["sh", "-c", cmd]) }
+    function run(args) { Quickshell.execDetached([root.helper].concat(args)) }
     function refresh() { if (!stateGet.running) stateGet.running = true }
+    function maybeScan() {
+        if (root.visible && root.ready && root.serviceOnline && root.networkingEnabled && root.wifiAvailable && root.wifiEnabled && !root.scanRequested) {
+            root.scanRequested = true
+            if (!scanProc.running) scanProc.running = true
+        }
+    }
 
     onVisibleChanged: {
         if (visible) {
             ready = false
+            scanRequested = false
             refresh()
         }
     }
@@ -43,7 +53,7 @@ Rectangle {
 
     Process {
         id: stateGet
-        command: ["sh", "-c", "$HOME/.local/bin/index-network state 2>/dev/null"]
+        command: [root.helper, "state"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var f = text.trim().split("\t")
@@ -71,12 +81,43 @@ Rectangle {
                     root.ipv4Address = "--"
                 }
                 root.ready = true
+                root.maybeScan()
+            }
+        }
+    }
+
+    Process {
+        id: scanProc
+        property bool started: false
+        command: [root.helper, "scan-wifi"]
+        stdout: StdioCollector {}
+        onRunningChanged: {
+            if (running) {
+                started = true
+                root.scanning = true
+            } else if (started) {
+                started = false
+                root.scanning = false
+                delayedRefresh.restart()
+            }
+        }
+    }
+    Process {
+        id: wifiChooser
+        property bool started: false
+        command: [root.helper, "choose-wifi"]
+        stdout: StdioCollector {}
+        onRunningChanged: {
+            if (running) started = true
+            else if (started) {
+                started = false
+                delayedRefresh.restart()
             }
         }
     }
 
     Timer {
-        interval: 2500
+        interval: 6000
         repeat: true
         running: root.visible
         onTriggered: root.refresh()
@@ -139,7 +180,7 @@ Rectangle {
                     enabled: root.serviceOnline
                     onClicked: {
                         root.networkingEnabled = !root.networkingEnabled
-                        root.run("$HOME/.local/bin/index-network toggle-networking")
+                        root.run(["toggle-networking"])
                         delayedRefresh.restart()
                     }
                 }
@@ -222,7 +263,7 @@ Rectangle {
                     enabled: root.serviceOnline && root.networkingEnabled
                     onClicked: {
                         root.wifiEnabled = !root.wifiEnabled
-                        root.run("$HOME/.local/bin/index-network toggle-wifi")
+                        root.run(["toggle-wifi"])
                         delayedRefresh.restart()
                     }
                 }
@@ -237,11 +278,11 @@ Rectangle {
                 opacity: root.serviceOnline && root.networkingEnabled && root.wifiEnabled ? 1.0 : 0.45
                 color: wifiArea.containsMouse ? "#143245" : "#0c1620"
                 border.color: root.cyanD; border.width: 1
-                Text { anchors.centerIn: parent; text: root.wifiConnected ? "CHANGE WI-FI" : "CONNECT WI-FI"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
+                Text { anchors.centerIn: parent; text: root.scanning ? "SCANNING WI-FI..." : (root.wifiConnected ? "CHANGE WI-FI" : "CONNECT WI-FI"); font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
                 MouseArea {
                     id: wifiArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    enabled: root.serviceOnline && root.networkingEnabled && root.wifiEnabled
-                    onClicked: { root.run("$HOME/.local/bin/index-network choose-wifi"); delayedRefresh.restart() }
+                    enabled: root.serviceOnline && root.networkingEnabled && root.wifiEnabled && !root.scanning && !wifiChooser.running
+                    onClicked: if (!wifiChooser.running) wifiChooser.running = true
                 }
             }
             Rectangle {
@@ -253,7 +294,7 @@ Rectangle {
                 MouseArea {
                     id: disconnectArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     enabled: root.wifiConnected
-                    onClicked: { root.run("$HOME/.local/bin/index-network disconnect"); delayedRefresh.restart() }
+                    onClicked: { root.run(["disconnect"]); delayedRefresh.restart() }
                 }
             }
         }
@@ -275,7 +316,7 @@ Rectangle {
             Text { anchors.centerIn: parent; text: "OPEN ADVANCED NETWORK SETTINGS"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
             MouseArea {
                 id: advancedArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                onClicked: root.run("nm-connection-editor >/dev/null 2>&1 &")
+                onClicked: Quickshell.execDetached(["nm-connection-editor"])
             }
         }
 

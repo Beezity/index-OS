@@ -35,7 +35,7 @@ remove \
   "$HOME/.config/fastfetch" \
   "$HOME/.config/the-index" \
   "$HOME/.local/share/themes/the-index" \
-  "${XDG_CACHE_HOME:-$HOME/.cache}/the-index/clipboard"
+  "${XDG_CACHE_HOME:-$HOME/.cache}/the-index"
 
 remove \
   "$HOME/.config/fontconfig/fonts.conf" \
@@ -77,7 +77,8 @@ remove \
   "$HOME/.local/bin/index-power" \
   "$HOME/.local/bin/index-input" \
   "$HOME/.local/bin/index-clipboard" \
-  "$HOME/.local/bin/index-notifications"
+  "$HOME/.local/bin/index-notifications" \
+  "$HOME/.local/bin/index-settings"
 
 rmdir "$HOME/.config/fontconfig" "$HOME/.config/wofi" "$HOME/.config/foot" "$HOME/.config/fish" 2>/dev/null || true
 rmdir "$HOME/.config/xdg-desktop-portal/wlr" "$HOME/.config/xdg-desktop-portal" 2>/dev/null || true

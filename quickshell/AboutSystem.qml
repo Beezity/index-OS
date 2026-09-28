@@ -9,7 +9,7 @@ Item {
     property var info: ({ distro: "...", kernel: "...", arch: "...", labwc: "...", quickshell: "..." })
     signal requestBack()
 
-    function run(cmd) { Quickshell.execDetached(["sh", "-c", cmd]) }
+    function launch(argv) { Quickshell.execDetached(argv) }
     function refresh() { systemInfo.running = true }
 
     Component.onCompleted: refresh()
@@ -94,9 +94,9 @@ Item {
 
         Rectangle { Layout.fillWidth: true; height: 1; color: IndexTheme.cyanDark }
 
-        IndexSectionButton { label: "RUN INDEX DOCTOR"; detail: "check desktop health"; onClicked: root.run("foot -e index-doctor") }
-        IndexSectionButton { label: "INDEX UPDATE"; detail: "open updater in terminal"; onClicked: root.run("foot -e index-update") }
-        IndexSectionButton { label: "PROJECT REPOSITORY"; detail: "Beezity/index-OS"; onClicked: root.run("xdg-open https://github.com/Beezity/index-OS") }
+        IndexSectionButton { label: "RUN INDEX DOCTOR"; detail: "check desktop health"; onClicked: root.launch(["foot", "-e", "index-doctor"]) }
+        IndexSectionButton { label: "INDEX UPDATE"; detail: "open updater in terminal"; onClicked: root.launch(["foot", "-e", "index-update"]) }
+        IndexSectionButton { label: "PROJECT REPOSITORY"; detail: "Beezity/index-OS"; onClicked: root.launch(["xdg-open", "https://github.com/Beezity/index-OS"]) }
 
         Item { Layout.fillHeight: true }
         Text {

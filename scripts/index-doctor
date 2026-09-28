@@ -67,6 +67,7 @@ check_file "$HOME/.config/quickshell/PowerPanel.qml" "Power panel"
 check_file "$HOME/.local/bin/index-power" "Power helper"
 check_file "$HOME/.config/quickshell/InputPanel.qml" "Input panel"
 check_file "$HOME/.local/bin/index-input" "Input helper"
+check_file "$HOME/.local/bin/index-settings" "Settings utility helper"
 if [[ -x "$HOME/.local/bin/index-input" ]]; then
   INPUT_STATE="$("$HOME/.local/bin/index-input" state 2>/dev/null || true)"
   [[ "${INPUT_STATE%%$'\t'*}" == 1 ]] && ok "labwc input backend readable" || fail "labwc input backend unavailable"
