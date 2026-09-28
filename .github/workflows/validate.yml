@@ -95,6 +95,7 @@ jobs:
               ;;
             list)
               if [[ "${2:-}" == -fields ]]; then
+                [[ "${FAKE_CLIPHIST_NO_FIELDS:-0}" != 1 ]] || exit 2
                 while IFS=$'\t' read -r id preview; do
                   [[ -n "$id" ]] && printf '%s\ttext/plain\t%s\n' "$id" "$preview"
                 done < "$FAKE_CLIPHIST_DB"
@@ -139,6 +140,14 @@ jobs:
           test "$(printf '%s\n' "$dump" | head -n1 | cut -f2)" = 1
           test "$(printf '%s\n' "$dump" | head -n1 | cut -f3)" = 50
           ! grep -q $'^1\t' "$FAKE_CLIPHIST_DB"
+
+          # Debian's packaged cliphist is older and lacks list -fields. Exercise
+          # the default id/preview fallback explicitly.
+          export FAKE_CLIPHIST_NO_FIELDS=1
+          fallback="$(run_clip dump)"
+          test "$(printf '%s\n' "$fallback" | head -n1 | cut -f2)" = 1
+          test "$(printf '%s\n' "$fallback" | head -n1 | cut -f3)" = 50
+          unset FAKE_CLIPHIST_NO_FIELDS
 
           printf 'fake-image-data' | run_clip store image
           dump="$(run_clip dump)"
