@@ -40,6 +40,7 @@ Rectangle {
     property var autostartApps: []
     property bool appearanceOpen: false
     property bool audioOpen: false
+    property bool networkOpen: false
 
     // Build one locked, atomic config write.
     // The old version launched several detached read/temp/move jobs at once, so
@@ -108,6 +109,7 @@ Rectangle {
         else {
             panel.appearanceOpen = false
             panel.audioOpen = false
+            panel.networkOpen = false
         }
     }
     Component.onCompleted: panel.refresh()
@@ -213,7 +215,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 14
         spacing: 12
-        visible: !panel.appearanceOpen && !panel.audioOpen
+        visible: !panel.appearanceOpen && !panel.audioOpen && !panel.networkOpen
 
         // header
         RowLayout {
@@ -522,8 +524,7 @@ Rectangle {
 
             Repeater {
                 model: [
-                    { t: "NETWORK",   s: panel.netName === "" ? "offline" : panel.netName,
-                      c: "nm-connection-editor || iwgtk" },
+                    { t: "NETWORK",   s: panel.netName === "" ? "offline" : panel.netName, page: "network" },
                     { t: "BLUETOOTH", s: panel.btOn ? "on" : "off",
                       c: "blueman-manager || blueberry" },
                     { t: "AUDIO",     s: "devices", page: "audio" },
@@ -554,6 +555,7 @@ Rectangle {
                         onClicked: {
                             if (modelData.page === "appearance") panel.appearanceOpen = true
                             else if (modelData.page === "audio") panel.audioOpen = true
+                            else if (modelData.page === "network") panel.networkOpen = true
                             else { panel.run(modelData.c); panel.requestClose() }
                         }
                     }
@@ -663,5 +665,11 @@ Rectangle {
         anchors.fill: parent
         visible: panel.audioOpen
         onRequestBack: panel.audioOpen = false
+    }
+
+    NetworkPanel {
+        anchors.fill: parent
+        visible: panel.networkOpen
+        onRequestBack: panel.networkOpen = false
     }
 }
