@@ -13,11 +13,16 @@ command -v apt-get >/dev/null 2>&1 || { bad "Debian with apt is required."; exit
 . /etc/os-release
 [[ "${ID:-}" == debian ]] || { bad "This installer is intended for Debian Linux."; exit 1; }
 DEBIAN_CODENAME="${VERSION_CODENAME:-}"
-case "$DEBIAN_CODENAME" in
-  trixie) DEBIAN_LABEL="Debian 13 (Trixie)" ;;
-  sid) DEBIAN_LABEL="Debian Sid" ;;
-  *) bad "Debian 13 (trixie) or Sid is required; detected: ${PRETTY_NAME:-unknown}"; exit 1 ;;
-esac
+if [[ "$DEBIAN_CODENAME" == trixie ]]; then
+  DEBIAN_LABEL="Debian 13 (Trixie)"
+  DEBIAN_TRACK="trixie"
+elif [[ "${VERSION:-}" == *sid* || "${PRETTY_NAME:-}" == *"/sid"* || "${PRETTY_NAME:-}" == *" sid"* ]]; then
+  DEBIAN_LABEL="Debian Sid"
+  DEBIAN_TRACK="sid"
+else
+  bad "Debian 13 (trixie) or Sid is required; detected: ${PRETTY_NAME:-unknown}"
+  exit 1
+fi
 note "detected $DEBIAN_LABEL"
 validate_repository_layout
 
@@ -60,7 +65,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${PACKAGES[@]}"
 ok "official Debian dependencies installed"
 
 say "installing Quickshell..."
-if [[ "$DEBIAN_CODENAME" == trixie ]]; then
+if [[ "$DEBIAN_TRACK" == trixie ]]; then
   if ! grep -RqsE '(^|[[:space:]])trixie-backports([[:space:]]|$)' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
     note "enabling trixie-backports for Quickshell"
     sudo tee /etc/apt/sources.list.d/index-os-trixie-backports.sources >/dev/null <<'EOF'
