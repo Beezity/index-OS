@@ -73,6 +73,7 @@ apply_cursor() {
   sed -i '/^XCURSOR_THEME=/d;/^XCURSOR_SIZE=/d' "$envf"
   printf 'XCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$theme" "$size" >> "$envf"
   sync_input_cursor_size "$size"
+  command -v labwc >/dev/null 2>&1 && labwc --reconfigure >/dev/null 2>&1 || true
 }
 apply_wallpaper() {
   wall=$1
