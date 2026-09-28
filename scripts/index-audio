@@ -1,0 +1,80 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — PipeWire/WirePlumber audio helper
+set -eu
+
+have_wpctl() { command -v wpctl >/dev/null 2>&1; }
+require_wpctl() { have_wpctl || { echo "wpctl is required" >&2; exit 1; }; }
+
+volume_percent() {
+  target=$1
+  out=$(wpctl get-volume "$target" 2>/dev/null || true)
+  value=$(printf '%s\n' "$out" | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+(\.[0-9]+)?$/){printf "%d", $i*100; exit}}')
+  [ -n "$value" ] || value=0
+  muted=0
+  printf '%s' "$out" | grep -q '\[MUTED\]' && muted=1 || true
+  printf '%s|%s' "$value" "$muted"
+}
+
+node_label() {
+  target=$1
+  wpctl inspect "$target" 2>/dev/null | sed -n \
+    -e 's/^[[:space:]]*\*\{0,1\}[[:space:]]*node.description = "\(.*\)"$/\1/p' \
+    -e 's/^[[:space:]]*\*\{0,1\}[[:space:]]*node.nick = "\(.*\)"$/\1/p' \
+    -e 's/^[[:space:]]*\*\{0,1\}[[:space:]]*node.name = "\(.*\)"$/\1/p' | head -1
+}
+
+list_section() {
+  section=$1 stop=$2
+  wpctl status 2>/dev/null | awk -v start="$section" -v stop="$stop" '
+    index($0, start) { inside=1; next }
+    index($0, stop) { inside=0 }
+    inside {
+      line=$0
+      sub(/^[^0-9]*/, "", line)
+      if (line ~ /^[0-9]+\./) {
+        id=line; sub(/\..*/, "", id)
+        sub(/^[0-9]+\.[[:space:]]*/, "", line)
+        sub(/[[:space:]]*\[vol:.*$/, "", line)
+        print id "|" line
+      }
+    }'
+}
+
+choose_default() {
+  kind=$1
+  case "$kind" in
+    output) entries=$(list_section 'Sinks:' 'Sources:'); prompt='audio output' ;;
+    input) entries=$(list_section 'Sources:' 'Filters:'); prompt='audio input' ;;
+    *) exit 2 ;;
+  esac
+  [ -n "$entries" ] || exit 0
+  command -v wofi >/dev/null 2>&1 || { echo "wofi is required for device selection" >&2; exit 1; }
+  selected=$(printf '%s\n' "$entries" | awk -F'|' '{print "[" $1 "] " $2}' | wofi --dmenu -p "$prompt" || true)
+  [ -n "$selected" ] || exit 0
+  id=$(printf '%s\n' "$selected" | sed -n 's/^\[\([0-9][0-9]*\)\].*/\1/p')
+  [ -n "$id" ] && wpctl set-default "$id"
+}
+
+require_wpctl
+
+case "${1:-}" in
+  state)
+    ov=$(volume_percent @DEFAULT_AUDIO_SINK@)
+    iv=$(volume_percent @DEFAULT_AUDIO_SOURCE@)
+    out_name=$(node_label @DEFAULT_AUDIO_SINK@ || true)
+    in_name=$(node_label @DEFAULT_AUDIO_SOURCE@ || true)
+    printf '%s\t%s\t%s\t%s\n' "$ov" "$iv" "$out_name" "$in_name"
+    ;;
+  list-outputs) list_section 'Sinks:' 'Sources:' ;;
+  list-inputs) list_section 'Sources:' 'Filters:' ;;
+  choose-output) choose_default output ;;
+  choose-input) choose_default input ;;
+  set-output-volume) wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "$2%" ;;
+  set-input-volume) wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SOURCE@ "$2%" ;;
+  toggle-output-mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+  toggle-input-mute) wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ;;
+  *)
+    echo "usage: index-audio {state|list-outputs|list-inputs|choose-output|choose-input|set-output-volume PCT|set-input-volume PCT|toggle-output-mute|toggle-input-mute}" >&2
+    exit 2
+    ;;
+esac
