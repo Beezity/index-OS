@@ -9,6 +9,7 @@ import Quickshell
 
 ShellRoot {
     Bar {}
+    SettingsLauncher {}
     AboutPopup {}
     Atmosphere {}
     Notifications {}
