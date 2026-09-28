@@ -42,7 +42,7 @@ PACKAGES=(
   network-manager nm-connection-editor bluez bluez-tools blueman
   pipewire pipewire-pulse wireplumber libspa-0.2-bluetooth ffmpeg gstreamer1.0-plugins-good gstreamer1.0-libav
   qt6-wayland qt6ct qt5ct qml6-module-qtcore qml6-module-qtmultimedia
-  brightnessctl upower gammastep gnome-power-manager
+  brightnessctl upower gammastep gnome-power-manager power-profiles-daemon
   fonts-dejavu fonts-liberation2 fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji fonts-noto-extra
   papirus-icon-theme adwaita-icon-theme
   cups printer-driver-cups-pdf system-config-printer
@@ -82,7 +82,7 @@ else
 fi
 ok "Quickshell installed"
 
-for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics flock fc-cache xmllint; do
+for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp swappy wl-copy nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics powerprofilesctl flock fc-cache xmllint; do
   require_command "$cmd"
 done
 
@@ -97,6 +97,7 @@ POLKIT_AGENT="$(dpkg -L polkit-kde-agent-1 | grep '/polkit-kde-authentication-ag
 [[ -x "$POLKIT_AGENT" ]] || { bad "could not locate polkit-kde-authentication-agent-1"; exit 1; }
 
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service
+sudo systemctl start power-profiles-daemon.service
 sudo systemctl enable gdm3.service
 
 export INDEX_DEX_COMMAND="dex"
@@ -104,6 +105,7 @@ export INDEX_POLKIT_AGENT="$POLKIT_AGENT"
 export INDEX_CURSOR_ROOT="/usr/share/icons/Adwaita"
 export INDEX_FILE_ROLLER_DESKTOP="org.gnome.FileRoller.desktop"
 export INDEX_REQUIRE_CURSOR_INDEX=0 INDEX_VALIDATE_CURSOR_ROOT=1 INDEX_VALIDATE_TITLEBAR_BUTTONS=0
+export INDEX_POWER_PROFILE_SERVICE="power-profiles-daemon.service"
 export INDEX_GDM_SERVICE="gdm3.service"
 export INDEX_COMPLETION_EXTRA=""
 export INDEX_COMPLETION_FIRST_LINE="$DEBIAN_LABEL installation complete. GDM is installed and enabled. Reboot to log in and select THE INDEX from GDM's session menu."
