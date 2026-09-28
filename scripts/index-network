@@ -23,7 +23,7 @@ wifi_device() {
 
 state() {
   if ! nmcli general status >/dev/null 2>&1; then
-    printf '0\t0\t0\tNO CONNECTION\tunknown\t\tunknown\t0\t\n'
+    printf '0\t0\t0\t0\tNO CONNECTION\tunknown\t\tunknown\t0\t\n'
     return
   fi
 
@@ -51,7 +51,7 @@ state() {
   fi
 
   connectivity=$(nmcli -g CONNECTIVITY general 2>/dev/null | head -1 || printf 'unknown')
-  printf '1\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  printf '1\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$networking" "$wifi_available" "$wifi_enabled" \
     "$(sanitize "$name")" "$(sanitize "$kind")" "$(sanitize "$dev")" \
     "$(sanitize "$connectivity")" "$signal" "$(sanitize "$ipv4")"
