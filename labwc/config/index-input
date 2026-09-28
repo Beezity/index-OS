@@ -1,38 +1,7 @@
 #!/bin/sh
-# WILL OF THE CITY :: THE INDEX — apply saved input settings into rc.xml
-set -u
+# WILL OF THE CITY :: THE INDEX — compatibility input apply wrapper
+set -eu
 
-CONF="$HOME/.config/labwc/index.conf"
-RC="$HOME/.config/labwc/rc.xml"
-ENV="$HOME/.config/labwc/environment"
-
-[ -f "$CONF" ] || exit 0
-[ -f "$RC" ] || exit 0
-
-get_setting() {
-  key="$1"
-  sed -n "s/^${key}=//p" "$CONF" | tail -n1
-}
-
-POINTER_SPEED="$(get_setting POINTER_SPEED)"
-NATURAL_SCROLL="$(get_setting NATURAL_SCROLL)"
-TAP_CLICK="$(get_setting TAP_CLICK)"
-CURSOR_SIZE="$(get_setting CURSOR_SIZE)"
-
-case "$POINTER_SPEED" in
-  -1|-1.0|-1.00|0|0.0|0.00|1|1.0|1.00|-0.[0-9]|-0.[0-9][0-9]|0.[0-9]|0.[0-9][0-9])
-    sed -i "s|<pointerSpeed>[^<]*</pointerSpeed>|<pointerSpeed>$POINTER_SPEED</pointerSpeed>|g" "$RC"
-    ;;
-esac
-
-case "$NATURAL_SCROLL" in
-  yes|no) sed -i "s|<naturalScroll>[^<]*</naturalScroll>|<naturalScroll>$NATURAL_SCROLL</naturalScroll>|g" "$RC" ;;
-esac
-
-case "$TAP_CLICK" in
-  yes|no) sed -i "s|<tap>[^<]*</tap>|<tap>$TAP_CLICK</tap>|g" "$RC" ;;
-esac
-
-if [ -n "$CURSOR_SIZE" ] && printf '%s' "$CURSOR_SIZE" | grep -Eq '^[0-9]{1,3}$' && [ -f "$ENV" ]; then
-  sed -i "s|^XCURSOR_SIZE=.*|XCURSOR_SIZE=$CURSOR_SIZE|" "$ENV"
-fi
+HELPER="$HOME/.local/bin/index-input"
+[ -x "$HELPER" ] || exit 0
+exec "$HELPER" apply
