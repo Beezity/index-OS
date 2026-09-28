@@ -14,7 +14,11 @@ sanitize() {
 }
 
 connected_device() {
-  nmcli -t -f DEVICE,STATE device status 2>/dev/null | awk -F: '$2 == "connected" { print $1; exit }'
+  nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null | awk -F: '
+    $3 == "connected" && ($2 == "wifi" || $2 == "ethernet") { print $1; found=1; exit }
+    $3 == "connected" && $2 != "loopback" && fallback == "" { fallback=$1 }
+    END { if (!found && fallback != "") print fallback }
+  '
 }
 
 wifi_device() {
@@ -23,7 +27,7 @@ wifi_device() {
 
 state() {
   if ! nmcli general status >/dev/null 2>&1; then
-    printf '0\t0\t0\t0\tNO CONNECTION\tunknown\t\tunknown\t0\t\n'
+    printf '0\t0\t0\t0\tNO CONNECTION\tunknown\t\tunknown\t0\t--\n'
     return
   fi
 
@@ -38,12 +42,13 @@ state() {
   dev=$(connected_device || true)
   name='NO CONNECTION'
   kind='unknown'
-  ipv4=''
+  ipv4='--'
   signal=0
   if [ -n "$dev" ]; then
     name=$(nmcli --escape no -g GENERAL.CONNECTION device show "$dev" 2>/dev/null | head -1 || true)
     kind=$(nmcli --escape no -g GENERAL.TYPE device show "$dev" 2>/dev/null | head -1 || true)
-    ipv4=$(nmcli --escape no -g 'IP4.ADDRESS[1]' device show "$dev" 2>/dev/null | head -1 || true)
+    addr=$(nmcli --escape no -g 'IP4.ADDRESS[1]' device show "$dev" 2>/dev/null | head -1 || true)
+    [ -n "$addr" ] && ipv4=$addr
     if [ "$kind" = "wifi" ]; then
       signal=$(nmcli -f IN-USE,SIGNAL device wifi list ifname "$dev" --rescan no 2>/dev/null | awk '$1 == "*" { print $2; exit }')
       signal=${signal:-0}
@@ -91,6 +96,7 @@ choose_wifi() {
     exit 1
   }
 
+  nmcli networking on
   nmcli radio wifi on
   ssids=$(nmcli --escape no -g SSID device wifi list ifname "$dev" --rescan yes 2>/dev/null | awk 'NF && !seen[$0]++')
   [ -n "$ssids" ] || exit 0
@@ -122,6 +128,11 @@ require_nmcli
 
 case "${1:-}" in
   state) state ;;
+  networking-on) nmcli networking on ;;
+  networking-off) nmcli networking off ;;
+  toggle-networking)
+    [ "$(nmcli networking 2>/dev/null || true)" = "enabled" ] && nmcli networking off || nmcli networking on
+    ;;
   wifi-on) nmcli radio wifi on ;;
   wifi-off) nmcli radio wifi off ;;
   toggle-wifi)
@@ -133,7 +144,7 @@ case "${1:-}" in
     [ -n "$dev" ] && nmcli device disconnect "$dev" || true
     ;;
   *)
-    echo "usage: index-network {state|wifi-on|wifi-off|toggle-wifi|choose-wifi|disconnect}" >&2
+    echo "usage: index-network {state|networking-on|networking-off|toggle-networking|wifi-on|wifi-off|toggle-wifi|choose-wifi|disconnect}" >&2
     exit 2
     ;;
 esac
