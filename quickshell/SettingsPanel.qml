@@ -31,11 +31,6 @@ Rectangle {
     property int  batTimeMin: -1
     property string lidAction: "suspend"     // suspend | lock | ignore
     property int  screenOffMin: 10           // 0 = never
-    property real pointerSpeed: 0.0          // -1.0 .. 1.0
-    property bool naturalScroll: false
-    property bool tapClick: true
-    property int  cursorSize: 24
-    property bool inputLoaded: false
     property bool hasLid: false
     property var autostartApps: []
     property bool appearanceOpen: false
@@ -43,6 +38,7 @@ Rectangle {
     property bool networkOpen: false
     property bool bluetoothOpen: false
     property bool powerOpen: false
+    property bool inputOpen: false
 
     // Build one locked, atomic config write.
     // The old version launched several detached read/temp/move jobs at once, so
@@ -70,21 +66,6 @@ Rectangle {
         panel.run(panel.confWriteCommand(pairs))
     }
 
-    function applyInput(): void {
-        var cmd = panel.confWriteCommand([
-            ["POINTER_SPEED", panel.pointerSpeed.toFixed(2)],
-            ["NATURAL_SCROLL", panel.naturalScroll ? "yes" : "no"],
-            ["TAP_CLICK", panel.tapClick ? "yes" : "no"]
-        ])
-        // Save first, then apply from that exact saved file in the SAME process.
-        panel.run(cmd + "; sh \"$HOME/.config/labwc/index-input\"; pkill -HUP labwc"); panel.refreshSavedSoon()
-    }
-
-    function applyCursor(): void {
-        panel.run("$HOME/.local/bin/index-appearance set-cursor-size " + panel.cursorSize)
-        panel.refreshSavedSoon()
-    }
-
     signal requestClose()
 
     function run(cmd) { Quickshell.execDetached(["sh","-c",cmd]) }
@@ -99,10 +80,7 @@ Rectangle {
         id: savedRefresh
         interval: 250
         repeat: false
-        onTriggered: {
-            inputGet.running = true
-            idleGet.running = true
-        }
+        onTriggered: idleGet.running = true
     }
 
     // pull fresh values every time the panel appears
@@ -114,13 +92,14 @@ Rectangle {
             panel.networkOpen = false
             panel.bluetoothOpen = false
             panel.powerOpen = false
+            panel.inputOpen = false
         }
     }
     Component.onCompleted: panel.refresh()
     function refresh(): void {
         volGet.running=true; briGet.running=true; btGet.running=true; netGet.running=true
         batGet.running=true; batTimeGet.running=true; lidGet.running=true; lidDetect.running=true
-        autostartGet.running=true; idleGet.running=true; inputGet.running=true
+        autostartGet.running=true; idleGet.running=true
     }
 
     // ---- pollers ----
@@ -159,23 +138,6 @@ Rectangle {
         stdout: StdioCollector { onStreamFinished: { var v=parseInt(text.trim()); panel.batTimeMin = isNaN(v) ? -1 : v } }
     }
     Process {
-        id: inputGet
-        command: ["sh","-c","f=$HOME/.config/labwc/index.conf; " +
-                  "ps=$(sed -n 's|^POINTER_SPEED=||p' $f 2>/dev/null | tail -1); " +
-                  "ns=$(sed -n 's|^NATURAL_SCROLL=||p' $f 2>/dev/null | tail -1); " +
-                  "tp=$(sed -n 's|^TAP_CLICK=||p' $f 2>/dev/null | tail -1); " +
-                  "cs=$(sed -n 's|^CURSOR_SIZE=||p' $f 2>/dev/null | tail -1); " +
-                  "printf '%s|%s|%s|%s' \"$ps\" \"$ns\" \"$tp\" \"$cs\""]
-        stdout: StdioCollector { onStreamFinished: {
-            var f = text.trim().split("|")
-            var v = parseFloat(f[0]); if (!isNaN(v)) panel.pointerSpeed = v
-            if (f[1]) panel.naturalScroll = (f[1] === "yes")
-            if (f[2]) panel.tapClick      = (f[2] === "yes")
-            var c = parseInt(f[3]); if (!isNaN(c)) panel.cursorSize = c
-        } }
-    }
-
-    Process {
         id: idleGet
         command: ["sh","-c","f=$HOME/.config/labwc/index.conf; [ -f $f ] && sed -n 's|^SCREEN_OFF_SEC=||p' $f | tail -1 || echo 600"]
         stdout: StdioCollector { onStreamFinished: {
@@ -208,8 +170,8 @@ Rectangle {
     }
     Timer {
         interval: 4000; running: true; repeat: true; triggeredOnStart: true
-        // Only poll live system state. Saved input/idle preferences are loaded
-        // by refresh() when the panel opens, so an old async read cannot undo a click.
+        // Only poll live system state. Saved preferences are loaded by refresh()
+        // when the panel opens, so an old async read cannot undo a click.
         onTriggered: { volGet.running=true; briGet.running=true; btGet.running=true; netGet.running=true;
                        batGet.running=true; batTimeGet.running=true; lidGet.running=true;
                        lidDetect.running=true; autostartGet.running=true }
@@ -219,7 +181,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 14
         spacing: 12
-        visible: !panel.appearanceOpen && !panel.audioOpen && !panel.networkOpen && !panel.bluetoothOpen && !panel.powerOpen
+        visible: !panel.appearanceOpen && !panel.audioOpen && !panel.networkOpen && !panel.bluetoothOpen && !panel.powerOpen && !panel.inputOpen
 
         // header
         RowLayout {
@@ -293,98 +255,6 @@ Rectangle {
                     color: Sfx.enabled ? "#04141c" : panel.cyanB }
                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                     onClicked: { Sfx.enabled = !Sfx.enabled; if (Sfx.enabled) Sfx.play("menu") } }
-            }
-        }
-
-        // ---- mouse / touchpad ----
-        ColumnLayout {
-            Layout.fillWidth: true; spacing: 6
-
-            Text { text: "MOUSE"
-                font.family: panel.pixel; font.pixelSize: 13; color: panel.cyanB }
-
-            // pointer speed
-            Text { text: "  speed  " + panel.pointerSpeed.toFixed(2)
-                font.family: panel.pixel; font.pixelSize: 11; color: panel.cyanD }
-            Rectangle {
-                Layout.fillWidth: true; height: 16
-                color: "#05080d"; border.color: panel.cyanD; border.width: 1
-                Rectangle {
-                    x: 2; y: 2; height: parent.height - 4
-                    width: Math.max(2, (parent.width - 4) * ((panel.pointerSpeed + 1) / 2))
-                    color: panel.cyan
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    function setFromX(mx) {
-                        var f = Math.max(0, Math.min(1, mx / width))
-                        panel.pointerSpeed = Math.round((f * 2 - 1) * 100) / 100
-                    }
-                    onPressed: function(m) { setFromX(m.x) }
-                    onPositionChanged: function(m) { if (pressed) setFromX(m.x) }
-                    onReleased: panel.applyInput()
-                }
-            }
-
-            // cursor size
-            RowLayout {
-                Layout.fillWidth: true; spacing: 5
-                Text { text: "  cursor"
-                    font.family: panel.pixel; font.pixelSize: 11; color: panel.cyanD }
-                Repeater {
-                    model: [16, 24, 32, 48]
-                    delegate: Rectangle {
-                        required property int modelData
-                        Layout.fillWidth: true; height: 24
-                        readonly property bool on: panel.cursorSize === modelData
-                        color: on ? panel.cyan : (curMa.containsMouse ? "#143245" : "transparent")
-                        border.color: panel.cyanD; border.width: 1
-                        Text {
-                            anchors.centerIn: parent; text: modelData
-                            font.family: panel.pixel; font.pixelSize: 11
-                            color: parent.on ? "#04141c" : panel.cyanB
-                        }
-                        MouseArea {
-                            id: curMa; anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { panel.cursorSize = modelData; panel.applyCursor() }
-                        }
-                    }
-                }
-            }
-
-            // toggles
-            RowLayout {
-                Layout.fillWidth: true; spacing: 5
-                Repeater {
-                    model: [
-                        { key: "scroll", label: "NATURAL SCROLL" },
-                        { key: "tap",    label: "TAP TO CLICK"   }
-                    ]
-                    delegate: Rectangle {
-                        required property var modelData
-                        Layout.fillWidth: true; height: 28
-                        readonly property bool on: modelData.key === "scroll" ? panel.naturalScroll : panel.tapClick
-                        color: on ? panel.cyan : (tglMa.containsMouse ? "#143245" : "transparent")
-                        border.color: panel.cyanD; border.width: 1
-                        Text {
-                            anchors.centerIn: parent
-                            text: modelData.label + (parent.on ? "  ON" : "  OFF")
-                            font.family: panel.pixel; font.pixelSize: 10
-                            color: parent.on ? "#04141c" : panel.cyanB
-                        }
-                        MouseArea {
-                            id: tglMa; anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (modelData.key === "scroll") panel.naturalScroll = !panel.naturalScroll
-                                else panel.tapClick = !panel.tapClick
-                                panel.applyInput()
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -535,7 +405,8 @@ Rectangle {
                     { t: "FILES",     s: "manager", c: "thunar" },
                     { t: "MUTE",      s: "toggle",  c: "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" },
                     { t: "APPEARANCE", s: "themes", page: "appearance" },
-                    { t: "POWER",      s: "profiles", page: "power" }
+                    { t: "POWER",      s: "profiles", page: "power" },
+                    { t: "INPUT",      s: "pointer", page: "input" }
                 ]
                 delegate: Rectangle {
                     required property var modelData
@@ -562,6 +433,7 @@ Rectangle {
                             else if (modelData.page === "network") panel.networkOpen = true
                             else if (modelData.page === "bluetooth") panel.bluetoothOpen = true
                             else if (modelData.page === "power") panel.powerOpen = true
+                            else if (modelData.page === "input") panel.inputOpen = true
                             else { panel.run(modelData.c); panel.requestClose() }
                         }
                     }
@@ -690,5 +562,11 @@ Rectangle {
         anchors.fill: parent
         visible: panel.powerOpen
         onRequestBack: panel.powerOpen = false
+    }
+
+    InputPanel {
+        anchors.fill: parent
+        visible: panel.inputOpen
+        onRequestBack: panel.inputOpen = false
     }
 }
