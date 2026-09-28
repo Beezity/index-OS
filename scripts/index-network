@@ -1,0 +1,139 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — NetworkManager helper
+set -eu
+
+require_nmcli() {
+  command -v nmcli >/dev/null 2>&1 || {
+    echo "nmcli is required" >&2
+    exit 1
+  }
+}
+
+sanitize() {
+  printf '%s' "$1" | tr '\t\r\n' '   '
+}
+
+connected_device() {
+  nmcli -t -f DEVICE,STATE device status 2>/dev/null | awk -F: '$2 == "connected" { print $1; exit }'
+}
+
+wifi_device() {
+  nmcli -t -f DEVICE,TYPE device status 2>/dev/null | awk -F: '$2 == "wifi" { print $1; exit }'
+}
+
+state() {
+  if ! nmcli general status >/dev/null 2>&1; then
+    printf '0\t0\t0\tNO CONNECTION\tunknown\t\tunknown\t0\t\n'
+    return
+  fi
+
+  network_state=$(nmcli networking 2>/dev/null || printf 'disabled')
+  [ "$network_state" = "enabled" ] && networking=1 || networking=0
+
+  wdev=$(wifi_device || true)
+  [ -n "$wdev" ] && wifi_available=1 || wifi_available=0
+  wifi_state=$(nmcli radio wifi 2>/dev/null || printf 'disabled')
+  [ "$wifi_state" = "enabled" ] && wifi_enabled=1 || wifi_enabled=0
+
+  dev=$(connected_device || true)
+  name='NO CONNECTION'
+  kind='unknown'
+  ipv4=''
+  signal=0
+  if [ -n "$dev" ]; then
+    name=$(nmcli --escape no -g GENERAL.CONNECTION device show "$dev" 2>/dev/null | head -1 || true)
+    kind=$(nmcli --escape no -g GENERAL.TYPE device show "$dev" 2>/dev/null | head -1 || true)
+    ipv4=$(nmcli --escape no -g 'IP4.ADDRESS[1]' device show "$dev" 2>/dev/null | head -1 || true)
+    if [ "$kind" = "wifi" ]; then
+      signal=$(nmcli -f IN-USE,SIGNAL device wifi list ifname "$dev" --rescan no 2>/dev/null | awk '$1 == "*" { print $2; exit }')
+      signal=${signal:-0}
+    fi
+  fi
+
+  connectivity=$(nmcli -g CONNECTIVITY general 2>/dev/null | head -1 || printf 'unknown')
+  printf '1\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$networking" "$wifi_available" "$wifi_enabled" \
+    "$(sanitize "$name")" "$(sanitize "$kind")" "$(sanitize "$dev")" \
+    "$(sanitize "$connectivity")" "$signal" "$(sanitize "$ipv4")"
+}
+
+saved_wifi_profile() {
+  ssid=$1
+  tmp=$(mktemp)
+  trap 'rm -f "$tmp"' EXIT HUP INT TERM
+  nmcli --escape no -g NAME connection show 2>/dev/null > "$tmp" || true
+  while IFS= read -r profile; do
+    [ -n "$profile" ] || continue
+    type=$(nmcli --escape no -g connection.type connection show "$profile" 2>/dev/null | head -1 || true)
+    [ "$type" = "802-11-wireless" ] || [ "$type" = "wifi" ] || continue
+    profile_ssid=$(nmcli --escape no -g 802-11-wireless.ssid connection show "$profile" 2>/dev/null | head -1 || true)
+    if [ "$profile_ssid" = "$ssid" ]; then
+      printf '%s\n' "$profile"
+      rm -f "$tmp"
+      trap - EXIT HUP INT TERM
+      return 0
+    fi
+  done < "$tmp"
+  rm -f "$tmp"
+  trap - EXIT HUP INT TERM
+  return 1
+}
+
+choose_wifi() {
+  command -v wofi >/dev/null 2>&1 || {
+    echo "wofi is required for Wi-Fi selection" >&2
+    exit 1
+  }
+
+  dev=$(wifi_device || true)
+  [ -n "$dev" ] || {
+    echo "no Wi-Fi device found" >&2
+    exit 1
+  }
+
+  nmcli radio wifi on
+  ssids=$(nmcli --escape no -g SSID device wifi list ifname "$dev" --rescan yes 2>/dev/null | awk 'NF && !seen[$0]++')
+  [ -n "$ssids" ] || exit 0
+  selected=$(printf '%s\n' "$ssids" | wofi --dmenu -p 'Wi-Fi network' || true)
+  [ -n "$selected" ] || exit 0
+
+  profile=$(saved_wifi_profile "$selected" || true)
+  if [ -n "$profile" ]; then
+    nmcli connection up "$profile" ifname "$dev"
+    exit 0
+  fi
+
+  # Open networks succeed without credentials.
+  if nmcli device wifi connect "$selected" ifname "$dev" >/dev/null 2>&1; then
+    exit 0
+  fi
+
+  # For normal WPA/WPA2 personal networks, collect the secret without putting it
+  # in nmcli's argv. Enterprise/certificate networks remain an advanced-editor job.
+  password=$(wofi --dmenu --password -p "Password: $selected" || true)
+  [ -n "$password" ] || exit 0
+  if ! printf '%s\n' "$password" | nmcli --ask device wifi connect "$selected" ifname "$dev"; then
+    command -v notify-send >/dev/null 2>&1 && notify-send 'THE INDEX' 'Could not connect. Use Advanced Network Settings for enterprise or custom authentication.' || true
+    exit 1
+  fi
+}
+
+require_nmcli
+
+case "${1:-}" in
+  state) state ;;
+  wifi-on) nmcli radio wifi on ;;
+  wifi-off) nmcli radio wifi off ;;
+  toggle-wifi)
+    [ "$(nmcli radio wifi 2>/dev/null || true)" = "enabled" ] && nmcli radio wifi off || nmcli radio wifi on
+    ;;
+  choose-wifi) choose_wifi ;;
+  disconnect)
+    dev=$(connected_device || true)
+    [ -n "$dev" ] && nmcli device disconnect "$dev" || true
+    ;;
+  *)
+    echo "usage: index-network {state|wifi-on|wifi-off|toggle-wifi|choose-wifi|disconnect}" >&2
+    exit 2
+    ;;
+esac
