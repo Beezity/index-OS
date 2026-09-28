@@ -260,6 +260,19 @@ PanelWindow {
 
                 Text { text: Qt.formatDateTime(clock.date, "ddd dd MMM").toUpperCase(); font.family: bar.pixel; font.pixelSize: 13; color: bar.cyanD }
 
+                Text {
+                    text: "SET"
+                    font.family: bar.pixel; font.pixelSize: 13
+                    color: settingsArea.containsMouse || bar.settingsOpen ? bar.cyanB : bar.cyanD
+                    MouseArea {
+                        id: settingsArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: { bar.settingsOpen = !bar.settingsOpen; Sfx.play("menu") }
+                    }
+                }
+
                 Timer {
                     interval: 5000; running: true; repeat: true; triggeredOnStart: true
                     onTriggered: { netProc.running = true; btProc.running = true; batProc.running = true; volProc.running = true }
