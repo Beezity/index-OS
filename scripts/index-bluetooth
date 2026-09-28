@@ -1,0 +1,136 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — BlueZ/bluetoothctl helper
+set -eu
+
+require_bluetoothctl() {
+  command -v bluetoothctl >/dev/null 2>&1 || {
+    echo "bluetoothctl is required" >&2
+    exit 1
+  }
+}
+
+sanitize() {
+  printf '%s' "$1" | tr '\t\r\n' '   '
+}
+
+valid_mac() {
+  printf '%s\n' "$1" | grep -Eq '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$'
+}
+
+service_online() {
+  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet bluetooth.service 2>/dev/null; then
+    return 0
+  fi
+  bluetoothctl list >/dev/null 2>&1
+}
+
+state() {
+  if ! service_online; then
+    printf 'STATE\t0\t0\t0\t0\tNO ADAPTER\t--\n'
+    return
+  fi
+
+  controllers=$(bluetoothctl list 2>/dev/null || true)
+  if [ -z "$controllers" ]; then
+    printf 'STATE\t1\t0\t0\t0\tNO ADAPTER\t--\n'
+    return
+  fi
+
+  info=$(bluetoothctl show 2>/dev/null || true)
+  [ -n "$info" ] || {
+    printf 'STATE\t1\t0\t0\t0\tNO ADAPTER\t--\n'
+    return
+  }
+
+  address=$(printf '%s\n' "$info" | sed -n 's/^Controller \([0-9A-Fa-f:]*\).*/\1/p' | head -1)
+  name=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*Alias: //p' | head -1)
+  [ -n "$name" ] || name=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*Name: //p' | head -1)
+  [ -n "$name" ] || name='BLUETOOTH ADAPTER'
+  [ -n "$address" ] || address='--'
+
+  powered=0
+  discovering=0
+  printf '%s\n' "$info" | grep -q '^[[:space:]]*Powered: yes' && powered=1 || true
+  printf '%s\n' "$info" | grep -q '^[[:space:]]*Discovering: yes' && discovering=1 || true
+
+  printf 'STATE\t1\t1\t%s\t%s\t%s\t%s\n' \
+    "$powered" "$discovering" "$(sanitize "$name")" "$(sanitize "$address")"
+}
+
+devices() {
+  service_online || return 0
+  bluetoothctl list 2>/dev/null | grep -q '^Controller ' || return 0
+
+  bluetoothctl devices 2>/dev/null | while IFS= read -r line; do
+    mac=$(printf '%s\n' "$line" | awk '$1 == "Device" { print $2 }')
+    [ -n "$mac" ] || continue
+    valid_mac "$mac" || continue
+
+    info=$(bluetoothctl info "$mac" 2>/dev/null || true)
+    name=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*Alias: //p' | head -1)
+    [ -n "$name" ] || name=$(printf '%s\n' "$line" | cut -d' ' -f3-)
+    [ -n "$name" ] || name="$mac"
+
+    paired=0; connected=0; trusted=0
+    printf '%s\n' "$info" | grep -q '^[[:space:]]*Paired: yes' && paired=1 || true
+    printf '%s\n' "$info" | grep -q '^[[:space:]]*Connected: yes' && connected=1 || true
+    printf '%s\n' "$info" | grep -q '^[[:space:]]*Trusted: yes' && trusted=1 || true
+
+    printf 'DEVICE\t%s\t%s\t%s\t%s\t%s\n' \
+      "$mac" "$paired" "$connected" "$trusted" "$(sanitize "$name")"
+  done
+}
+
+snapshot() {
+  state
+  devices
+}
+
+need_adapter() {
+  service_online || { echo "Bluetooth service unavailable" >&2; exit 1; }
+  bluetoothctl list 2>/dev/null | grep -q '^Controller ' || {
+    echo "no Bluetooth adapter found" >&2
+    exit 1
+  }
+}
+
+need_mac() {
+  mac=${1:-}
+  valid_mac "$mac" || { echo "invalid Bluetooth device address" >&2; exit 2; }
+}
+
+require_bluetoothctl
+
+case "${1:-}" in
+  state) state ;;
+  devices) devices ;;
+  snapshot) snapshot ;;
+  power)
+    need_adapter
+    case "${2:-}" in on|off) bluetoothctl power "$2" ;; *) exit 2 ;; esac
+    ;;
+  scan)
+    need_adapter
+    bluetoothctl power on >/dev/null
+    bluetoothctl --timeout 12 scan on
+    ;;
+  connect)
+    need_adapter; need_mac "${2:-}"
+    bluetoothctl connect "$2"
+    ;;
+  disconnect)
+    need_adapter; need_mac "${2:-}"
+    bluetoothctl disconnect "$2"
+    ;;
+  pair)
+    need_adapter; need_mac "${2:-}"
+    bluetoothctl power on >/dev/null
+    bluetoothctl --agent NoInputNoOutput pair "$2"
+    bluetoothctl trust "$2"
+    bluetoothctl connect "$2"
+    ;;
+  *)
+    echo "usage: index-bluetooth {state|devices|snapshot|power on|power off|scan|connect MAC|disconnect MAC|pair MAC}" >&2
+    exit 2
+    ;;
+esac
