@@ -71,6 +71,12 @@ generate_thumbnail() {
   fi
 }
 
+stored_item_matches() {
+  local id="$1" source="$2"
+  valid_id "$id" || return 1
+  printf '%s\n' "$id" | cliphist decode 2>/dev/null | cmp -s - "$source"
+}
+
 store_unlocked() {
   local kind="${1:-data}" tmp_base tmp size id
   have_backend || return 0
@@ -92,9 +98,18 @@ store_unlocked() {
     return 0
   fi
 
-  cliphist store < "$tmp" >/dev/null
+  # cliphist 0.4+ understands MAX_ITEMS through the environment. Newer
+  # versions also understand MAX_STORE_SIZE; the explicit pre-read above keeps
+  # the 100 MiB ceiling effective on older distro packages too.
+  if ! CLIPHIST_MAX_ITEMS="$MAX_ITEMS" CLIPHIST_MAX_STORE_SIZE="100MiB" \
+      cliphist store < "$tmp" >/dev/null; then
+    rm -f -- "$tmp"
+    trap - EXIT HUP INT TERM
+    return 0
+  fi
+
   id="$(cliphist list 2>/dev/null | head -n1 | cut -f1)"
-  if [[ "$kind" == image ]] && valid_id "$id"; then
+  if [[ "$kind" == image ]] && valid_id "$id" && stored_item_matches "$id" "$tmp"; then
     generate_thumbnail "$id" "$tmp"
   fi
   prune_history
