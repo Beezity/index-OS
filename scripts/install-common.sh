@@ -16,6 +16,16 @@ say "backing up files managed by THE INDEX..."
 bash "$SCRIPT_DIR/index-backup"
 ok "pre-install backup created"
 
+say "enabling PipeWire/WirePlumber user services..."
+if systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service; then
+  ok "PipeWire/WirePlumber user services enabled"
+else
+  bad "could not enable PipeWire/WirePlumber user services for $USER"
+  note "Run this from the target user's login session, then rerun the installer:"
+  note "  systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service"
+  exit 1
+fi
+
 say "installing GDM session..."
 sudo install -Dm644 "$INDEX_ROOT/labwc/session/the-index.desktop" /usr/share/wayland-sessions/the-index.desktop
 ok "THE INDEX session registered with GDM"
