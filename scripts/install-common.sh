@@ -56,6 +56,11 @@ if [[ -f "$CFG/the-index/appearance.conf" ]]; then
 fi
 
 say "installing labwc configuration..."
+SAVED_INDEX_CONF=""
+if [[ -f "$CFG/labwc/index.conf" ]]; then
+  SAVED_INDEX_CONF="$(mktemp --suffix=.index-conf)"
+  cp -f "$CFG/labwc/index.conf" "$SAVED_INDEX_CONF"
+fi
 rm -rf "$CFG/labwc"; mkdir -p "$CFG/labwc"
 cp -f "$INDEX_ROOT/labwc/config/rc.xml" "$CFG/labwc/rc.xml"
 cp -f "$INDEX_ROOT/labwc/config/menu.xml" "$CFG/labwc/menu.xml"
@@ -64,7 +69,12 @@ cp -f "$INDEX_ROOT/labwc/config/environment" "$CFG/labwc/environment"
 cp -f "$INDEX_ROOT/wallpaper/the-index.png" "$CFG/labwc/wall.png"
 if [[ "$INDEX_DEX_COMMAND" != dex ]]; then sed -i -e "s/command -v dex /command -v $INDEX_DEX_COMMAND /" -e "s/dex -a -e labwc/$INDEX_DEX_COMMAND -a -e labwc/" "$CFG/labwc/autostart"; fi
 if [[ "$INDEX_POLKIT_AGENT" != /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]]; then sed -i "s#/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1#$INDEX_POLKIT_AGENT#" "$CFG/labwc/autostart"; fi
-[[ -f "$INDEX_ROOT/labwc/config/index.conf" ]] && cp -f "$INDEX_ROOT/labwc/config/index.conf" "$CFG/labwc/index.conf"
+if [[ -n "$SAVED_INDEX_CONF" && -f "$SAVED_INDEX_CONF" ]]; then
+  cp -f "$SAVED_INDEX_CONF" "$CFG/labwc/index.conf"
+  rm -f "$SAVED_INDEX_CONF"
+elif [[ -f "$INDEX_ROOT/labwc/config/index.conf" ]]; then
+  cp -f "$INDEX_ROOT/labwc/config/index.conf" "$CFG/labwc/index.conf"
+fi
 for script in index-lock index-logout index-display-save index-display-restore index-idle index-input index-clip; do [[ -f "$INDEX_ROOT/labwc/config/$script" ]] || continue; cp -f "$INDEX_ROOT/labwc/config/$script" "$CFG/labwc/$script"; chmod +x "$CFG/labwc/$script"; done
 chmod +x "$CFG/labwc/autostart"
 
