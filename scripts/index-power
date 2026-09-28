@@ -13,7 +13,8 @@ profile_get() {
   fi
   if command -v busctl >/dev/null 2>&1; then
     busctl get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile 2>/dev/null |
-      sed -n 's/^s "\(.*\)"$/\1/p' && return 0
+      sed -n 's/^s "\(.*\)"$/\1/p'
+    return
   fi
   return 1
 }
@@ -37,11 +38,12 @@ profile_set() {
   p=$1
   case "$p" in power-saver|balanced|performance) ;; *) echo "invalid power profile: $p" >&2; exit 2 ;; esac
   available=$(profile_list)
-  printf ',%s,' ",$available," | grep -q ",$p," || { echo "power profile unavailable: $p" >&2; exit 1; }
+  printf ',%s,' "$available" | grep -q ",$p," || { echo "power profile unavailable: $p" >&2; exit 1; }
   if command -v powerprofilesctl >/dev/null 2>&1; then
     powerprofilesctl set "$p"
     return
   fi
+  command -v busctl >/dev/null 2>&1 || { echo "power profile backend unavailable" >&2; exit 1; }
   busctl set-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile s "$p"
 }
 
@@ -68,7 +70,7 @@ battery_info() {
 
 brightness_info() {
   if command -v brightnessctl >/dev/null 2>&1; then
-    pct=$(brightnessctl -m 2>/dev/null | awk -F, 'NR==1 {gsub(/%/,"",$4); print $4}')
+    pct=$(brightnessctl -c backlight -m 2>/dev/null | awk -F, 'NR==1 {gsub(/%/,"",$4); print $4}')
     case "$pct" in ''|*[!0-9]*) ;; *) printf '1|%s' "$pct"; return ;; esac
   fi
   printf '0|-1'
@@ -89,24 +91,27 @@ screen_seconds() {
   [ -n "$v" ] && printf '%s' "$v" || printf '600'
 }
 
-write_screen_seconds() {
-  v=$1
-  case "$v" in ''|*[!0-9]*) echo "invalid screen timeout: $v" >&2; exit 2 ;; esac
+write_key() {
+  key=$1 value=$2
   mkdir -p "$(dirname "$CONF")"
   touch "$CONF"
   lock="$CONF.lock"
-  if command -v flock >/dev/null 2>&1; then
-    (
-      flock -x 9
-      t=$(mktemp "$CONF.tmp.XXXXXX")
-      { grep -v '^SCREEN_OFF_SEC=' "$CONF" || true; printf 'SCREEN_OFF_SEC=%s\n' "$v"; } > "$t"
-      mv "$t" "$CONF"
-    ) 9>"$lock"
-  else
+  write_locked() {
     t=$(mktemp "$CONF.tmp.XXXXXX")
-    { grep -v '^SCREEN_OFF_SEC=' "$CONF" || true; printf 'SCREEN_OFF_SEC=%s\n' "$v"; } > "$t"
+    { grep -v "^${key}=" "$CONF" || true; printf '%s=%s\n' "$key" "$value"; } > "$t"
     mv "$t" "$CONF"
+  }
+  if command -v flock >/dev/null 2>&1; then
+    ( flock -x 9; write_locked ) 9>"$lock"
+  else
+    write_locked
   fi
+}
+
+write_screen_seconds() {
+  v=$1
+  case "$v" in ''|*[!0-9]*) echo "invalid screen timeout: $v" >&2; exit 2 ;; esac
+  write_key SCREEN_OFF_SEC "$v"
   if [ -x "$IDLE" ]; then
     setsid sh "$IDLE" >/dev/null 2>&1 &
   fi
@@ -138,7 +143,8 @@ case "${1:-}" in
     case "$2" in ''|*[!0-9]*) exit 2 ;; esac
     [ "$2" -ge 5 ] && [ "$2" -le 100 ] || exit 2
     command -v brightnessctl >/dev/null 2>&1 || { echo "brightness control unavailable" >&2; exit 1; }
-    brightnessctl set "$2%" >/dev/null
+    brightnessctl -c backlight set "$2%" >/dev/null
+    write_key BRIGHTNESS "$2"
     ;;
   set-screen-seconds) [ "$#" -eq 2 ] || exit 2; write_screen_seconds "$2" ;;
   set-lid-action) [ "$#" -eq 2 ] || exit 2; set_lid_action "$2" ;;
