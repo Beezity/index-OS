@@ -196,7 +196,6 @@ PanelWindow {
 
                     Flow {
                         Layout.fillWidth: true
-                        width: parent.width
                         spacing: 5
                         visible: notificationDelegate.notification.actions.length > 0
 
