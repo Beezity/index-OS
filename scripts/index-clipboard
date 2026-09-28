@@ -73,22 +73,24 @@ generate_thumbnail() {
 
 store_unlocked() {
   local kind="${1:-data}" tmp_base tmp size id
-  have_backend || exit 0
+  have_backend || return 0
 
   tmp_base="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
   [[ -d "$tmp_base" && -w "$tmp_base" ]] || tmp_base="${TMPDIR:-/tmp}"
   tmp="$(mktemp "$tmp_base/index-clipboard.XXXXXX")"
   chmod 600 "$tmp" 2>/dev/null || true
-  trap 'rm -f "$tmp"' EXIT HUP INT TERM
+  trap 'rm -f -- "$tmp"' EXIT HUP INT TERM
 
   # Read at most one byte past the limit so oversized clipboard payloads are
   # rejected before they ever enter cliphist's persistent database.
   head -c "$((MAX_BYTES + 1))" > "$tmp" || true
   size="$(wc -c < "$tmp")"
   size="${size//[[:space:]]/}"
-  [[ "$size" =~ ^[0-9]+$ ]] || exit 0
-  (( size > 0 )) || exit 0
-  (( size <= MAX_BYTES )) || exit 0
+  if ! [[ "$size" =~ ^[0-9]+$ ]] || (( size == 0 || size > MAX_BYTES )); then
+    rm -f -- "$tmp"
+    trap - EXIT HUP INT TERM
+    return 0
+  fi
 
   cliphist store < "$tmp" >/dev/null
   id="$(cliphist list 2>/dev/null | head -n1 | cut -f1)"
@@ -96,6 +98,9 @@ store_unlocked() {
     generate_thumbnail "$id" "$tmp"
   fi
   prune_history
+
+  rm -f -- "$tmp"
+  trap - EXIT HUP INT TERM
 }
 
 store_item() {
@@ -126,8 +131,8 @@ emit_rows() {
       thumb=""
       [[ -f "$PREVIEW_DIR/$id.png" ]] && { kind=image; thumb="file://$PREVIEW_DIR/$id.png"; }
       printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$kind" "$(sanitize_field "$mime")" "$(sanitize_field "$preview")" "$thumb"
-      ((count+=1))
-      ((count >= MAX_ITEMS)) && break
+      ((++count))
+      (( count >= MAX_ITEMS )) && break
     done
   else
     mapfile -t rows < <(cliphist list 2>/dev/null | head -n "$MAX_ITEMS")
@@ -149,8 +154,8 @@ emit_rows() {
         mime="image"
       fi
       printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$kind" "$mime" "$(sanitize_field "$preview")" "$thumb"
-      ((count+=1))
-      ((count >= MAX_ITEMS)) && break
+      ((++count))
+      (( count >= MAX_ITEMS )) && break
     done
   fi
 }
@@ -171,7 +176,7 @@ select_item() {
 }
 
 clear_history() {
-  have_backend || exit 0
+  have_backend || return 0
   cliphist wipe >/dev/null
   rm -f -- "$PREVIEW_DIR"/*.png 2>/dev/null || true
 }
