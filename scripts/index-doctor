@@ -55,7 +55,7 @@ check_file "$HOME/.config/wofi/config" "Wofi configuration"
 section "THEMING"
 check_file "$HOME/.local/share/themes/the-index/labwc/themerc" "Index labwc theme"
 if [[ -f /usr/share/icons/Papirus-Dark/index.theme ]]; then ok "Papirus-Dark icon theme"; else fail "Papirus-Dark icon theme missing"; fi
-if [[ -d /usr/share/icons/capitaine-cursors/cursors || -d "$HOME/.local/share/icons/capitaine-cursors/cursors" ]]; then ok "Capitaine cursor theme"; else fail "Capitaine cursor theme missing"; fi
+if [[ -d /usr/share/icons/Adwaita/cursors ]]; then ok "Adwaita cursor theme"; else fail "Adwaita cursor theme missing"; fi
 if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA font available"; else warn "Perfect DOS VGA font could not be confirmed"; fi
 
 section "DESKTOP SERVICES"
