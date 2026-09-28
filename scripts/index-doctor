@@ -50,6 +50,12 @@ check_file "$HOME/.config/quickshell/BluetoothMenu.qml" "Bluetooth panel"
 check_file "$HOME/.local/bin/index-bluetooth" "Bluetooth helper"
 check_file "$HOME/.config/quickshell/PowerPanel.qml" "Power panel"
 check_file "$HOME/.local/bin/index-power" "Power helper"
+check_file "$HOME/.config/quickshell/InputPanel.qml" "Input panel"
+check_file "$HOME/.local/bin/index-input" "Input helper"
+if [[ -x "$HOME/.local/bin/index-input" ]]; then
+  INPUT_STATE="$("$HOME/.local/bin/index-input" state 2>/dev/null || true)"
+  [[ "${INPUT_STATE%%$'\t'*}" == 1 ]] && ok "labwc input backend readable" || warn "labwc input backend could not be read"
+fi
 check_file "$HOME/.config/foot/foot.ini" "Foot configuration"
 check_file "$HOME/.config/fish/config.fish" "Fish configuration"
 check_file "$HOME/.config/wofi/config" "Wofi configuration"
