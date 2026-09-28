@@ -86,13 +86,6 @@ On an existing Fedora GNOME installation, you can switch to TTY3 with:
 sudo chvt 3
 ```
 
-If you installed the earlier experimental greetd/ReGreet setup, remove that old display-manager configuration with:
-
-```bash
-bash ./remove-display-manager.sh
-sudo reboot
-```
-
 ## Settings
 
 Open Settings with the `SET` control on the right side of the top bar.
