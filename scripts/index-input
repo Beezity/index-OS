@@ -18,11 +18,11 @@ managed_value() {
     /<device[^>]*category="default"[^>]*>/ { managed=(scope == "pointer") }
     /<device[^>]*category="touchpad"[^>]*>/ { managed=1 }
     managed {
-      open="<" tag ">"; close="</" tag ">"
-      if (index($0, open)) {
+      openTag="<" tag ">"; closeTag="</" tag ">"
+      if (index($0, openTag)) {
         line=$0
-        sub(".*" open, "", line)
-        sub(close ".*", "", line)
+        sub(".*" openTag, "", line)
+        sub(closeTag ".*", "", line)
         print line
         exit
       }
@@ -56,11 +56,11 @@ replace_managed_unlocked() {
     /<device[^>]*category="default"[^>]*>/ { managed=(scope == "pointer") }
     /<device[^>]*category="touchpad"[^>]*>/ { managed=1 }
     managed {
-      open="<" tag ">"; close="</" tag ">"
-      if (index($0, open)) {
+      openTag="<" tag ">"; closeTag="</" tag ">"
+      if (index($0, openTag)) {
         found++
-        pattern=open "[^<]*" close
-        replacement=open value close
+        pattern=openTag "[^<]*" closeTag
+        replacement=openTag value closeTag
         gsub(pattern, replacement)
       }
     }
