@@ -26,7 +26,7 @@ if [ "$pick" = "$CLEAR" ]; then
   exit 0
 fi
 
-id=${pick%%	*}
+id=$(printf '%s\n' "$pick" | cut -f1)
 case "$id" in
   ''|*[!0-9]*) printf '%s' "$pick" | cliphist decode | wl-copy ;;
   *)
