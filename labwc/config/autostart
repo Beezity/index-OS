@@ -40,10 +40,17 @@ for p in /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 \
   fi
 done
 
-# Clipboard history (Super+V).
+# Clipboard history (Super+V). The helper enforces the 50-entry / 100 MiB
+# limits and creates small cached previews for image entries. Keep separate
+# text/image watchers so older wl-clipboard releases still capture both types.
 if command -v wl-paste >/dev/null 2>&1 && command -v cliphist >/dev/null 2>&1; then
-  wl-paste --type text --watch cliphist store &
-  wl-paste --type image --watch cliphist store &
+  if [ -x "$HOME/.local/bin/index-clipboard" ]; then
+    wl-paste --type text --watch "$HOME/.local/bin/index-clipboard" store text &
+    wl-paste --type image --watch "$HOME/.local/bin/index-clipboard" store image &
+  else
+    wl-paste --type text --watch cliphist store &
+    wl-paste --type image --watch cliphist store &
+  fi
 fi
 
 # Removable-media automounting.
