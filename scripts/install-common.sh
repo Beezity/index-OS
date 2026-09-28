@@ -57,18 +57,22 @@ fi
 
 say "installing labwc configuration..."
 SAVED_INDEX_CONF=""
+SAVED_LIBINPUT=""
 SAVED_POINTER_SPEED=""; SAVED_NATURAL_SCROLL=""; SAVED_TAP_CLICK=""
 if [[ -f "$CFG/labwc/rc.xml" ]]; then
-  SAVED_POINTER_SPEED="$(sed -n 's|.*<pointerSpeed>\([^<]*\)</pointerSpeed>.*|\1|p' "$CFG/labwc/rc.xml" | head -n1 || true)"
-  SAVED_NATURAL_SCROLL="$(sed -n 's|.*<naturalScroll>\([^<]*\)</naturalScroll>.*|\1|p' "$CFG/labwc/rc.xml" | head -n1 || true)"
-  SAVED_TAP_CLICK="$(sed -n 's|.*<tap>\([^<]*\)</tap>.*|\1|p' "$CFG/labwc/rc.xml" | head -n1 || true)"
+  SAVED_LIBINPUT="$(mktemp --suffix=.index-libinput)"
+  sed -n '/<libinput>/,/<\/libinput>/p' "$CFG/labwc/rc.xml" > "$SAVED_LIBINPUT"
+  if ! grep -q '<libinput>' "$SAVED_LIBINPUT" || ! grep -q '</libinput>' "$SAVED_LIBINPUT"; then
+    rm -f "$SAVED_LIBINPUT"
+    SAVED_LIBINPUT=""
+  fi
 fi
 if [[ -f "$CFG/labwc/index.conf" ]]; then
   SAVED_INDEX_CONF="$(mktemp --suffix=.index-conf)"
   cp -f "$CFG/labwc/index.conf" "$SAVED_INDEX_CONF"
-  [[ -n "$SAVED_POINTER_SPEED" ]] || SAVED_POINTER_SPEED="$(sed -n 's/^POINTER_SPEED=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
-  [[ -n "$SAVED_NATURAL_SCROLL" ]] || SAVED_NATURAL_SCROLL="$(sed -n 's/^NATURAL_SCROLL=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
-  [[ -n "$SAVED_TAP_CLICK" ]] || SAVED_TAP_CLICK="$(sed -n 's/^TAP_CLICK=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
+  SAVED_POINTER_SPEED="$(sed -n 's/^POINTER_SPEED=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
+  SAVED_NATURAL_SCROLL="$(sed -n 's/^NATURAL_SCROLL=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
+  SAVED_TAP_CLICK="$(sed -n 's/^TAP_CLICK=//p' "$SAVED_INDEX_CONF" | tail -n1 || true)"
 fi
 rm -rf "$CFG/labwc"; mkdir -p "$CFG/labwc"
 cp -f "$INDEX_ROOT/labwc/config/rc.xml" "$CFG/labwc/rc.xml"
@@ -77,19 +81,30 @@ cp -f "$INDEX_ROOT/labwc/config/autostart" "$CFG/labwc/autostart"
 cp -f "$INDEX_ROOT/labwc/config/environment" "$CFG/labwc/environment"
 cp -f "$INDEX_ROOT/wallpaper/the-index.png" "$CFG/labwc/wall.png"
 
-# Input state is now authoritative in Labwc rc.xml. Preserve existing values
-# across upgrades, including migration from the former index.conf mirror.
-case "$SAVED_POINTER_SPEED" in
-  -1|-1.0|-1.00|0|0.0|0.00|1|1.0|1.00|-0.[0-9]|-0.[0-9][0-9]|0.[0-9]|0.[0-9][0-9])
+# Labwc rc.xml is the input source of truth. Preserve the complete prior
+# libinput block so advanced per-device overrides survive normal updates. Only
+# fall back to the former index.conf keys when no usable prior block exists.
+if [[ -n "$SAVED_LIBINPUT" && -s "$SAVED_LIBINPUT" ]]; then
+  INPUT_TMP="$(mktemp "$CFG/labwc/.rc.xml.input.XXXXXX")"
+  awk '
+    NR==FNR { block=block $0 ORS; next }
+    !skip && /<libinput>/ { printf "%s", block; skip=1; next }
+    skip { if (/<\/libinput>/) skip=0; next }
+    { print }
+  ' "$SAVED_LIBINPUT" "$CFG/labwc/rc.xml" > "$INPUT_TMP"
+  mv "$INPUT_TMP" "$CFG/labwc/rc.xml"
+  rm -f "$SAVED_LIBINPUT"
+else
+  if [[ "$SAVED_POINTER_SPEED" =~ ^-?(0([.][0-9]+)?|1([.]0+)?)$ ]]; then
     sed -i "s|<pointerSpeed>[^<]*</pointerSpeed>|<pointerSpeed>$SAVED_POINTER_SPEED</pointerSpeed>|g" "$CFG/labwc/rc.xml"
-    ;;
-esac
-case "$SAVED_NATURAL_SCROLL" in
-  yes|no) sed -i "s|<naturalScroll>[^<]*</naturalScroll>|<naturalScroll>$SAVED_NATURAL_SCROLL</naturalScroll>|g" "$CFG/labwc/rc.xml" ;;
-esac
-case "$SAVED_TAP_CLICK" in
-  yes|no) sed -i "s|<tap>[^<]*</tap>|<tap>$SAVED_TAP_CLICK</tap>|g" "$CFG/labwc/rc.xml" ;;
-esac
+  fi
+  case "$SAVED_NATURAL_SCROLL" in
+    yes|no) sed -i "s|<naturalScroll>[^<]*</naturalScroll>|<naturalScroll>$SAVED_NATURAL_SCROLL</naturalScroll>|g" "$CFG/labwc/rc.xml" ;;
+  esac
+  case "$SAVED_TAP_CLICK" in
+    yes|no) sed -i "s|<tap>[^<]*</tap>|<tap>$SAVED_TAP_CLICK</tap>|g" "$CFG/labwc/rc.xml" ;;
+  esac
+fi
 
 if [[ "$INDEX_DEX_COMMAND" != dex ]]; then sed -i -e "s/command -v dex /command -v $INDEX_DEX_COMMAND /" -e "s/dex -a -e labwc/$INDEX_DEX_COMMAND -a -e labwc/" "$CFG/labwc/autostart"; fi
 if [[ "$INDEX_POLKIT_AGENT" != /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]]; then sed -i "s#/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1#$INDEX_POLKIT_AGENT#" "$CFG/labwc/autostart"; fi
