@@ -52,6 +52,8 @@ Rectangle {
                 var line = text.replace(/[\r\n]+$/, "")
                 var f = line.split("\t")
                 if (f.length < 6) {
+                    root.backendAvailable = false
+                    root.touchpadPresent = false
                     root.ready = false
                     return
                 }
