@@ -77,9 +77,22 @@ check_file "$HOME/.config/wofi/config" "Wofi configuration"
 
 section "THEMING"
 check_file "$HOME/.local/share/themes/the-index/labwc/themerc" "Index labwc theme"
+check_file "$HOME/.local/share/themes/the-index/gtk-3.0/gtk.css" "Index GTK3 theme"
+check_file "$HOME/.local/share/themes/the-index/gtk-4.0/gtk.css" "Index GTK4 theme"
+check_file "$HOME/.config/gtk-3.0/settings.ini" "GTK3 settings"
+check_file "$HOME/.config/gtk-3.0/gtk.css" "GTK3 user stylesheet"
+check_file "$HOME/.config/gtk-4.0/settings.ini" "GTK4 settings"
+check_file "$HOME/.config/gtk-4.0/gtk.css" "GTK4 user stylesheet"
+if [[ -f "$HOME/.config/labwc/rc.xml" ]] && grep -q '<font place="ActiveWindow"><name>Perfect DOS VGA 437</name><size>10</size></font>' "$HOME/.config/labwc/rc.xml" && grep -q '<font place="InactiveWindow"><name>Perfect DOS VGA 437</name><size>10</size></font>' "$HOME/.config/labwc/rc.xml"; then
+  ok "Labwc uses compatible base DOS title font"
+else
+  fail "Labwc title font compatibility setting missing"
+fi
+if [[ -f "$HOME/.config/gtk-3.0/gtk.css" ]] && grep -q '^\.thunar menubar > menuitem' "$HOME/.config/gtk-3.0/gtk.css"; then ok "Thunar GTK polish rules installed"; else fail "Thunar GTK polish rules missing"; fi
 if [[ -f /usr/share/icons/Papirus-Dark/index.theme ]]; then ok "Papirus-Dark icon theme"; else fail "Papirus-Dark icon theme missing"; fi
 if [[ -d /usr/share/icons/Adwaita/cursors ]]; then ok "Adwaita cursor theme"; else fail "Adwaita cursor theme missing"; fi
-if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA font available"; else warn "Perfect DOS VGA font could not be confirmed"; fi
+if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA Universal font available"; else warn "Perfect DOS VGA Universal font could not be confirmed"; fi
+if has fc-match && fc-match 'Perfect DOS VGA 437' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA base font available"; else warn "Perfect DOS VGA base font could not be confirmed"; fi
 
 section "DESKTOP SERVICES"
 for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist ffmpeg notify-send playerctl upower brightnessctl; do check_cmd "$cmd"; done
