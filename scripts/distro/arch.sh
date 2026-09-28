@@ -12,7 +12,7 @@ for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi grim slurp 
 QS_VERSION="$(pacman -Q quickshell | awk '{print $2}' | cut -d- -f1)"; if command -v vercmp >/dev/null 2>&1 && (( $(vercmp "$QS_VERSION" 0.3.0) < 0 )); then bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; fi
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service; sudo systemctl enable gdm.service
 export INDEX_DEX_COMMAND="dex" INDEX_POLKIT_AGENT="/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1" INDEX_CURSOR_ROOT="/usr/share/icons/Adwaita" INDEX_FILE_ROLLER_DESKTOP="file-roller.desktop"
-export INDEX_REQUIRE_CURSOR_INDEX=1 INDEX_VALIDATE_CURSOR_ROOT=1 INDEX_VALIDATE_TITLEBAR_BUTTONS=1
+export INDEX_REQUIRE_CURSOR_INDEX=0 INDEX_VALIDATE_CURSOR_ROOT=1 INDEX_VALIDATE_TITLEBAR_BUTTONS=1
 export INDEX_COMPLETION_FIRST_LINE="GDM is installed and enabled. Reboot to log in and select THE INDEX from GDM's session menu."
 export INDEX_COMPLETION_EXTRA=$'\n   Super+Return  terminal      Super+D  launcher\n   Super+Q       close         Super+L  lock\n   Super+1..5    desktops      Super+Shift+S  screenshot\n'
 exec bash "$SCRIPT_DIR/install-common.sh"
