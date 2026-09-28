@@ -12,9 +12,23 @@ need_backend() {
   [ -f "$RC" ] || { echo "input backend unavailable: $RC" >&2; exit 1; }
 }
 
-first_tag() {
-  tag=$1
-  sed -n "s|.*<${tag}>\([^<]*\)</${tag}>.*|\1|p" "$RC" 2>/dev/null | head -n1
+managed_value() {
+  tag=$1 scope=$2
+  awk -v tag="$tag" -v scope="$scope" '
+    /<device[^>]*category="default"[^>]*>/ { managed=(scope == "pointer") }
+    /<device[^>]*category="touchpad"[^>]*>/ { managed=1 }
+    managed {
+      open="<" tag ">"; close="</" tag ">"
+      if (index($0, open)) {
+        line=$0
+        sub(".*" open, "", line)
+        sub(close ".*", "", line)
+        print line
+        exit
+      }
+    }
+    /<\/device>/ { managed=0 }
+  ' "$RC" 2>/dev/null | head -n1
 }
 
 touchpad_present() {
@@ -32,33 +46,47 @@ reload_labwc() {
   labwc --reconfigure >/dev/null 2>&1 || true
 }
 
-replace_tag_all_unlocked() {
-  tag=$1 value=$2
-  grep -q "<${tag}>[^<]*</${tag}>" "$RC" || {
-    echo "input setting missing from Labwc config: $tag" >&2
-    return 1
-  }
+replace_managed_unlocked() {
+  tag=$1 value=$2 scope=$3
   dir=$(dirname "$RC")
   tmp=$(mktemp "$dir/.rc.xml.input.XXXXXX")
   trap 'rm -f "$tmp"' EXIT HUP INT TERM
-  sed "s|<${tag}>[^<]*</${tag}>|<${tag}>${value}</${tag}>|g" "$RC" > "$tmp"
-  if cmp -s "$RC" "$tmp"; then
+  awk -v tag="$tag" -v value="$value" -v scope="$scope" '
+    BEGIN { changed=0; managed=0 }
+    /<device[^>]*category="default"[^>]*>/ { managed=(scope == "pointer") }
+    /<device[^>]*category="touchpad"[^>]*>/ { managed=1 }
+    managed {
+      open="<" tag ">"; close="</" tag ">"
+      if (index($0, open)) {
+        before=$0
+        pattern=open "[^<]*" close
+        replacement=open value close
+        gsub(pattern, replacement)
+        if ($0 != before) changed++
+      }
+    }
+    { print }
+    /<\/device>/ { managed=0 }
+    END { if (changed == 0) exit 3 }
+  ' "$RC" > "$tmp" || {
+    status=$?
     rm -f "$tmp"
     trap - EXIT HUP INT TERM
-    return 0
-  fi
+    [ "$status" -eq 3 ] && echo "input setting missing from managed Labwc device categories: $tag" >&2
+    return "$status"
+  }
   chmod --reference="$RC" "$tmp" 2>/dev/null || true
   mv "$tmp" "$RC"
   trap - EXIT HUP INT TERM
 }
 
-replace_tag_all() {
+replace_managed() {
   need_backend
-  tag=$1 value=$2
+  tag=$1 value=$2 scope=$3
   if command -v flock >/dev/null 2>&1; then
-    ( flock -x 9; replace_tag_all_unlocked "$tag" "$value" ) 9>"$LOCK"
+    ( flock -x 9; replace_managed_unlocked "$tag" "$value" "$scope" ) 9>"$LOCK"
   else
-    replace_tag_all_unlocked "$tag" "$value"
+    replace_managed_unlocked "$tag" "$value" "$scope"
   fi
   reload_labwc
 }
@@ -68,9 +96,9 @@ state() {
     printf '0\t0.00\tno\t0\tyes\n'
     return 0
   fi
-  speed=$(first_tag pointerSpeed || true)
-  natural=$(first_tag naturalScroll || true)
-  tap=$(first_tag tap || true)
+  speed=$(managed_value pointerSpeed pointer || true)
+  natural=$(managed_value naturalScroll pointer || true)
+  tap=$(managed_value tap touchpad || true)
   valid=1
   if ! valid_speed "$speed"; then speed=0.00; valid=0; fi
   case "$natural" in yes|no) ;; *) natural=no; valid=0 ;; esac
@@ -86,17 +114,17 @@ case "${1:-}" in
   set-speed)
     [ "$#" -eq 2 ] || exit 2
     valid_speed "$2" || { echo "invalid pointer speed: $2" >&2; exit 2; }
-    replace_tag_all pointerSpeed "$2"
+    replace_managed pointerSpeed "$2" pointer
     ;;
   set-natural-scroll)
     [ "$#" -eq 2 ] || exit 2
     case "$2" in yes|no) ;; *) echo "invalid natural-scroll value: $2" >&2; exit 2 ;; esac
-    replace_tag_all naturalScroll "$2"
+    replace_managed naturalScroll "$2" pointer
     ;;
   set-tap)
     [ "$#" -eq 2 ] || exit 2
     case "$2" in yes|no) ;; *) echo "invalid tap value: $2" >&2; exit 2 ;; esac
-    replace_tag_all tap "$2"
+    replace_managed tap "$2" touchpad
     ;;
   *)
     echo "usage: index-input {state|set-speed VALUE|set-natural-scroll yes|no|set-tap yes|no}" >&2
