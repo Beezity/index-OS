@@ -282,7 +282,10 @@ Rectangle {
             Text { anchors.centerIn: parent; text: "OPEN ADVANCED BLUETOOTH SETTINGS"; font.family: bt.pixel; font.pixelSize: 10; color: bt.cyanB }
             MouseArea {
                 id: advancedArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                onClicked: Quickshell.execDetached(["blueman-manager"])
+                onClicked: {
+                    Quickshell.execDetached(["blueman-manager"])
+                    if (!bt.embedded) bt.requestClose()
+                }
             }
         }
 
