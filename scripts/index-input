@@ -6,6 +6,7 @@ RC="${INDEX_INPUT_RC:-${XDG_CONFIG_HOME:-$HOME/.config}/labwc/rc.xml}"
 LOCK="${RC}.input.lock"
 
 sanitize() { printf '%s' "$1" | tr '\t\r\n' '   '; }
+valid_speed() { printf '%s\n' "$1" | grep -Eq '^-?(0([.][0-9]+)?|1([.]0+)?)$'; }
 
 need_backend() {
   [ -f "$RC" ] || { echo "input backend unavailable: $RC" >&2; exit 1; }
@@ -71,10 +72,7 @@ state() {
   natural=$(first_tag naturalScroll || true)
   tap=$(first_tag tap || true)
   valid=1
-  case "$speed" in
-    -1|-1.0|-1.00|0|0.0|0.00|1|1.0|1.00|-0.[0-9]|-0.[0-9][0-9]|0.[0-9]|0.[0-9][0-9]) ;;
-    *) speed=0.00; valid=0 ;;
-  esac
+  if ! valid_speed "$speed"; then speed=0.00; valid=0; fi
   case "$natural" in yes|no) ;; *) natural=no; valid=0 ;; esac
   case "$tap" in yes|no) ;; *) tap=yes; valid=0 ;; esac
   printf '%s\t%s\t%s\t%s\t%s\n' "$valid" "$(sanitize "$speed")" "$natural" "$(touchpad_present)" "$tap"
@@ -87,10 +85,7 @@ case "${1:-}" in
     ;;
   set-speed)
     [ "$#" -eq 2 ] || exit 2
-    case "$2" in
-      -1|-1.0|-1.00|0|0.0|0.00|1|1.0|1.00|-0.[0-9]|-0.[0-9][0-9]|0.[0-9]|0.[0-9][0-9]) ;;
-      *) echo "invalid pointer speed: $2" >&2; exit 2 ;;
-    esac
+    valid_speed "$2" || { echo "invalid pointer speed: $2" >&2; exit 2; }
     replace_tag_all pointerSpeed "$2"
     ;;
   set-natural-scroll)
