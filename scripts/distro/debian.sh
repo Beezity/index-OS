@@ -39,7 +39,7 @@ PACKAGES=(
   swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
   foot fish wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-poppler pavucontrol fastfetch
   xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex libnotify-bin playerctl polkit-kde-agent-1 udiskie udisks2 gvfs gvfs-backends tumbler ffmpegthumbnailer
-  network-manager network-manager-gnome bluez bluez-tools blueman
+  network-manager nm-connection-editor bluez bluez-tools blueman
   pipewire pipewire-pulse wireplumber libspa-0.2-bluetooth ffmpeg gstreamer1.0-plugins-good gstreamer1.0-libav
   qt6-wayland qt6ct qt5ct qml6-module-qtcore qml6-module-qtmultimedia
   brightnessctl upower gammastep gnome-power-manager
