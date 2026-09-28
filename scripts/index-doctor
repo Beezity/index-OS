@@ -48,6 +48,8 @@ check_file "$HOME/.config/quickshell/shell.qml" "Quickshell shell"
 check_file "$HOME/.config/quickshell/Bar.qml" "Quickshell top bar"
 check_file "$HOME/.config/quickshell/BluetoothMenu.qml" "Bluetooth panel"
 check_file "$HOME/.local/bin/index-bluetooth" "Bluetooth helper"
+check_file "$HOME/.config/quickshell/PowerPanel.qml" "Power panel"
+check_file "$HOME/.local/bin/index-power" "Power helper"
 check_file "$HOME/.config/foot/foot.ini" "Foot configuration"
 check_file "$HOME/.config/fish/config.fish" "Fish configuration"
 check_file "$HOME/.config/wofi/config" "Wofi configuration"
@@ -59,11 +61,16 @@ if [[ -d /usr/share/icons/Adwaita/cursors ]]; then ok "Adwaita cursor theme"; el
 if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA font available"; else warn "Perfect DOS VGA font could not be confirmed"; fi
 
 section "DESKTOP SERVICES"
-for cmd in nmcli bluetoothctl wpctl wl-copy playerctl; do check_cmd "$cmd"; done
+for cmd in nmcli bluetoothctl wpctl wl-copy playerctl upower brightnessctl; do check_cmd "$cmd"; done
 if has systemctl; then
   for svc in NetworkManager bluetooth cups; do
     if systemctl is-enabled --quiet "$svc.service" 2>/dev/null; then ok "$svc enabled"; else warn "$svc not enabled"; fi
   done
+  if systemctl is-active --quiet power-profiles-daemon.service 2>/dev/null || systemctl is-active --quiet tuned-ppd.service 2>/dev/null; then
+    ok "power profile backend active"
+  else
+    warn "power profile backend not active"
+  fi
 fi
 if has pgrep && pgrep -x pipewire >/dev/null 2>&1; then ok "PipeWire running"; else warn "PipeWire not detected in current session"; fi
 if has pgrep && pgrep -x wireplumber >/dev/null 2>&1; then ok "WirePlumber running"; else warn "WirePlumber not detected in current session"; fi
