@@ -49,14 +49,16 @@ fi
 # Removable-media automounting.
 command -v udiskie >/dev/null 2>&1 && udiskie --no-notify &
 
-# Restore persisted input/brightness/display state.
+# Restore persisted brightness and input state.
 [ -f "$HOME/.config/labwc/index.conf" ] && . "$HOME/.config/labwc/index.conf"
 if [ -n "${BRIGHTNESS:-}" ] && command -v brightnessctl >/dev/null 2>&1; then
   brightnessctl set "$BRIGHTNESS%" >/dev/null 2>&1 || true
 fi
 
-if [ -x "$HOME/.config/labwc/index-input" ]; then
-  ( "$HOME/.config/labwc/index-input"; sleep 1; labwc --reconfigure ) >/dev/null 2>&1 &
+if [ -x "$HOME/.local/bin/index-input" ]; then
+  "$HOME/.local/bin/index-input" apply >/dev/null 2>&1 &
+elif [ -x "$HOME/.config/labwc/index-input" ]; then
+  "$HOME/.config/labwc/index-input" >/dev/null 2>&1 &
 fi
 
 [ -x "$HOME/.config/labwc/index-idle" ] && "$HOME/.config/labwc/index-idle" &
