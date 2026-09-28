@@ -27,7 +27,6 @@ PanelWindow {
 
     property bool menuOpen: false
     property bool settingsOpen: false
-    property bool btOpen: false
     property bool notifOpen: false
 
     Calendar { id: calPopup }
@@ -163,32 +162,6 @@ PanelWindow {
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { bar.notifOpen = !bar.notifOpen; Sfx.play("menu") } }
                 }
 
-                Text {
-                    id: netText
-                    property string ssid: ""
-                    text: ssid ? "NET " + ssid : "NET --"
-                    font.family: bar.pixel; font.pixelSize: 13
-                    color: ssid ? bar.cyanD : bar.warn
-                    elide: Text.ElideRight; Layout.maximumWidth: 150
-                }
-                Process {
-                    id: netProc
-                    command: ["sh", "-c", "type=$(nmcli -t -f TYPE connection show --active 2>/dev/null | head -1); case \"$type\" in 802-3-ethernet|ethernet) printf 'ETHERNET' ;; 802-11-wireless|wifi|wireless) printf 'WI-FI' ;; *) name=$(nmcli -t -f NAME connection show --active 2>/dev/null | head -1); printf '%s' \"$name\" | LC_ALL=C tr -cd ' -~' ;; esac"]
-                    stdout: StdioCollector { onStreamFinished: netText.ssid = text.trim() }
-                }
-
-                Text {
-                    id: btText
-                    property bool powered: false
-                    text: powered ? "BT ON" : "BT --"
-                    font.family: bar.pixel; font.pixelSize: 13; color: powered ? bar.cyan : bar.cyanD
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { bar.btOpen = !bar.btOpen; Sfx.play("menu") } }
-                }
-                Process {
-                    id: btProc
-                    command: ["sh", "-c", "bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && echo 1 || echo 0"]
-                    stdout: StdioCollector { onStreamFinished: btText.powered = text.trim() === "1" }
-                }
 
                 Text {
                     id: batText
@@ -208,34 +181,6 @@ PanelWindow {
                     } }
                 }
 
-                Text {
-                    id: volText
-                    property int volume: 50
-                    property bool muted: false
-                    text: muted ? "VOL MUTE" : "VOL " + volume
-                    font.family: bar.pixel; font.pixelSize: 13; color: muted ? bar.warn : bar.cyanD
-                    MouseArea {
-                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        onClicked: function(m) {
-                            if (m.button === Qt.RightButton) { bar.settingsOpen = !bar.settingsOpen; Sfx.play("menu"); return }
-                            Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]); volRefresh.restart()
-                        }
-                        onWheel: function(w) {
-                            Quickshell.execDetached(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", w.angleDelta.y > 0 ? "5%+" : "5%-"]); volRefresh.restart()
-                        }
-                    }
-                }
-                Process {
-                    id: volProc
-                    command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-                    stdout: StdioCollector { onStreamFinished: {
-                        var m = text.match(/([0-9.]+)/)
-                        if (m) volText.volume = Math.round(parseFloat(m[1]) * 100)
-                        volText.muted = text.indexOf("MUTED") >= 0
-                    } }
-                }
-                Timer { id: volRefresh; interval: 150; repeat: false; onTriggered: volProc.running = true }
 
                 Repeater {
                     model: SystemTray.items
@@ -257,8 +202,6 @@ PanelWindow {
                     }
                 }
 
-                Text { text: Qt.formatDateTime(clock.date, "ddd dd MMM").toUpperCase(); font.family: bar.pixel; font.pixelSize: 13; color: bar.cyanD }
-
                 Text {
                     text: "SET"
                     font.family: bar.pixel; font.pixelSize: 13
@@ -275,10 +218,7 @@ PanelWindow {
                 Timer {
                     interval: 5000; running: !bar.settingsOpen; repeat: true; triggeredOnStart: true
                     onTriggered: {
-                        if (!netProc.running) netProc.running = true
-                        if (!btProc.running) btProc.running = true
                         if (!batProc.running) batProc.running = true
-                        if (!volProc.running) volProc.running = true
                     }
                 }
             }
@@ -331,17 +271,6 @@ PanelWindow {
                 }
             }
         }
-    }
-
-    PanelWindow {
-        visible: bar.btOpen
-        anchors { top: true; right: true }
-        margins { top: bar.implicitHeight; right: 8 }
-        implicitWidth: 340; implicitHeight: 420
-        color: "transparent"; exclusiveZone: 0
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.namespace: "index-bluetooth"
-        BluetoothMenu { anchors.fill: parent; onRequestClose: bar.btOpen = false }
     }
 
     PanelWindow {
