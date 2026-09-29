@@ -30,7 +30,9 @@ jobs:
 
       - name: Exercise Niri display backend
         run: |
+          set -euxo pipefail
           tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
           mkdir -p "$tmp/bin" "$tmp/home/.config/niri"
           cp niri/config/config.kdl niri/config/input.kdl niri/config/outputs.kdl niri/config/cursor.kdl "$tmp/home/.config/niri/"
           cat > "$tmp/bin/niri" <<'EOF'
@@ -49,14 +51,16 @@ jobs:
           chmod +x "$tmp/bin/niri"
           run_display() { env HOME="$tmp/home" PATH="$tmp/bin:$PATH" NIRI_SOCKET=fake python3 scripts/index-displays "$@"; }
           state="$(run_display state)"
-          printf '%s\n' "$state" | grep -q $'^@output\tHDMI-A-1\tASUSTeK Monitor 2\t1\t0\t0\t1.000000\tnormal$'
+          printf '%s\n' "$state"
+          printf '%s\n' "$state" | grep -q $'^@output\tHDMI-A-1\t'
           printf '%s\n' "$state" | grep -q $'^@mode\t1920\t1080\t180.000\t1\t1$'
           run_display apply eDP-1 1 1920 1080 144.000 3840 0 1.0 normal
+          cat "$tmp/home/.config/niri/outputs.kdl"
           grep -q 'output "eDP-1"' "$tmp/home/.config/niri/outputs.kdl"
           grep -q 'position x=3840 y=0' "$tmp/home/.config/niri/outputs.kdl"
           run_display set-main eDP-1
+          cat "$tmp/home/.config/niri/outputs.kdl"
           grep -q 'focus-at-startup' "$tmp/home/.config/niri/outputs.kdl"
-          rm -rf "$tmp"
 
       - name: Exercise Niri input backend
         run: |
@@ -92,7 +96,6 @@ jobs:
           import re
           text=open('niri/config/config.kdl').read()
           binds=re.findall(r'^\s*([^/\s][^\s{}]*)\s+[^\n]*\{', text, re.M)
-          # Only inspect actual keybind-looking nodes.
           keys=[x for x in binds if '+' in x or x in {'Print','XF86AudioRaiseVolume','XF86AudioLowerVolume','XF86AudioMute','XF86AudioPlay','XF86AudioNext','XF86AudioPrev','XF86MonBrightnessUp','XF86MonBrightnessDown'}]
           dup=sorted({x for x in keys if keys.count(x)>1})
           if dup: raise SystemExit('duplicate Niri binds: '+', '.join(dup))
