@@ -1,0 +1,99 @@
+name: validate-niri
+
+on:
+  push:
+    branches:
+      - feat/niri-migration
+  pull_request:
+    paths:
+      - "niri/**"
+      - "quickshell/**"
+      - "scripts/**"
+      - "install*.sh"
+      - "patch-niri-fedora.sh"
+      - ".github/workflows/validate-niri.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fedora-niri:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: dnf -y install niri bash shellcheck python3 libxml2 git
+
+      - name: Check migration shell syntax
+        shell: bash
+        run: |
+          bash -n patch-niri-fedora.sh setup.sh
+          bash -n scripts/common.sh scripts/install-niri-common.sh scripts/validate.sh scripts/index-doctor
+          bash -n scripts/index-session-start scripts/index-lock scripts/index-logout scripts/index-idle
+          bash -n scripts/index-display-save scripts/index-display-restore
+          bash -n scripts/index-appearance scripts/index-power scripts/index-input scripts/index-backup scripts/index-uninstall
+          bash -n scripts/distro/fedora.sh scripts/distro/arch.sh scripts/distro/debian.sh scripts/distro/fedora-niri-patch.sh
+
+      - name: Shellcheck niri migration helpers
+        shell: bash
+        run: |
+          shellcheck --severity=error \
+            patch-niri-fedora.sh \
+            scripts/install-niri-common.sh \
+            scripts/index-session-start scripts/index-lock scripts/index-logout scripts/index-idle \
+            scripts/index-display-save scripts/index-display-restore \
+            scripts/index-appearance scripts/index-power scripts/index-input \
+            scripts/distro/fedora-niri-patch.sh
+
+      - name: Validate shipped niri configuration
+        shell: bash
+        run: |
+          test -s niri/config/config.kdl
+          test -s niri/config/index-input.kdl
+          test -s niri/config/index-cursor.kdl
+          test -s niri/config/index-outputs.kdl
+          tmp="$(mktemp -d)"
+          cp niri/config/*.kdl "$tmp/"
+          NIRI_CONFIG="$tmp/config.kdl" niri validate
+          grep -q '^Exec=niri-session$' niri/session/the-index.desktop
+          grep -q 'spawn-sh-at-startup.*index-session-start' niri/config/config.kdl
+          grep -q 'prefer-no-csd' niri/config/config.kdl
+          rm -rf "$tmp"
+
+      - name: Exercise niri input helper
+        shell: bash
+        run: |
+          tmp="$(mktemp -d)"
+          cp niri/config/index-input.kdl "$tmp/input.kdl"
+          run_input() {
+            env INDEX_INPUT_BACKEND=niri INDEX_NIRI_INPUT="$tmp/input.kdl" XDG_CONFIG_HOME="$tmp/config" bash scripts/index-input "$@"
+          }
+          state="$(run_input state)"
+          test "$(printf '%s' "$state" | cut -f1)" = 1
+          run_input set-speed 0.25
+          run_input set-natural-scroll yes
+          run_input set-tap no
+          state="$(run_input state)"
+          test "$(printf '%s' "$state" | cut -f2)" = 0.25
+          test "$(printf '%s' "$state" | cut -f3)" = yes
+          test "$(printf '%s' "$state" | cut -f5)" = no
+          grep -q '^// INDEX_POINTER_SPEED=0.25$' "$tmp/input.kdl"
+          grep -q '^// INDEX_NATURAL_SCROLL=yes$' "$tmp/input.kdl"
+          grep -q '^// INDEX_TAP_CLICK=no$' "$tmp/input.kdl"
+          if run_input set-speed '0.5;echo bad'; then
+            echo 'unsafe pointer speed unexpectedly accepted'
+            exit 1
+          fi
+          rm -rf "$tmp"
+
+      - name: Check compositor separation
+        shell: bash
+        run: |
+          grep -q 'PACKAGES=(.*niri' scripts/distro/fedora.sh || grep -q '^  niri xwayland-satellite' scripts/distro/fedora.sh
+          grep -q 'PACKAGES=(niri xwayland-satellite' scripts/distro/arch.sh
+          ! grep -q '^Exec=/usr/bin/labwc$' niri/session/the-index.desktop
+          grep -q 'exec bash "$SCRIPT_DIR/install-niri-common.sh"' scripts/distro/fedora.sh
+          grep -q 'exec bash "$SCRIPT_DIR/install-niri-common.sh"' scripts/distro/arch.sh
+          grep -q 'exec bash "$SCRIPT_DIR/install-common.sh"' scripts/distro/debian.sh
