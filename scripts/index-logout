@@ -1,0 +1,18 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — end the active compositor session
+set -eu
+
+case ":${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:" in
+  *:niri:*|*:Niri:*)
+    command -v niri >/dev/null 2>&1 || { echo 'index-logout: niri is unavailable' >&2; exit 1; }
+    exec niri msg action quit --skip-confirmation
+    ;;
+esac
+
+if [ -n "${NIRI_SOCKET:-}" ]; then
+  command -v niri >/dev/null 2>&1 || { echo 'index-logout: niri is unavailable' >&2; exit 1; }
+  exec niri msg action quit --skip-confirmation
+fi
+
+command -v labwc >/dev/null 2>&1 || { echo 'index-logout: labwc is unavailable' >&2; exit 1; }
+exec labwc --exit

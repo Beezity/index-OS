@@ -1,0 +1,180 @@
+name: validate-niri
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y shellcheck python3
+
+      - name: Check scripts
+        run: |
+          bash -n install-niri.sh install-niri-fedora.sh install-niri-debian.sh \
+            scripts/install-niri-common.sh scripts/distro/arch-niri.sh scripts/distro/fedora-niri.sh scripts/distro/debian-niri.sh \
+            scripts/index-lock scripts/index-idle scripts/index-logout scripts/index-input scripts/index-power scripts/index-appearance scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update \
+            niri/config/index-autostart
+          shellcheck --severity=error install-niri.sh install-niri-fedora.sh install-niri-debian.sh \
+            scripts/install-niri-common.sh scripts/distro/arch-niri.sh scripts/distro/fedora-niri.sh scripts/distro/debian-niri.sh \
+            scripts/index-lock scripts/index-idle scripts/index-logout scripts/index-input scripts/index-power scripts/index-appearance scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-uninstall scripts/index-update \
+            niri/config/index-autostart
+          python3 -m py_compile scripts/index-displays
+
+      - name: Exercise Niri display backend
+        run: |
+          set -euxo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/bin" "$tmp/home/.config/niri"
+          cp niri/config/config.kdl niri/config/input.kdl niri/config/outputs.kdl niri/config/cursor.kdl "$tmp/home/.config/niri/"
+          cat > "$tmp/bin/niri" <<'EOF'
+          #!/usr/bin/env bash
+          set -e
+          if [[ "$1 $2 $3" == 'msg --json outputs' ]]; then
+            cat <<'JSON'
+          {"eDP-1":{"name":"eDP-1","make":"Acer","model":"Internal","serial_number":"1","modes":[{"width":1920,"height":1080,"refresh_rate":144000,"is_preferred":true},{"width":1920,"height":1080,"refresh_rate":60000,"is_preferred":false}],"current_mode":0,"logical":{"x":1920,"y":0,"width":1920,"height":1080,"scale":1.0,"transform":"normal"}},"HDMI-A-1":{"name":"HDMI-A-1","make":"ASUSTeK","model":"Monitor","serial_number":"2","modes":[{"width":1920,"height":1080,"refresh_rate":180000,"is_preferred":true}],"current_mode":0,"logical":{"x":0,"y":0,"width":1920,"height":1080,"scale":1.0,"transform":"normal"}}}
+          JSON
+          elif [[ "$1" == validate ]]; then
+            exit 0
+          else
+            echo "unexpected fake niri command: $*" >&2; exit 2
+          fi
+          EOF
+          chmod +x "$tmp/bin/niri"
+          run_display() { env HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/home/.config" PATH="$tmp/bin:$PATH" NIRI_SOCKET=fake python3 scripts/index-displays "$@"; }
+          state="$(run_display state)"
+          printf '%s\n' "$state" | grep -q $'^@output\tHDMI-A-1\tASUSTeK Monitor 2\t'
+          printf '%s\n' "$state" | grep -q $'^@mode\t1920\t1080\t180.000\t1\t1$'
+          run_display apply eDP-1 1 1920 1080 144.000 3840 0 1.0 normal
+          grep -q 'output "eDP-1"' "$tmp/home/.config/niri/outputs.kdl"
+          grep -q 'position x=3840 y=0' "$tmp/home/.config/niri/outputs.kdl"
+
+          # A disconnected DisplayLink output must not disappear when another
+          # live output is changed or rebased.
+          python3 - "$tmp/home/.config/the-index/displays.json" <<'PY'
+          import json, sys
+          path=sys.argv[1]
+          data=json.load(open(path))
+          data['outputs']['DVI-I-1']={
+              'name':'DVI-I-1','description':'DisplayLink USB','enabled':True,
+              'x':-1920,'y':0,'scale':1.0,'transform':'normal',
+              'modes':[{'width':1920,'height':1080,'refresh':60.0,'preferred':True,'current':True}]
+          }
+          with open(path,'w') as f: json.dump(data,f)
+          PY
+          run_display set-main eDP-1
+          grep -q 'focus-at-startup' "$tmp/home/.config/niri/outputs.kdl"
+          grep -q 'output "DVI-I-1"' "$tmp/home/.config/niri/outputs.kdl"
+
+      - name: Exercise Niri input backend
+        run: |
+          tmp="$(mktemp -d)"
+          mkdir -p "$tmp/niri"
+          cp niri/config/input.kdl "$tmp/niri/input.kdl"
+          run_input() { env INDEX_INPUT_BACKEND=niri INDEX_INPUT_NIRI="$tmp/niri/input.kdl" INDEX_INPUT_NO_VALIDATE=1 sh scripts/index-input "$@"; }
+          test "$(run_input state | cut -f1)" = 1
+          run_input set-speed 0.35
+          run_input set-natural-scroll yes
+          run_input set-tap no
+          state="$(run_input state)"
+          test "$(printf '%s' "$state" | cut -f2)" = 0.35
+          test "$(printf '%s' "$state" | cut -f3)" = yes
+          test "$(printf '%s' "$state" | cut -f5)" = no
+          grep -q 'accel-speed 0.35' "$tmp/niri/input.kdl"
+          grep -q 'natural-scroll' "$tmp/niri/input.kdl"
+          rm -rf "$tmp"
+
+      - name: Check backend structure
+        run: |
+          test -s niri/config/config.kdl
+          test -s niri/config/input.kdl
+          test -s niri/config/outputs.kdl
+          test -s niri/config/cursor.kdl
+          test -s niri/config/index-autostart
+          test -s niri/config/portal/niri-portals.conf
+          test -s niri/session/the-index-niri.desktop
+          test -s scripts/index-logout
+          grep -q '^Exec=niri-session$' niri/session/the-index-niri.desktop
+          grep -q 'include optional=true "custom.kdl"' niri/config/config.kdl
+          grep -q '^org.freedesktop.impl.portal.FileChooser=gtk;$' niri/config/portal/niri-portals.conf
+          grep -q '^org.freedesktop.impl.portal.Secret=gnome-keyring;$' niri/config/portal/niri-portals.conf
+          grep -q 'gnome-keyring' scripts/distro/fedora-niri.sh
+          grep -q 'gnome-keyring' scripts/distro/arch-niri.sh
+          grep -q 'gnome-keyring' scripts/distro/debian-niri.sh
+          grep -q 'index-displays' quickshell/DisplaysPanel.qml
+          ! grep -q 'wlr-randr' quickshell/DisplaysPanel.qml
+          grep -q 'WindowManager.screenProjection(bar.screen).windowsets' quickshell/Bar.qml
+          grep -q '/.local/bin/index-logout' quickshell/Bar.qml
+          ! grep -q '/.config/labwc/index-logout' quickshell/Bar.qml
+          grep -q 'custom.kdl' scripts/index-uninstall
+          ! grep -q 'remove "$HOME/.config/niri"' scripts/index-uninstall
+
+          # Both session entries are part of the backup/restore contract.
+          grep -q '/usr/share/wayland-sessions/the-index-niri.desktop' scripts/index-backup
+          grep -q '/usr/share/wayland-sessions/the-index-niri.desktop' scripts/index-restore
+
+          # Screenshot behavior must stay identical across compositors and must
+          # never regress to automatically opening an editor.
+          grep -q 'spawn "index-snip" "region"' niri/config/config.kdl
+          grep -q 'spawn "index-snip" "full"' niri/config/config.kdl
+          grep -q 'spawn "index-snip" "copy-region"' niri/config/config.kdl
+          ! grep -qi 'swappy' niri/config/config.kdl niri/config/index-autostart
+
+          # xwayland-satellite is integrated by Niri; do not manually spawn it
+          # or inject DISPLAY into the compositor configuration.
+          ! grep -Eq 'spawn[^\n]*xwayland-satellite|DISPLAY[[:space:]]' niri/config/config.kdl niri/config/index-autostart
+
+          python3 - <<'PY'
+          import re
+          text=open('niri/config/config.kdl').read()
+          binds=re.findall(r'^\s*([^/\s][^\s{}]*)\s+[^\n]*\{', text, re.M)
+          keys=[x for x in binds if '+' in x or x in {'Print','XF86AudioRaiseVolume','XF86AudioLowerVolume','XF86AudioMute','XF86AudioPlay','XF86AudioNext','XF86AudioPrev','XF86MonBrightnessUp','XF86MonBrightnessDown'}]
+          dup=sorted({x for x in keys if keys.count(x)>1})
+          if dup: raise SystemExit('duplicate Niri binds: '+', '.join(dup))
+          PY
+
+  niri-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate static and generated config with Fedora Niri
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" fedora:44 bash -lc '
+            set -euo pipefail
+            dnf -y install niri python3 >/dev/null
+            cd /repo
+            NIRI_CONFIG=/repo/niri/config/config.kdl niri validate
+
+            tmp=$(mktemp -d)
+            trap "rm -rf $tmp" EXIT
+            mkdir -p "$tmp/cfg/niri"
+            cp -a /repo/niri/config/. "$tmp/cfg/niri/"
+            cfg="$tmp/cfg/niri"
+
+            INDEX_INPUT_BACKEND=niri \
+              INDEX_INPUT_NIRI="$cfg/input.kdl" \
+              INDEX_NIRI_CONFIG="$cfg/config.kdl" \
+              sh /repo/scripts/index-input set-speed 0.35
+            INDEX_INPUT_BACKEND=niri \
+              INDEX_INPUT_NIRI="$cfg/input.kdl" \
+              INDEX_NIRI_CONFIG="$cfg/config.kdl" \
+              sh /repo/scripts/index-input set-natural-scroll yes
+            INDEX_INPUT_BACKEND=niri \
+              INDEX_INPUT_NIRI="$cfg/input.kdl" \
+              INDEX_NIRI_CONFIG="$cfg/config.kdl" \
+              sh /repo/scripts/index-input set-tap no
+            NIRI_CONFIG="$cfg/config.kdl" niri validate
+
+            XDG_CONFIG_HOME="$tmp/cfg" NIRI_CONFIG="$cfg/config.kdl" python3 -c "import runpy; ns=runpy.run_path(\"/repo/scripts/index-displays\"); ns[\"write_niri\"]([{\"name\":\"HDMI-A-1\",\"description\":\"ASUSTeK\",\"enabled\":True,\"x\":0,\"y\":0,\"scale\":1.0,\"transform\":\"normal\",\"modes\":[{\"width\":1920,\"height\":1080,\"refresh\":180.0,\"preferred\":True,\"current\":True}]},{\"name\":\"eDP-1\",\"description\":\"Internal\",\"enabled\":True,\"x\":1920,\"y\":0,\"scale\":1.0,\"transform\":\"normal\",\"modes\":[{\"width\":1920,\"height\":1080,\"refresh\":144.0,\"preferred\":True,\"current\":True}]}], \"HDMI-A-1\")"
+            grep -q "output \"HDMI-A-1\"" "$cfg/outputs.kdl"
+            NIRI_CONFIG="$cfg/config.kdl" niri validate
+            niri msg action quit --help >/dev/null
+          '

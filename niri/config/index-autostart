@@ -1,0 +1,56 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — niri session startup
+set -u
+
+# niri-session imports the compositor environment into systemd/D-Bus itself.
+# Keep this update as a compatibility fallback for services not managed there.
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE NIRI_SOCKET >/dev/null 2>&1 || true
+fi
+
+if [ -x "$HOME/.local/bin/index-appearance" ]; then
+  "$HOME/.local/bin/index-appearance" apply >/dev/null 2>&1 &
+elif command -v swaybg >/dev/null 2>&1 && [ -f "$HOME/.config/the-index/wall.png" ]; then
+  swaybg -i "$HOME/.config/the-index/wall.png" -m fill &
+fi
+
+INDEX_QS_ENV=""
+if { [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi 'vmware' /sys/class/dmi/id/sys_vendor; } || \
+   { command -v systemd-detect-virt >/dev/null 2>&1 && [ "$(systemd-detect-virt 2>/dev/null || true)" = "vmware" ]; }; then
+  INDEX_QS_ENV="QT_QUICK_BACKEND=software"
+fi
+if [ -n "$INDEX_QS_ENV" ]; then
+  env $INDEX_QS_ENV quickshell -p "$HOME/.config/quickshell/shell.qml" &
+else
+  quickshell -p "$HOME/.config/quickshell/shell.qml" &
+fi
+
+for p in \
+  /usr/libexec/kf6/polkit-kde-authentication-agent-1 \
+  /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 \
+  /usr/libexec/polkit-gnome-authentication-agent-1; do
+  if [ -x "$p" ]; then "$p" & break; fi
+done
+
+if command -v wl-paste >/dev/null 2>&1 && command -v cliphist >/dev/null 2>&1; then
+  if [ -x "$HOME/.local/bin/index-clipboard" ]; then
+    "$HOME/.local/bin/index-clipboard" prune >/dev/null 2>&1 || true
+    wl-paste --type text --watch "$HOME/.local/bin/index-clipboard" store text &
+    wl-paste --type image --watch "$HOME/.local/bin/index-clipboard" store image &
+  else
+    wl-paste --type text --watch cliphist store &
+    wl-paste --type image --watch cliphist store &
+  fi
+fi
+
+command -v udiskie >/dev/null 2>&1 && udiskie --no-notify &
+
+POWER_CONF="$HOME/.config/the-index/power.conf"
+if [ -f "$POWER_CONF" ]; then
+  BRIGHTNESS="$(sed -n 's/^BRIGHTNESS=//p' "$POWER_CONF" | tail -n1)"
+  if [ -n "$BRIGHTNESS" ] && command -v brightnessctl >/dev/null 2>&1; then
+    brightnessctl set "$BRIGHTNESS%" >/dev/null 2>&1 || true
+  fi
+fi
+
+[ -x "$HOME/.local/bin/index-idle" ] && "$HOME/.local/bin/index-idle" &

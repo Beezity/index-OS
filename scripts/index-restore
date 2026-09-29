@@ -51,7 +51,7 @@ while IFS=$'\t' read -r state path; do
   [[ "$state" == present || "$state" == missing ]] || { echo "Invalid manifest entry." >&2; exit 1; }
   [[ -n "$path" ]] || { echo "Invalid empty manifest path." >&2; exit 1; }
   case "$path" in
-    "$HOME"/*|/usr/share/wayland-sessions/the-index.desktop|/etc/apt/sources.list.d/index-os-trixie-backports.sources|/etc/systemd/logind.conf.d/90-index.conf) ;;
+    "$HOME"/*|/usr/share/wayland-sessions/the-index.desktop|/usr/share/wayland-sessions/the-index-niri.desktop|/etc/apt/sources.list.d/index-os-trixie-backports.sources|/etc/systemd/logind.conf.d/90-index.conf) ;;
     *) echo "Refusing unsafe restore path: $path" >&2; exit 1 ;;
   esac
   if [[ "$state" == present && ! -e "$SRC/files/${path#/}" && ! -L "$SRC/files/${path#/}" ]]; then

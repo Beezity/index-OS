@@ -7,10 +7,10 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   cat <<'EOF'
 usage: index-uninstall [--yes]
 
-Removes configuration and user-owned files installed by THE INDEX.
-Installed packages, unrelated files, and saved Index backups are left intact.
-
-Use index-restore afterwards if you want to restore a pre-install snapshot.
+Removes configuration and files managed by THE INDEX.
+Installed packages, unrelated files, user-owned Niri custom.kdl, and saved Index
+backups are left intact. Use index-restore afterwards if you want to restore a
+pre-install snapshot.
 EOF
   exit 0
 fi
@@ -20,22 +20,23 @@ cat <<'EOF'
 THE INDEX configuration uninstaller
 
 This removes Index-managed configuration, themes, bundled fonts, helper commands,
-and the THE INDEX GDM session. It does not uninstall distro packages or delete backups.
+and THE INDEX GDM sessions. It does not uninstall distro packages, delete backups,
+or remove ~/.config/niri/custom.kdl.
 EOF
-if (( ! YES )); then
-  read -r -p "Continue? [y/N] " answer
-  [[ "$answer" =~ ^[Yy]$ ]] || { echo "Cancelled."; exit 0; }
-fi
+if (( ! YES )); then read -r -p "Continue? [y/N] " answer; [[ "$answer" =~ ^[Yy]$ ]] || { echo "Cancelled."; exit 0; }; fi
 
 remove(){ rm -rf -- "$@"; }
+remove "$HOME/.config/labwc" "$HOME/.config/quickshell" "$HOME/.config/fastfetch" "$HOME/.config/the-index" "$HOME/.local/share/themes/the-index" "${XDG_CACHE_HOME:-$HOME/.cache}/the-index"
 
+# Niri may contain advanced user-owned configuration. Remove only files THE
+# INDEX owns and leave custom.kdl or any unrelated Niri files in place.
 remove \
-  "$HOME/.config/labwc" \
-  "$HOME/.config/quickshell" \
-  "$HOME/.config/fastfetch" \
-  "$HOME/.config/the-index" \
-  "$HOME/.local/share/themes/the-index" \
-  "${XDG_CACHE_HOME:-$HOME/.cache}/the-index"
+  "$HOME/.config/niri/config.kdl" \
+  "$HOME/.config/niri/input.kdl" \
+  "$HOME/.config/niri/outputs.kdl" \
+  "$HOME/.config/niri/cursor.kdl" \
+  "$HOME/.config/niri/index-autostart"
+rmdir "$HOME/.config/niri" 2>/dev/null || true
 
 remove \
   "$HOME/.config/fontconfig/fonts.conf" \
@@ -43,55 +44,39 @@ remove \
   "$HOME/.config/gtk-4.0/settings.ini" "$HOME/.config/gtk-4.0/gtk.css" \
   "$HOME/.config/wofi/config" "$HOME/.config/wofi/style.css" \
   "$HOME/.config/foot/foot.ini" "$HOME/.config/fish/config.fish" \
-  "$HOME/.config/xdg-desktop-portal/labwc-portals.conf" "$HOME/.config/xdg-desktop-portal/wlr/config" \
+  "$HOME/.config/xdg-desktop-portal/labwc-portals.conf" "$HOME/.config/xdg-desktop-portal/niri-portals.conf" "$HOME/.config/xdg-desktop-portal/wlr/config" \
   "$HOME/.config/qt5ct/qt5ct.conf" "$HOME/.config/qt5ct/colors/the-index.conf" \
   "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt6ct/colors/the-index.conf" \
-  "$HOME/.config/environment.d/60-index-browsers.conf" \
-  "$HOME/.local/share/icons/default/index.theme"
-
+  "$HOME/.config/environment.d/60-index-browsers.conf" "$HOME/.local/share/icons/default/index.theme"
 remove "$HOME/.local/share/icons/capitaine-cursors"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 shopt -s nullglob
-for src in "$REPO_ROOT"/assets/*.ttf "$REPO_ROOT"/assets/*.otf; do
-  remove "$HOME/.local/share/fonts/$(basename "$src")"
-done
+for src in "$REPO_ROOT"/assets/*.ttf "$REPO_ROOT"/assets/*.otf; do remove "$HOME/.local/share/fonts/$(basename "$src")"; done
 shopt -u nullglob
 
-if [[ -e /usr/share/wayland-sessions/the-index.desktop ]]; then
-  sudo rm -f -- /usr/share/wayland-sessions/the-index.desktop
-fi
-if [[ -e /etc/apt/sources.list.d/index-os-trixie-backports.sources ]]; then
-  sudo rm -f -- /etc/apt/sources.list.d/index-os-trixie-backports.sources
-fi
+for session in /usr/share/wayland-sessions/the-index.desktop /usr/share/wayland-sessions/the-index-niri.desktop; do [[ -e "$session" ]] && sudo rm -f -- "$session"; done
+[[ -e /etc/apt/sources.list.d/index-os-trixie-backports.sources ]] && sudo rm -f -- /etc/apt/sources.list.d/index-os-trixie-backports.sources
 
 remove \
-  "$HOME/.local/bin/index-default-apps" \
-  "$HOME/.local/bin/index-snip" \
-  "$HOME/.local/bin/index-doctor" \
-  "$HOME/.local/bin/index-appearance" \
-  "$HOME/.local/bin/index-audio" \
-  "$HOME/.local/bin/index-network" \
-  "$HOME/.local/bin/index-bluetooth" \
-  "$HOME/.local/bin/index-power" \
-  "$HOME/.local/bin/index-input" \
-  "$HOME/.local/bin/index-clipboard" \
-  "$HOME/.local/bin/index-notifications" \
-  "$HOME/.local/bin/index-settings"
+  "$HOME/.local/bin/index-default-apps" "$HOME/.local/bin/index-snip" "$HOME/.local/bin/index-doctor" \
+  "$HOME/.local/bin/index-backup" "$HOME/.local/bin/index-restore" "$HOME/.local/bin/index-uninstall" "$HOME/.local/bin/index-update" \
+  "$HOME/.local/bin/index-appearance" "$HOME/.local/bin/index-audio" "$HOME/.local/bin/index-network" "$HOME/.local/bin/index-bluetooth" \
+  "$HOME/.local/bin/index-power" "$HOME/.local/bin/index-input" "$HOME/.local/bin/index-clipboard" "$HOME/.local/bin/index-notifications" "$HOME/.local/bin/index-settings" \
+  "$HOME/.local/bin/index-lock" "$HOME/.local/bin/index-idle" "$HOME/.local/bin/index-displays" "$HOME/.local/bin/index-logout"
 
 rmdir "$HOME/.config/fontconfig" "$HOME/.config/wofi" "$HOME/.config/foot" "$HOME/.config/fish" 2>/dev/null || true
 rmdir "$HOME/.config/xdg-desktop-portal/wlr" "$HOME/.config/xdg-desktop-portal" 2>/dev/null || true
 rmdir "$HOME/.config/qt5ct/colors" "$HOME/.config/qt5ct" "$HOME/.config/qt6ct/colors" "$HOME/.config/qt6ct" 2>/dev/null || true
 rmdir "$HOME/.config/environment.d" "$HOME/.local/share/icons/default" 2>/dev/null || true
-
 command -v fc-cache >/dev/null 2>&1 && fc-cache -f >/dev/null || true
 
 cat <<'EOF'
-THE INDEX configuration has been removed.
+THE INDEX managed configuration has been removed.
 
 Packages installed by the distro installer were left installed.
-MIME/user-directory settings were left untouched because they may have changed since installation.
+MIME/user-directory settings and user-owned Niri custom.kdl were left untouched.
 Saved backups were preserved. To recover your pre-install configuration, run:
   index-restore latest
 
