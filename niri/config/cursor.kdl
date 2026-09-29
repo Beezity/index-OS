@@ -1,0 +1,5 @@
+// WILL OF THE CITY :: THE INDEX — managed cursor defaults
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 24
+}
