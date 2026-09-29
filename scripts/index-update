@@ -1,51 +1,35 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-
-REPO_URL="https://github.com/Beezity/index-OS.git"
-BRANCH="main"
-TMP=""
-
-cleanup(){ [[ -z "$TMP" ]] || rm -rf "$TMP"; }
-trap cleanup EXIT
-
+REPO_URL="https://github.com/Beezity/index-OS.git"; BRANCH="main"; TMP=""
+cleanup(){ [[ -z "$TMP" ]] || rm -rf "$TMP"; }; trap cleanup EXIT
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   cat <<'EOF'
 usage: index-update
 
 Downloads the latest THE INDEX main branch and reapplies the installer for the
-current supported distribution. A normal pre-install backup is created first.
+current distribution and selected compositor backend. A backup is created first.
 EOF
   exit 0
 fi
 (( $# == 0 )) || { echo "usage: index-update" >&2; exit 2; }
-
 command -v git >/dev/null 2>&1 || { echo "index-update: git is required" >&2; exit 1; }
 
+COMPOSITOR=labwc
+[[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/the-index/compositor" ]] && COMPOSITOR="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/the-index/compositor")"
+case "$COMPOSITOR" in labwc|niri) ;; *) COMPOSITOR=labwc ;; esac
+
 if [[ -r /etc/fedora-release ]] && command -v dnf >/dev/null 2>&1; then
-  INSTALLER="install-fedora.sh"
-  DISTRO="Fedora"
+  DISTRO=Fedora; [[ "$COMPOSITOR" == niri ]] && INSTALLER="install-niri-fedora.sh" || INSTALLER="install-fedora.sh"
 elif command -v pacman >/dev/null 2>&1 && [[ -r /etc/arch-release ]]; then
-  INSTALLER="install.sh"
-  DISTRO="Arch Linux"
+  DISTRO="Arch Linux"; [[ "$COMPOSITOR" == niri ]] && INSTALLER="install-niri.sh" || INSTALLER="install.sh"
 elif command -v apt-get >/dev/null 2>&1 && [[ -r /etc/os-release ]] && grep -q '^ID=debian$' /etc/os-release; then
-  INSTALLER="install-debian.sh"
-  DISTRO="Debian"
+  DISTRO=Debian; [[ "$COMPOSITOR" == niri ]] && INSTALLER="install-niri-debian.sh" || INSTALLER="install-debian.sh"
 else
-  echo "index-update: unsupported distribution" >&2
-  echo "Currently supported: Arch Linux, Fedora, Debian 13, and Debian Sid." >&2
-  exit 1
+  echo "index-update: unsupported distribution" >&2; exit 1
 fi
 
-printf 'WILL OF THE CITY :: THE INDEX\n'
-printf 'Updating THE INDEX on %s...\n' "$DISTRO"
-TMP="$(mktemp -d)"
-git clone --depth=1 --branch "$BRANCH" "$REPO_URL" "$TMP/index-OS"
-cd "$TMP/index-OS"
-
+printf 'WILL OF THE CITY :: THE INDEX\nUpdating THE INDEX (%s backend) on %s...\n' "$COMPOSITOR" "$DISTRO"
+TMP="$(mktemp -d)"; git clone --depth=1 --branch "$BRANCH" "$REPO_URL" "$TMP/index-OS"; cd "$TMP/index-OS"
 [[ -f "$INSTALLER" ]] || { echo "index-update: downloaded repository is missing $INSTALLER" >&2; exit 1; }
-
-printf 'Latest files downloaded. Running %s...\n\n' "$INSTALLER"
-bash "./$INSTALLER"
-
-printf '\nTHE INDEX update completed.\n'
-printf 'Run index-doctor to verify the installation.\n'
+printf 'Latest files downloaded. Running %s...\n\n' "$INSTALLER"; bash "./$INSTALLER"
+printf '\nTHE INDEX update completed. Run index-doctor to verify the installation.\n'
