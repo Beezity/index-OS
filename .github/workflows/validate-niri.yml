@@ -40,7 +40,7 @@ jobs:
           set -e
           if [[ "$1 $2 $3" == 'msg --json outputs' ]]; then
             cat <<'JSON'
-          {"eDP-1":{"name":"eDP-1","make":"Acer","model":"Internal","serial":"1","modes":[{"width":1920,"height":1080,"refresh_rate":144000,"is_preferred":true},{"width":1920,"height":1080,"refresh_rate":60000,"is_preferred":false}],"current_mode":0,"logical":{"x":1920,"y":0,"width":1920,"height":1080,"scale":1.0,"transform":"normal"}},"HDMI-A-1":{"name":"HDMI-A-1","make":"ASUSTeK","model":"Monitor","serial":"2","modes":[{"width":1920,"height":1080,"refresh_rate":180000,"is_preferred":true}],"current_mode":0,"logical":{"x":0,"y":0,"width":1920,"height":1080,"scale":1.0,"transform":"normal"}}}
+          {"eDP-1":{"name":"eDP-1","make":"Acer","model":"Internal","serial_number":"1","modes":[{"width":1920,"height":1080,"refresh_rate":144000,"is_preferred":true},{"width":1920,"height":1080,"refresh_rate":60000,"is_preferred":false}],"current_mode":0,"logical":{"x":1920,"y":0,"width":1920,"height":1080,"scale":1.0,"transform":"normal"}},"HDMI-A-1":{"name":"HDMI-A-1","make":"ASUSTeK","model":"Monitor","serial_number":"2","modes":[{"width":1920,"height":1080,"refresh_rate":180000,"is_preferred":true}],"current_mode":0,"logical":{"x":0,"y":0,"width":1920,"height":1080,"scale":1.0,"transform":"normal"}}}
           JSON
           elif [[ "$1" == validate ]]; then
             exit 0
@@ -51,16 +51,28 @@ jobs:
           chmod +x "$tmp/bin/niri"
           run_display() { env HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/home/.config" PATH="$tmp/bin:$PATH" NIRI_SOCKET=fake python3 scripts/index-displays "$@"; }
           state="$(run_display state)"
-          printf '%s\n' "$state"
-          printf '%s\n' "$state" | grep -q $'^@output\tHDMI-A-1\t'
+          printf '%s\n' "$state" | grep -q $'^@output\tHDMI-A-1\tASUSTeK Monitor 2\t'
           printf '%s\n' "$state" | grep -q $'^@mode\t1920\t1080\t180.000\t1\t1$'
           run_display apply eDP-1 1 1920 1080 144.000 3840 0 1.0 normal
-          cat "$tmp/home/.config/niri/outputs.kdl"
           grep -q 'output "eDP-1"' "$tmp/home/.config/niri/outputs.kdl"
           grep -q 'position x=3840 y=0' "$tmp/home/.config/niri/outputs.kdl"
+
+          # A disconnected DisplayLink output must not disappear when another
+          # live output is changed or rebased.
+          python3 - "$tmp/home/.config/the-index/displays.json" <<'PY'
+          import json, sys
+          path=sys.argv[1]
+          data=json.load(open(path))
+          data['outputs']['DVI-I-1']={
+              'name':'DVI-I-1','description':'DisplayLink USB','enabled':True,
+              'x':-1920,'y':0,'scale':1.0,'transform':'normal',
+              'modes':[{'width':1920,'height':1080,'refresh':60.0,'preferred':True,'current':True}]
+          }
+          with open(path,'w') as f: json.dump(data,f)
+          PY
           run_display set-main eDP-1
-          cat "$tmp/home/.config/niri/outputs.kdl"
           grep -q 'focus-at-startup' "$tmp/home/.config/niri/outputs.kdl"
+          grep -q 'output "DVI-I-1"' "$tmp/home/.config/niri/outputs.kdl"
 
       - name: Exercise Niri input backend
         run: |
@@ -87,11 +99,19 @@ jobs:
           test -s niri/config/outputs.kdl
           test -s niri/config/cursor.kdl
           test -s niri/config/index-autostart
+          test -s niri/config/portal/niri-portals.conf
           test -s niri/session/the-index-niri.desktop
           grep -q '^Exec=niri-session$' niri/session/the-index-niri.desktop
           grep -q 'include optional=true "custom.kdl"' niri/config/config.kdl
+          grep -q '^org.freedesktop.impl.portal.FileChooser=gtk;$' niri/config/portal/niri-portals.conf
+          grep -q '^org.freedesktop.impl.portal.Secret=gnome-keyring;$' niri/config/portal/niri-portals.conf
+          grep -q 'gnome-keyring' scripts/distro/fedora-niri.sh
+          grep -q 'gnome-keyring' scripts/distro/arch-niri.sh
+          grep -q 'gnome-keyring' scripts/distro/debian-niri.sh
           grep -q 'index-displays' quickshell/DisplaysPanel.qml
           ! grep -q 'wlr-randr' quickshell/DisplaysPanel.qml
+          grep -q 'custom.kdl' scripts/index-uninstall
+          ! grep -q 'remove "$HOME/.config/niri"' scripts/index-uninstall
           python3 - <<'PY'
           import re
           text=open('niri/config/config.kdl').read()
