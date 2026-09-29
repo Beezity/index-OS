@@ -16,6 +16,7 @@ THE INDEX keeps a compact cyan/DOS-style interface while relying on standard Lin
 - desktop atmosphere elements are rendered per monitor, including the district text, top-right quote, bottom-right standby text, centered quote ticker, and rising cyan motes
 - Prescript of the Day is rendered on every monitor from one shared global state, so all copies show and reroll the same prescript
 - centered clock, workspaces, task buttons, notification history, battery status, system tray, and `SET` control in the bar
+- task buttons are clipped before the centered clock, so many or long-titled windows cannot overrun the time display
 - centered THE INDEX application/search menu with `Super+Space` and `= expression` calculator input backed by Qalculate!
 - native Settings panels for **Network**, **Bluetooth**, **Audio**, **Appearance**, **Power**, **Displays**, and **Notifications**
 - pointer/touchpad controls integrated into Settings
@@ -28,7 +29,7 @@ THE INDEX keeps a compact cyan/DOS-style interface while relying on standard Lin
 - power profiles, battery information, brightness, screen timeout, and lid behavior
 - GTK3/GTK4, Qt, Wofi, Foot, Fastfetch, icon, cursor, and bundled font theming
 - Thunar as the default file manager with THE INDEX GTK styling
-- screenshot workflow using grim/slurp/swappy
+- screenshot workflow using grim/slurp with automatic saves to `Pictures/Screenshots`, clipboard copy, and a completion notification
 - GDM Wayland session entry
 
 ## Install
@@ -137,8 +138,11 @@ Press Enter or click the calculator result to copy it to the clipboard. The sepa
 | `Super+1` … `Super+5` | Switch workspace |
 | `Super+P` | Toggle Prescript of the Day on all monitors |
 | `Super+V` | Open clipboard history |
-| `Super+Shift+S` | Region screenshot/editor |
-| `Print` | Full screenshot |
+| `Super+Shift+S` | Select a region, save it to `Pictures/Screenshots`, and copy it to the clipboard |
+| `Print` | Save a full screenshot to `Pictures/Screenshots` and copy it to the clipboard |
+| `Shift+Print` | Select a region and copy it to the clipboard without saving |
+
+The screenshot helper creates the `Screenshots` directory automatically if it does not exist and uses timestamped filenames. It does not open an editor after capture.
 
 ## Updating
 
