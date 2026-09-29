@@ -74,6 +74,11 @@ if [[ -f "$HOME/.config/quickshell/Prescript.qml" && -f "$HOME/.config/labwc/rc.
 else
   fail "Prescript IPC toggle or Super+P binding missing"
 fi
+if [[ -f "$HOME/.config/quickshell/Bar.qml" && -f "$HOME/.config/labwc/rc.xml" ]] && grep -q 'target: "startmenu"' "$HOME/.config/quickshell/Bar.qml" && grep -q '<keybind key="W-space">' "$HOME/.config/labwc/rc.xml"; then
+  ok "launcher IPC toggle and Super+Space binding"
+else
+  fail "launcher IPC toggle or Super+Space binding missing"
+fi
 if [[ -x "$HOME/.local/bin/index-input" ]]; then
   INPUT_STATE="$("$HOME/.local/bin/index-input" state 2>/dev/null || true)"
   [[ "${INPUT_STATE%%$'\t'*}" == 1 ]] && ok "labwc input backend readable" || fail "labwc input backend unavailable"
@@ -102,7 +107,7 @@ if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -
 if has fc-match && fc-match 'Perfect DOS VGA 437' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA base font available"; else warn "Perfect DOS VGA base font could not be confirmed"; fi
 
 section "DESKTOP SERVICES"
-for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist ffmpeg notify-send playerctl upower brightnessctl; do check_cmd "$cmd"; done
+for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist qalc ffmpeg notify-send playerctl upower brightnessctl; do check_cmd "$cmd"; done
 if has systemctl; then
   for svc in NetworkManager bluetooth cups; do
     if systemctl is-enabled --quiet "$svc.service" 2>/dev/null; then ok "$svc enabled"; else warn "$svc not enabled"; fi
