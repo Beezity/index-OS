@@ -131,7 +131,7 @@ done
 
 say "installing THE INDEX helpers..."
 mkdir -p "$HOME/.local/bin"
-for helper in index-doctor index-backup index-restore index-uninstall index-update index-appearance index-audio index-network index-bluetooth index-power index-input index-clipboard index-notifications index-settings index-lock index-idle index-displays; do
+for helper in index-doctor index-backup index-restore index-uninstall index-update index-appearance index-audio index-network index-bluetooth index-power index-input index-clipboard index-notifications index-settings index-lock index-idle index-displays index-logout; do
   install -m755 "$INDEX_ROOT/scripts/$helper" "$HOME/.local/bin/$helper"
 done
 install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"
@@ -153,7 +153,7 @@ sudo systemctl enable "$INDEX_GDM_SERVICE"
 
 say "validating Niri installation..."
 NIRI_CONFIG="$CFG/niri/config.kdl" niri validate
-[[ -x "$HOME/.local/bin/index-displays" && -x "$HOME/.local/bin/index-lock" && -x "$HOME/.local/bin/index-idle" ]] || { bad "Niri helpers missing"; exit 1; }
+[[ -x "$HOME/.local/bin/index-displays" && -x "$HOME/.local/bin/index-lock" && -x "$HOME/.local/bin/index-idle" && -x "$HOME/.local/bin/index-logout" ]] || { bad "Niri helpers missing"; exit 1; }
 [[ -f "$CFG/quickshell/shell.qml" && -f "$CFG/quickshell/DisplaysPanel.qml" ]] || { bad "Quickshell installation incomplete"; exit 1; }
 [[ -f "$CFG/xdg-desktop-portal/niri-portals.conf" ]] || { bad "Niri portal preference missing"; exit 1; }
 
