@@ -11,7 +11,7 @@ sudo pacman -Syu --needed --noconfirm "${PACKAGES[@]}"; ok "all dependencies ins
 for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi qalc grim slurp wl-copy wl-paste cliphist ffmpeg notify-send nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics powerprofilesctl flock fc-cache xmllint python3; do require_command "$cmd"; done
 QS_VERSION="$(pacman -Q quickshell | awk '{print $2}' | cut -d- -f1)"; if command -v vercmp >/dev/null 2>&1 && (( $(vercmp "$QS_VERSION" 0.3.0) < 0 )); then bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; fi
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service; sudo systemctl start power-profiles-daemon.service; sudo systemctl enable gdm.service
-mkdir -p "$HOME/.local/bin" "$HOME/.config/the-index"; install -m755 "$INDEX_ROOT/scripts/index-displays" "$HOME/.local/bin/index-displays"; printf 'labwc\n' > "$HOME/.config/the-index/compositor"
+mkdir -p "$HOME/.local/bin" "$HOME/.config/the-index"; install -m755 "$INDEX_ROOT/scripts/index-displays" "$HOME/.local/bin/index-displays"; install -m755 "$INDEX_ROOT/scripts/index-logout" "$HOME/.local/bin/index-logout"; printf 'labwc\n' > "$HOME/.config/the-index/compositor"
 export INDEX_DEX_COMMAND="dex" INDEX_POLKIT_AGENT="/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1" INDEX_CURSOR_ROOT="/usr/share/icons/Adwaita" INDEX_FILE_ROLLER_DESKTOP="file-roller.desktop"
 export INDEX_REQUIRE_CURSOR_INDEX=0 INDEX_VALIDATE_CURSOR_ROOT=1 INDEX_VALIDATE_TITLEBAR_BUTTONS=1
 export INDEX_POWER_PROFILE_SERVICE="power-profiles-daemon.service"
