@@ -50,8 +50,8 @@ printf '[Icon Theme]\nInherits=%s\n' "$CURSOR_THEME" > "$HOME/.local/share/icons
 
 say "installing Niri configuration..."
 mkdir -p "$CFG/niri" "$CFG/the-index"
-# config.kdl and session startup are THE INDEX policy. The managed Settings
-# includes retain live user state across upgrades. custom.kdl is never touched.
+# Static policy is refreshed on updates. Settings-managed state and custom.kdl
+# remain user/session state and are not replaced by normal updates.
 cp -f "$INDEX_ROOT/niri/config/config.kdl" "$CFG/niri/config.kdl"
 cp -f "$INDEX_ROOT/niri/config/index-autostart" "$CFG/niri/index-autostart"
 chmod +x "$CFG/niri/index-autostart"
@@ -75,6 +75,13 @@ cp -f "$INDEX_ROOT/labwc/config/gtk/settings.ini" "$CFG/gtk-3.0/settings.ini"
 cp -f "$INDEX_ROOT/labwc/config/gtk/settings.ini" "$CFG/gtk-4.0/settings.ini"
 cp -f "$INDEX_ROOT/labwc/theme/the-index-gtk/gtk-3.0/gtk.css" "$CFG/gtk-3.0/gtk.css"
 cp -f "$INDEX_ROOT/labwc/theme/the-index-gtk/gtk-4.0/gtk.css" "$CFG/gtk-4.0/gtk.css"
+
+say "configuring Niri desktop portals..."
+mkdir -p "$CFG/xdg-desktop-portal"
+cp -f "$INDEX_ROOT/niri/config/portal/niri-portals.conf" "$CFG/xdg-desktop-portal/niri-portals.conf"
+# Niri/xdg-desktop-portal-gnome provides screencasting; THE INDEX deliberately
+# uses the GTK FileChooser so Thunar users do not require Nautilus.
+ok "Niri portal preference installed"
 
 say "installing Quickshell configuration..."
 SAVED_VID=""
@@ -128,8 +135,6 @@ for helper in index-doctor index-backup index-restore index-uninstall index-upda
   install -m755 "$INDEX_ROOT/scripts/$helper" "$HOME/.local/bin/$helper"
 done
 install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"
-# Keep index-snip installed for labwc compatibility and manual capture use;
-# the Niri keybindings use Niri's native screenshot actions.
 install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"
 
 xdg-user-dirs-update
@@ -150,6 +155,7 @@ say "validating Niri installation..."
 NIRI_CONFIG="$CFG/niri/config.kdl" niri validate
 [[ -x "$HOME/.local/bin/index-displays" && -x "$HOME/.local/bin/index-lock" && -x "$HOME/.local/bin/index-idle" ]] || { bad "Niri helpers missing"; exit 1; }
 [[ -f "$CFG/quickshell/shell.qml" && -f "$CFG/quickshell/DisplaysPanel.qml" ]] || { bad "Quickshell installation incomplete"; exit 1; }
+[[ -f "$CFG/xdg-desktop-portal/niri-portals.conf" ]] || { bad "Niri portal preference missing"; exit 1; }
 
 ok "THE INDEX Niri backend installed"
 printf '\n%s\n' "$INDEX_COMPLETION_FIRST_LINE"
