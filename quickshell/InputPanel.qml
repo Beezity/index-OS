@@ -14,6 +14,7 @@ Rectangle {
     readonly property color cyanB: "#85C5E8"
     readonly property color cyanD: "#3A7CA5"
     readonly property color warn: "#FF6B6B"
+    readonly property bool niriSession: Quickshell.env("NIRI_SOCKET") !== ""
 
     property bool backendAvailable: false
     property real pointerSpeed: 0.0
@@ -89,7 +90,7 @@ Rectangle {
 
         Text {
             visible: !root.ready || !root.backendAvailable
-            text: root.ready ? "LABWC INPUT BACKEND UNAVAILABLE" : "INPUT STATE UNAVAILABLE"
+            text: root.ready ? "COMPOSITOR INPUT BACKEND UNAVAILABLE" : "INPUT STATE UNAVAILABLE"
             font.family: root.pixel; font.pixelSize: 11; color: root.warn
         }
 
@@ -216,13 +217,15 @@ Rectangle {
         Rectangle { Layout.fillWidth: true; height: 1; color: root.cyanD }
         Text {
             Layout.fillWidth: true
-            text: "ADVANCED PER-DEVICE RULES: ~/.config/labwc/rc.xml"
+            text: root.niriSession ? "ADVANCED PER-DEVICE RULES: ~/.config/niri/config.kdl" : "ADVANCED PER-DEVICE RULES: ~/.config/labwc/rc.xml"
             wrapMode: Text.Wrap
             font.family: root.pixel; font.pixelSize: 10; color: root.cyanD
         }
         Text {
             Layout.fillWidth: true
-            text: "Changes here apply to Labwc device categories. Per-device overrides remain in Labwc configuration."
+            text: root.niriSession
+                ? "Changes here update THE INDEX's managed niri input include. Advanced per-device rules remain in niri configuration."
+                : "Changes here apply to labwc device categories. Per-device overrides remain in labwc configuration."
             wrapMode: Text.Wrap
             font.family: root.pixel; font.pixelSize: 9; color: root.cyanD
         }
