@@ -1,7 +1,7 @@
 //@ pragma UseQApplication
 // ============================================================
 //  WILL OF THE CITY :: THE INDEX — Quickshell entry point
-//  Started by labwc/config/autostart.
+//  Started by the compositor-neutral index-session-start helper.
 //  The secure lock screen is launched separately by index-lock.
 // ============================================================
 
