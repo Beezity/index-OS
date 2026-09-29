@@ -6,8 +6,20 @@ CFG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
 CONF="$CFG_ROOT/the-index/session.conf"
 LEGACY_CONF="$CFG_ROOT/labwc/index.conf"
 IDLE="$HOME/.local/bin/index-idle"
+[ -x "$IDLE" ] || IDLE="$CFG_ROOT/labwc/index-idle"
 
 sanitize() { printf '%s' "$1" | tr '\t\r\n' '   '; }
+
+backend() {
+  case "${INDEX_COMPOSITOR:-}" in niri|labwc) printf '%s' "$INDEX_COMPOSITOR"; return ;; esac
+  if [ -n "${NIRI_SOCKET:-}" ]; then printf niri; return; fi
+  case ":${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:" in
+    *:niri:*) printf niri; return ;;
+    *:labwc:*) printf labwc; return ;;
+  esac
+  [ -f "$CFG_ROOT/niri/config.kdl" ] && [ ! -f "$CFG_ROOT/labwc/rc.xml" ] && { printf niri; return; }
+  printf labwc
+}
 
 ensure_shared_config() {
   [ -f "$CONF" ] && return 0
@@ -105,6 +117,16 @@ screen_seconds() {
   [ -n "$v" ] && printf '%s' "$v" || printf '600'
 }
 
+sync_legacy_key() {
+  key=$1 value=$2
+  [ "$(backend)" = labwc ] || return 0
+  mkdir -p "$(dirname "$LEGACY_CONF")"
+  touch "$LEGACY_CONF"
+  t=$(mktemp "$LEGACY_CONF.tmp.XXXXXX")
+  { grep -v "^${key}=" "$LEGACY_CONF" || true; printf '%s=%s\n' "$key" "$value"; } > "$t"
+  mv "$t" "$LEGACY_CONF"
+}
+
 write_key() {
   key=$1 value=$2
   ensure_shared_config
@@ -120,6 +142,10 @@ write_key() {
   else
     write_locked
   fi
+  # Debian's compatibility backend still has a labwc autostart/idle script
+  # reading index.conf. Mirror only these two shared keys until Debian moves to
+  # niri; the authoritative state remains ~/.config/the-index/session.conf.
+  case "$key" in BRIGHTNESS|SCREEN_OFF_SEC) sync_legacy_key "$key" "$value" ;; esac
 }
 
 write_screen_seconds() {
