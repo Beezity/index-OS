@@ -35,7 +35,7 @@ After installation, log out and select **THE INDEX (Niri)** in GDM. The existing
 - `cursor.kdl` — managed by Appearance Settings
 - `custom.kdl` — optional user-owned advanced Niri overrides
 
-Do not put advanced manual changes into the managed files; Settings may rewrite them. Put Niri-specific custom rules, gestures, binds, layout overrides, VRR settings, output-specific advanced options, and other native options in `~/.config/niri/custom.kdl`. The installer never overwrites that file.
+Do not put advanced manual changes into the managed files; Settings may rewrite them. Put Niri-specific custom rules, gestures, binds, layout overrides, VRR settings, output-specific advanced options, and other native options in `~/.config/niri/custom.kdl`. Normal installs/updates never overwrite that file, and `index-uninstall` leaves it in place.
 
 All generated managed KDL is validated with `niri validate`; helpers restore the previous file if a generated change is invalid.
 
@@ -51,11 +51,17 @@ The labwc server-side titlebar cannot be carried over directly. Niri uses `prefe
 
 On labwc it reads/applies `wlr-randr` and delegates persistence to the existing labwc display saver. On Niri it reads structured state from `niri msg --json outputs`, writes `~/.config/niri/outputs.kdl`, validates it, and relies on Niri's live reload.
 
-The logical MAIN display is still the active output at `0,0`; on Niri it is additionally given `focus-at-startup`.
+Niri display persistence also keeps a private managed snapshot at `~/.config/the-index/displays.json`. This retains configuration for temporarily disconnected outputs, including USB/DisplayLink monitors, so changing another connected display does not erase the disconnected output's saved mode or position. The Settings panel itself still lists only outputs currently reported by Niri.
+
+The logical MAIN display is the active output at `0,0`; on Niri it is additionally given `focus-at-startup`.
+
+## Portals
+
+The Niri installers install `xdg-desktop-portal-gnome`, `xdg-desktop-portal-gtk`, and `gnome-keyring`. THE INDEX installs `~/.config/xdg-desktop-portal/niri-portals.conf` with GNOME as the general Niri portal backend so screencasting continues to use Niri/GNOME integration, while `FileChooser` is explicitly assigned to GTK. This avoids requiring Nautilus merely for file selection when the desktop's file manager is Thunar.
 
 ## Screenshots
 
-Niri uses its native screenshot actions. `Super+Shift+S` opens Niri's region selection and saves to `~/Pictures/Screenshots`; `Print` captures the focused screen; `Shift+Print` opens region selection without writing to disk. Niri also copies captures to the clipboard.
+Niri uses its native screenshot actions. `Super+Shift+S` opens Niri's region selection and saves to `~/Pictures/Screenshots`; `Print` captures the focused screen. `Shift+Print` uses the shared `index-snip copy-region` helper for a clipboard-only region capture. Niri's normal saved captures are also copied to the clipboard.
 
 The labwc backend keeps the grim/slurp `index-snip` workflow.
 
@@ -70,6 +76,7 @@ Before the backend is considered ready, test all of these in a real Niri session
 - internal laptop panel, direct HDMI/DP display, and DisplayLink output together
 - output enable/disable, resolution, refresh rate, scale, rotation and positions
 - Set Main and persistence across logout/login and hotplug
+- disconnect/reconnect DisplayLink after changing another monitor and confirm its saved position survives
 - bar, atmosphere text/motes, and the same Prescript on every output
 - per-monitor workspaces and Niri scrolling navigation
 - launcher placement and window/task activation
@@ -78,7 +85,8 @@ Before the backend is considered ready, test all of these in a real Niri session
 - pointer speed, natural scroll, tap-to-click, appearance and cursor changes
 - PipeWire audio, NetworkManager, BlueZ, notifications and clipboard history
 - Xwayland-satellite applications and games
-- screen sharing/file chooser portals
+- screen sharing through the GNOME portal and file choosing through GTK
 - `index-doctor`, `index-update`, backup/restore and uninstall
+- confirm `index-uninstall` preserves a pre-existing `~/.config/niri/custom.kdl`
 
 If a test fails, keep the Niri PR in draft and use the labwc session until the backend is fixed.
