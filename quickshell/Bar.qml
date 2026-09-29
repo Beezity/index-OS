@@ -31,8 +31,10 @@ PanelWindow {
 
     Calendar { id: calPopup }
 
+    // Each monitor gets a unique target. StartMenuState owns the public
+    // `startmenu` IPC endpoint and routes Super+Space to the active screen.
     IpcHandler {
-        target: "startmenu"
+        target: "startmenu-" + (bar.screen ? bar.screen.name : "unknown")
         function toggle(): void { bar.menuOpen = !bar.menuOpen; Sfx.play("menu") }
         function open(): void { bar.menuOpen = true }
         function close(): void { bar.menuOpen = false }
