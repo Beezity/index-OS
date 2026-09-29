@@ -21,7 +21,7 @@ PACKAGES=(
   swaybg swayidle grim slurp wl-clipboard cliphist
   foot fish wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv
   zathura zathura-pdf-mupdf pavucontrol fastfetch qalculate
-  xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk
+  xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk gnome-keyring
   libnotify playerctl polkit-kde udiskie udisks2 gvfs gvfs-mtp tumbler ffmpegthumbnailer
   NetworkManager nm-connection-editor nm-connection-editor-desktop bluez bluez-tools blueman
   pipewire pipewire-pulseaudio wireplumber gstreamer1-plugins-good gstreamer1-plugin-libav
