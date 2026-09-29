@@ -1,138 +1,86 @@
 #!/usr/bin/env bash
 set -u
-
 CYAN=$'\e[38;2;93;173;226m'; GREEN=$'\e[38;2;93;226;133m'; YELLOW=$'\e[38;2;255;210;92m'; RED=$'\e[38;2;255;107;107m'; DIM=$'\e[2m'; NC=$'\e[0m'
 PASS=0; WARN=0; FAIL=0
-
 ok(){ printf '  %s[OK]%s   %s\n' "$GREEN" "$NC" "$1"; ((PASS++)); }
 warn(){ printf '  %s[WARN]%s %s\n' "$YELLOW" "$NC" "$1"; ((WARN++)); }
 fail(){ printf '  %s[FAIL]%s %s\n' "$RED" "$NC" "$1"; ((FAIL++)); }
 section(){ printf '\n%s%s%s\n' "$CYAN" "$1" "$NC"; }
 has(){ command -v "$1" >/dev/null 2>&1; }
-check_cmd(){ if has "$1"; then ok "$1 available"; else fail "$1 missing"; fi; }
-check_file(){ if [[ -e "$1" ]]; then ok "$2"; else fail "$2 missing ($1)"; fi; }
+check_cmd(){ has "$1" && ok "$1 available" || fail "$1 missing"; }
+check_file(){ [[ -e "$1" ]] && ok "$2" || fail "$2 missing ($1)"; }
 
-printf '%sWILL OF THE CITY :: THE INDEX%s\n' "$CYAN" "$NC"
-printf '%sSYSTEM DIAGNOSTIC%s\n' "$DIM" "$NC"
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+COMPOSITOR=labwc
+[[ -f "$CFG/the-index/compositor" ]] && COMPOSITOR="$(cat "$CFG/the-index/compositor" 2>/dev/null || true)"
+case "$COMPOSITOR" in labwc|niri) ;; *) COMPOSITOR=labwc ;; esac
 
+printf '%sWILL OF THE CITY :: THE INDEX%s\n%sSYSTEM DIAGNOSTIC // %s%s\n' "$CYAN" "$NC" "$DIM" "$COMPOSITOR" "$NC"
 section "SYSTEM"
-if [[ -r /etc/os-release ]]; then
-  . /etc/os-release
-  ok "${PRETTY_NAME:-${NAME:-Linux}}"
-else
-  warn "could not read /etc/os-release"
-fi
-ok "architecture: $(uname -m)"
-printf '  %sINFO%s  kernel: %s\n' "$DIM" "$NC" "$(uname -r)"
+if [[ -r /etc/os-release ]]; then . /etc/os-release; ok "${PRETTY_NAME:-${NAME:-Linux}}"; else warn "could not read /etc/os-release"; fi
+ok "architecture: $(uname -m)"; printf '  %sINFO%s  kernel: %s\n' "$DIM" "$NC" "$(uname -r)"
 
 section "CORE"
-for cmd in labwc quickshell foot fish fastfetch wofi; do check_cmd "$cmd"; done
+for cmd in quickshell foot fish fastfetch wofi; do check_cmd "$cmd"; done
+if [[ "$COMPOSITOR" == niri ]]; then check_cmd niri; check_cmd niri-session; check_cmd xwayland-satellite; else check_cmd labwc; check_cmd wlr-randr; fi
 
 section "SESSION"
-check_file /usr/share/wayland-sessions/the-index.desktop "THE INDEX Wayland session registered"
-if has systemctl; then
-  if systemctl is-enabled --quiet gdm.service 2>/dev/null || systemctl is-enabled --quiet gdm3.service 2>/dev/null; then ok "GDM enabled"; else warn "GDM is not enabled"; fi
+if [[ "$COMPOSITOR" == niri ]]; then
+  check_file /usr/share/wayland-sessions/the-index-niri.desktop "THE INDEX (Niri) session registered"
+  check_file "$CFG/niri/config.kdl" "Niri configuration"
+  check_file "$CFG/niri/input.kdl" "Niri managed input"
+  check_file "$CFG/niri/outputs.kdl" "Niri managed outputs"
+  check_file "$CFG/niri/cursor.kdl" "Niri managed cursor"
+  check_file "$CFG/niri/index-autostart" "Niri startup"
+  if has niri && NIRI_CONFIG="$CFG/niri/config.kdl" niri validate >/dev/null 2>&1; then ok "Niri configuration validates"; else fail "Niri configuration validation failed"; fi
+  [[ -n "${NIRI_SOCKET:-}" || "${XDG_CURRENT_DESKTOP:-}" == *niri* ]] && ok "Niri session detected" || warn "doctor is not running inside a Niri session"
 else
-  warn "systemctl unavailable; GDM state not checked"
+  check_file /usr/share/wayland-sessions/the-index.desktop "THE INDEX labwc session registered"
+  check_file "$CFG/labwc/rc.xml" "labwc configuration"
+  check_file "$CFG/labwc/autostart" "labwc autostart"
+  check_file "$CFG/labwc/index-display-save" "labwc display saver"
+  check_file "$CFG/labwc/index-display-restore" "labwc display restorer"
+  [[ "${XDG_CURRENT_DESKTOP:-}" == *labwc* || "${XDG_SESSION_DESKTOP:-}" == *labwc* ]] && ok "labwc session detected" || warn "doctor is not running inside a labwc session"
 fi
-if [[ "${XDG_CURRENT_DESKTOP:-}" == *labwc* || "${XDG_SESSION_DESKTOP:-}" == *labwc* ]]; then
-  ok "labwc session detected"
-else
-  warn "current session does not identify as labwc"
-fi
+if has systemctl; then systemctl is-enabled --quiet gdm.service 2>/dev/null || systemctl is-enabled --quiet gdm3.service 2>/dev/null && ok "GDM enabled" || warn "GDM is not enabled"; fi
 
-section "INDEX CONFIG"
-check_file "$HOME/.config/labwc/rc.xml" "labwc configuration"
-check_file "$HOME/.config/labwc/autostart" "labwc autostart"
-check_file "$HOME/.config/labwc/index-display-save" "display layout saver"
-check_file "$HOME/.config/labwc/index-display-restore" "display layout restorer"
-check_file "$HOME/.config/quickshell/shell.qml" "Quickshell shell"
-check_file "$HOME/.config/quickshell/Bar.qml" "Quickshell top bar"
-check_file "$HOME/.config/quickshell/StartMenuState.qml" "launcher IPC router"
-check_file "$HOME/.config/quickshell/ClipboardPopup.qml" "Clipboard popup"
-check_file "$HOME/.local/bin/index-clipboard" "Clipboard helper"
-if [[ -x "$HOME/.local/bin/index-clipboard" ]]; then
-  CLIP_STATE="$("$HOME/.local/bin/index-clipboard" dump 2>/dev/null | head -n1 || true)"
-  [[ "$CLIP_STATE" == $'@status\t1\t'* ]] && ok "clipboard backend readable" || fail "clipboard backend unavailable"
-fi
-check_file "$HOME/.config/quickshell/Notifications.qml" "Notification server UI"
-check_file "$HOME/.config/quickshell/NotifHistory.qml" "Notification history"
-check_file "$HOME/.config/quickshell/NotificationPrefs.qml" "Notification preferences state"
-check_file "$HOME/.config/quickshell/NotificationPanel.qml" "Notification settings panel"
-check_file "$HOME/.local/bin/index-notifications" "Notification preferences helper"
-if [[ -x "$HOME/.local/bin/index-notifications" ]]; then
-  NOTIFY_STATE="$("$HOME/.local/bin/index-notifications" state 2>/dev/null || true)"
-  [[ "$NOTIFY_STATE" == $'1\t'* ]] && ok "notification preferences readable" || fail "notification preferences unavailable"
-fi
-check_file "$HOME/.config/quickshell/BluetoothMenu.qml" "Bluetooth panel"
-check_file "$HOME/.local/bin/index-bluetooth" "Bluetooth helper"
-check_file "$HOME/.config/quickshell/PowerPanel.qml" "Power panel"
-check_file "$HOME/.local/bin/index-power" "Power helper"
-check_file "$HOME/.config/quickshell/DisplaysPanel.qml" "Display panel"
-check_file "$HOME/.config/quickshell/InputPanel.qml" "Input panel"
-check_file "$HOME/.local/bin/index-input" "Input helper"
-check_file "$HOME/.config/quickshell/Prescript.qml" "Prescript widget"
-check_file "$HOME/.config/quickshell/PrescriptState.qml" "Shared Prescript state"
-check_file "$HOME/.local/bin/index-settings" "Settings utility helper"
-if [[ -f "$HOME/.config/quickshell/PrescriptState.qml" && -f "$HOME/.config/labwc/rc.xml" ]] && grep -q 'target: "prescript"' "$HOME/.config/quickshell/PrescriptState.qml" && grep -q '<keybind key="W-p">' "$HOME/.config/labwc/rc.xml"; then
-  ok "Prescript IPC toggle and Super+P binding"
-else
-  fail "Prescript IPC toggle or Super+P binding missing"
-fi
-if [[ -f "$HOME/.config/quickshell/StartMenuState.qml" && -f "$HOME/.config/quickshell/Bar.qml" && -f "$HOME/.config/labwc/rc.xml" ]] && grep -q 'target: "startmenu"' "$HOME/.config/quickshell/StartMenuState.qml" && grep -q 'target: "startmenu-"' "$HOME/.config/quickshell/Bar.qml" && grep -q '<keybind key="W-space">' "$HOME/.config/labwc/rc.xml"; then
-  ok "multimonitor launcher IPC and Super+Space binding"
-else
-  fail "launcher IPC router or Super+Space binding missing"
-fi
-if [[ -f "$HOME/.config/quickshell/shell.qml" ]] && grep -q 'model: Quickshell.screens' "$HOME/.config/quickshell/shell.qml" && grep -q 'screen: modelData' "$HOME/.config/quickshell/shell.qml"; then
-  ok "per-monitor shell surfaces enabled"
-else
-  fail "per-monitor shell surfaces missing"
-fi
-if [[ -x "$HOME/.local/bin/index-input" ]]; then
-  INPUT_STATE="$("$HOME/.local/bin/index-input" state 2>/dev/null || true)"
-  [[ "${INPUT_STATE%%$'\t'*}" == 1 ]] && ok "labwc input backend readable" || fail "labwc input backend unavailable"
-fi
-check_file "$HOME/.config/foot/foot.ini" "Foot configuration"
-check_file "$HOME/.config/fish/config.fish" "Fish configuration"
-check_file "$HOME/.config/wofi/config" "Wofi configuration"
+section "INDEX SHELL"
+for pair in \
+  "$CFG/quickshell/shell.qml|Quickshell shell" \
+  "$CFG/quickshell/Bar.qml|top bar" \
+  "$CFG/quickshell/SettingsPanel.qml|Settings panel" \
+  "$CFG/quickshell/DisplaysPanel.qml|Displays panel" \
+  "$CFG/quickshell/InputPanel.qml|Input panel" \
+  "$CFG/quickshell/PrescriptState.qml|shared Prescript state" \
+  "$HOME/.local/bin/index-displays|display backend" \
+  "$HOME/.local/bin/index-input|input backend" \
+  "$HOME/.local/bin/index-power|power backend" \
+  "$HOME/.local/bin/index-lock|lock helper" \
+  "$HOME/.local/bin/index-idle|idle helper"; do
+  check_file "${pair%%|*}" "${pair#*|}"
+done
+if [[ -f "$CFG/quickshell/shell.qml" ]] && grep -q 'model: Quickshell.screens' "$CFG/quickshell/shell.qml"; then ok "per-monitor shell surfaces enabled"; else fail "per-monitor shell surfaces missing"; fi
+if [[ -x "$HOME/.local/bin/index-input" ]]; then INPUT_STATE="$("$HOME/.local/bin/index-input" state 2>/dev/null || true)"; [[ "${INPUT_STATE%%$'\t'*}" == 1 ]] && ok "$COMPOSITOR input backend readable" || fail "$COMPOSITOR input backend unavailable"; fi
+if [[ -x "$HOME/.local/bin/index-displays" ]]; then DISPLAY_STATE="$("$HOME/.local/bin/index-displays" state 2>/dev/null | head -n1 || true)"; [[ "$DISPLAY_STATE" == $'@output\t'* ]] && ok "$COMPOSITOR display backend readable" || fail "$COMPOSITOR display backend unavailable"; fi
 
 section "THEMING"
-check_file "$HOME/.local/share/themes/the-index/labwc/themerc" "Index labwc theme"
 check_file "$HOME/.local/share/themes/the-index/gtk-3.0/gtk.css" "Index GTK3 theme"
 check_file "$HOME/.local/share/themes/the-index/gtk-4.0/gtk.css" "Index GTK4 theme"
-check_file "$HOME/.config/gtk-3.0/settings.ini" "GTK3 settings"
-check_file "$HOME/.config/gtk-3.0/gtk.css" "GTK3 user stylesheet"
-check_file "$HOME/.config/gtk-4.0/settings.ini" "GTK4 settings"
-check_file "$HOME/.config/gtk-4.0/gtk.css" "GTK4 user stylesheet"
-if [[ -f "$HOME/.config/labwc/rc.xml" ]] && grep -q '<font place="ActiveWindow"><name>Perfect DOS VGA 437 Universal</name><size>10</size></font>' "$HOME/.config/labwc/rc.xml" && grep -q '<font place="InactiveWindow"><name>Perfect DOS VGA 437 Universal</name><size>10</size></font>' "$HOME/.config/labwc/rc.xml"; then
-  ok "Labwc uses Unicode-safe DOS title font"
-else
-  fail "Labwc Unicode-safe title font setting missing"
-fi
-if [[ -f "$HOME/.config/gtk-3.0/gtk.css" ]] && grep -q '^\.thunar menubar > menuitem' "$HOME/.config/gtk-3.0/gtk.css"; then ok "Thunar GTK polish rules installed"; else fail "Thunar GTK polish rules missing"; fi
-if [[ -f /usr/share/icons/Papirus-Dark/index.theme ]]; then ok "Papirus-Dark icon theme"; else fail "Papirus-Dark icon theme missing"; fi
-if [[ -d /usr/share/icons/Adwaita/cursors ]]; then ok "Adwaita cursor theme"; else fail "Adwaita cursor theme missing"; fi
-if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA Universal font available"; else warn "Perfect DOS VGA Universal font could not be confirmed"; fi
-if has fc-match && fc-match 'Perfect DOS VGA 437' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA base font available"; else warn "Perfect DOS VGA base font could not be confirmed"; fi
+check_file "$CFG/gtk-3.0/settings.ini" "GTK3 settings"
+check_file "$CFG/gtk-4.0/settings.ini" "GTK4 settings"
+[[ -f /usr/share/icons/Papirus-Dark/index.theme ]] && ok "Papirus-Dark icon theme" || fail "Papirus-Dark icon theme missing"
+[[ -d /usr/share/icons/Adwaita/cursors ]] && ok "Adwaita cursor theme" || fail "Adwaita cursor theme missing"
+has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS' && ok "Perfect DOS VGA Universal font available" || warn "Universal DOS font could not be confirmed"
 
 section "DESKTOP SERVICES"
-for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist qalc ffmpeg notify-send playerctl upower brightnessctl wlr-randr; do check_cmd "$cmd"; done
+for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist qalc ffmpeg notify-send playerctl upower brightnessctl; do check_cmd "$cmd"; done
 if has systemctl; then
-  for svc in NetworkManager bluetooth cups; do
-    if systemctl is-enabled --quiet "$svc.service" 2>/dev/null; then ok "$svc enabled"; else warn "$svc not enabled"; fi
-  done
-  if systemctl is-active --quiet power-profiles-daemon.service 2>/dev/null || systemctl is-active --quiet tuned-ppd.service 2>/dev/null; then
-    ok "power profile backend active"
-  else
-    warn "power profile backend not active"
-  fi
+  for svc in NetworkManager bluetooth cups; do systemctl is-enabled --quiet "$svc.service" 2>/dev/null && ok "$svc enabled" || warn "$svc not enabled"; done
+  if systemctl is-active --quiet power-profiles-daemon.service 2>/dev/null || systemctl is-active --quiet tuned-ppd.service 2>/dev/null; then ok "power profile backend active"; else warn "power profile backend not active"; fi
 fi
-if has pgrep && pgrep -x pipewire >/dev/null 2>&1; then ok "PipeWire running"; else warn "PipeWire not detected in current session"; fi
-if has pgrep && pgrep -x wireplumber >/dev/null 2>&1; then ok "WirePlumber running"; else warn "WirePlumber not detected in current session"; fi
+pgrep -x pipewire >/dev/null 2>&1 && ok "PipeWire running" || warn "PipeWire not detected"
+pgrep -x wireplumber >/dev/null 2>&1 && ok "WirePlumber running" || warn "WirePlumber not detected"
 
 section "RESULT"
 printf '  %s%d passed%s / %s%d warnings%s / %s%d failed%s\n' "$GREEN" "$PASS" "$NC" "$YELLOW" "$WARN" "$NC" "$RED" "$FAIL" "$NC"
-
-if (( FAIL > 0 )); then exit 1; fi
-exit 0
+(( FAIL == 0 ))
