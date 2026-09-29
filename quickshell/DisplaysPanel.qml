@@ -1,6 +1,6 @@
 // WILL OF THE CITY :: THE INDEX — display settings subpanel
-// Uses wlroots output management through wlr-randr. State is refreshed on
-// open and after writes; there is no permanent output polling loop.
+// The QML layer stays compositor-neutral. index-displays is authoritative for
+// reading/applying/persisting outputs on both labwc and niri.
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -16,13 +16,12 @@ Rectangle {
     readonly property color cyanB: "#85C5E8"
     readonly property color cyanD: "#3A7CA5"
     readonly property color warn: "#FF6B6B"
-    readonly property string saveHelper: Quickshell.env("HOME") + "/.config/labwc/index-display-save"
+    readonly property string helper: Quickshell.env("HOME") + "/.local/bin/index-displays"
 
     property var outputs: []
     property int selectedIndex: -1
     property string statusText: ""
     property bool backendAvailable: true
-
     property bool draftEnabled: true
     property int draftWidth: 0
     property int draftHeight: 0
@@ -36,68 +35,28 @@ Rectangle {
     readonly property var transformChoices: ["normal", "90", "180", "270"]
 
     function selectedOutput() {
-        if (selectedIndex < 0 || selectedIndex >= outputs.length) return null
-        return outputs[selectedIndex]
+        return selectedIndex >= 0 && selectedIndex < outputs.length ? outputs[selectedIndex] : null
     }
 
     function parseState(raw) {
         var result = []
-        var lines = raw.split(/\r?\n/)
         var current = null
-        var readingModes = false
+        var lines = raw.split(/\r?\n/)
         for (var i = 0; i < lines.length; i++) {
-            var line = lines[i]
-            if (line.length > 0 && !/^\s/.test(line)) {
-                var h = line.match(/^(\S+)\s+"(.*)"$/)
-                if (!h) h = line.match(/^(\S+)(?:\s+(.*))?$/)
-                if (!h) continue
+            if (lines[i] === "") continue
+            var p = lines[i].split("\t")
+            if (p[0] === "@output" && p.length >= 8) {
                 current = {
-                    name: h[1],
-                    description: h[2] || h[1],
-                    enabled: false,
-                    x: 0,
-                    y: 0,
-                    scale: 1.0,
-                    transform: "normal",
-                    modes: []
+                    name: p[1], description: p[2] || p[1], enabled: p[3] === "1",
+                    x: parseInt(p[4]) || 0, y: parseInt(p[5]) || 0,
+                    scale: parseFloat(p[6]) || 1.0, transform: p[7] || "normal", modes: []
                 }
                 result.push(current)
-                readingModes = false
-                continue
-            }
-            if (!current) continue
-            var t = line.trim()
-            if (t.indexOf("Enabled:") === 0) {
-                current.enabled = t.slice(8).trim() === "yes"
-                readingModes = false
-            } else if (t === "Modes:") {
-                readingModes = true
-            } else if (readingModes) {
-                var m = t.match(/^(\d+)x(\d+)\s+px(?:,\s*([0-9.]+)\s+Hz)?(?:\s+\(([^)]*)\))?$/)
-                if (m) {
-                    var flags = m[4] || ""
-                    current.modes.push({
-                        width: parseInt(m[1]),
-                        height: parseInt(m[2]),
-                        refresh: m[3] ? parseFloat(m[3]) : 0,
-                        preferred: flags.indexOf("preferred") >= 0,
-                        current: flags.indexOf("current") >= 0
-                    })
-                    continue
-                }
-                readingModes = false
-            }
-            if (t.indexOf("Position:") === 0) {
-                var p = t.slice(9).trim().split(",")
-                if (p.length === 2) {
-                    current.x = parseInt(p[0]) || 0
-                    current.y = parseInt(p[1]) || 0
-                }
-            } else if (t.indexOf("Transform:") === 0) {
-                current.transform = t.slice(10).trim() || "normal"
-            } else if (t.indexOf("Scale:") === 0) {
-                var s = parseFloat(t.slice(6).trim())
-                current.scale = isNaN(s) ? 1.0 : s
+            } else if (p[0] === "@mode" && current && p.length >= 6) {
+                current.modes.push({
+                    width: parseInt(p[1]) || 0, height: parseInt(p[2]) || 0,
+                    refresh: parseFloat(p[3]) || 0, preferred: p[4] === "1", current: p[5] === "1"
+                })
             }
         }
         return result
@@ -105,302 +64,172 @@ Rectangle {
 
     function currentMode(output) {
         if (!output) return null
-        for (var i = 0; i < output.modes.length; i++)
-            if (output.modes[i].current) return output.modes[i]
-        for (var j = 0; j < output.modes.length; j++)
-            if (output.modes[j].preferred) return output.modes[j]
-        return output.modes.length > 0 ? output.modes[0] : null
+        for (var i = 0; i < output.modes.length; i++) if (output.modes[i].current) return output.modes[i]
+        for (var j = 0; j < output.modes.length; j++) if (output.modes[j].preferred) return output.modes[j]
+        return output.modes.length ? output.modes[0] : null
     }
 
     function loadDraft() {
-        var o = selectedOutput()
-        if (!o) return
+        var o = selectedOutput(); if (!o) return
         var m = currentMode(o)
         draftEnabled = o.enabled
         draftWidth = m ? m.width : 0
         draftHeight = m ? m.height : 0
         draftRefresh = m ? m.refresh : 0
-        draftX = o.x
-        draftY = o.y
-        draftScale = o.scale || 1.0
-        draftTransform = o.transform || "normal"
+        draftX = o.x; draftY = o.y; draftScale = o.scale || 1.0; draftTransform = o.transform || "normal"
     }
 
-    function selectOutput(i) {
-        if (i < 0 || i >= outputs.length) return
-        selectedIndex = i
-        loadDraft()
-    }
+    function selectOutput(i) { if (i >= 0 && i < outputs.length) { selectedIndex = i; loadDraft() } }
 
     function resolutionChoices() {
-        var o = selectedOutput()
-        if (!o) return []
-        var out = []
-        var seen = ({})
+        var o = selectedOutput(); if (!o) return []
+        var out = [], seen = ({})
         for (var i = 0; i < o.modes.length; i++) {
             var key = o.modes[i].width + "x" + o.modes[i].height
-            if (!seen[key]) {
-                seen[key] = true
-                out.push({ width: o.modes[i].width, height: o.modes[i].height, label: key })
-            }
+            if (!seen[key]) { seen[key] = true; out.push({ width: o.modes[i].width, height: o.modes[i].height }) }
         }
         return out
     }
 
     function refreshChoices() {
-        var o = selectedOutput()
-        if (!o) return []
-        var out = []
-        var seen = ({})
+        var o = selectedOutput(); if (!o) return []
+        var out = [], seen = ({})
         for (var i = 0; i < o.modes.length; i++) {
             var m = o.modes[i]
             if (m.width !== draftWidth || m.height !== draftHeight || m.refresh <= 0) continue
             var key = m.refresh.toFixed(3)
-            if (!seen[key]) {
-                seen[key] = true
-                out.push(m.refresh)
-            }
+            if (!seen[key]) { seen[key] = true; out.push(m.refresh) }
         }
         out.sort(function(a, b) { return b - a })
         return out
     }
 
     function cycleResolution(step) {
-        var choices = resolutionChoices()
-        if (choices.length === 0) return
+        var c = resolutionChoices(); if (!c.length) return
         var idx = 0
-        for (var i = 0; i < choices.length; i++)
-            if (choices[i].width === draftWidth && choices[i].height === draftHeight) { idx = i; break }
-        idx = (idx + step + choices.length) % choices.length
-        draftWidth = choices[idx].width
-        draftHeight = choices[idx].height
-        var rates = refreshChoices()
-        if (rates.length > 0) draftRefresh = rates[0]
+        for (var i = 0; i < c.length; i++) if (c[i].width === draftWidth && c[i].height === draftHeight) { idx = i; break }
+        idx = (idx + step + c.length) % c.length
+        draftWidth = c[idx].width; draftHeight = c[idx].height
+        var rates = refreshChoices(); draftRefresh = rates.length ? rates[0] : 0
     }
 
     function cycleRefresh(step) {
-        var choices = refreshChoices()
-        if (choices.length === 0) return
-        var idx = 0
-        var best = 999
-        for (var i = 0; i < choices.length; i++) {
-            var d = Math.abs(choices[i] - draftRefresh)
-            if (d < best) { best = d; idx = i }
-        }
-        idx = (idx + step + choices.length) % choices.length
-        draftRefresh = choices[idx]
+        var c = refreshChoices(); if (!c.length) return
+        var idx = 0, best = 999999
+        for (var i = 0; i < c.length; i++) { var d = Math.abs(c[i] - draftRefresh); if (d < best) { best = d; idx = i } }
+        draftRefresh = c[(idx + step + c.length) % c.length]
     }
 
     function cycleScale(step) {
-        var idx = 0
-        var best = 999
-        for (var i = 0; i < scaleChoices.length; i++) {
-            var d = Math.abs(scaleChoices[i] - draftScale)
-            if (d < best) { best = d; idx = i }
-        }
-        idx = (idx + step + scaleChoices.length) % scaleChoices.length
-        draftScale = scaleChoices[idx]
+        var idx = 0, best = 999
+        for (var i = 0; i < scaleChoices.length; i++) { var d = Math.abs(scaleChoices[i] - draftScale); if (d < best) { best = d; idx = i } }
+        draftScale = scaleChoices[(idx + step + scaleChoices.length) % scaleChoices.length]
     }
 
     function cycleTransform(step) {
-        var idx = transformChoices.indexOf(draftTransform)
-        if (idx < 0) idx = 0
-        idx = (idx + step + transformChoices.length) % transformChoices.length
-        draftTransform = transformChoices[idx]
+        var idx = transformChoices.indexOf(draftTransform); if (idx < 0) idx = 0
+        draftTransform = transformChoices[(idx + step + transformChoices.length) % transformChoices.length]
     }
 
-    function enabledCount() {
-        var n = 0
-        for (var i = 0; i < outputs.length; i++) if (outputs[i].enabled) n++
-        return n
-    }
+    function enabledCount() { var n = 0; for (var i = 0; i < outputs.length; i++) if (outputs[i].enabled) n++; return n }
 
     function applySelected() {
-        var o = selectedOutput()
-        if (!o || applyProc.running) return
-        if (!draftEnabled && o.enabled && enabledCount() <= 1) {
-            statusText = "CANNOT DISABLE THE LAST ACTIVE DISPLAY"
-            return
-        }
-        var args = ["wlr-randr", "--output", o.name]
-        if (!draftEnabled) {
-            args.push("--off")
-        } else {
-            args.push("--on")
-            if (draftWidth > 0 && draftHeight > 0) {
-                var mode = draftWidth + "x" + draftHeight
-                if (draftRefresh > 0) mode += "@" + draftRefresh.toFixed(3) + "Hz"
-                args.push("--mode", mode)
-            } else {
-                args.push("--preferred")
-            }
-            args.push("--pos", draftX + "," + draftY)
-            args.push("--scale", draftScale.toFixed(2))
-            args.push("--transform", draftTransform)
-        }
-        statusText = "APPLYING..."
-        applyProc.exec(args)
+        var o = selectedOutput(); if (!o || applyProc.running) return
+        if (!draftEnabled && o.enabled && enabledCount() <= 1) { statusText = "CANNOT DISABLE THE LAST ACTIVE DISPLAY"; return }
+        statusText = "APPLYING + SAVING..."
+        applyProc.exec([helper, "apply", o.name, draftEnabled ? "1" : "0",
+            String(draftWidth), String(draftHeight), draftRefresh.toFixed(3),
+            String(draftX), String(draftY), draftScale.toFixed(4), draftTransform])
     }
 
     function setMain() {
-        var selected = selectedOutput()
-        if (!selected || !selected.enabled || mainProc.running) return
-        var dx = selected.x
-        var dy = selected.y
-        var args = ["wlr-randr"]
-        for (var i = 0; i < outputs.length; i++) {
-            var o = outputs[i]
-            if (!o.enabled) continue
-            args.push("--output", o.name, "--pos", (o.x - dx) + "," + (o.y - dy))
-        }
+        var o = selectedOutput(); if (!o || !o.enabled || mainProc.running) return
         statusText = "SETTING MAIN DISPLAY..."
-        mainProc.exec(args)
+        mainProc.exec([helper, "set-main", o.name])
     }
 
-    function refresh() {
-        if (!stateProc.running) {
-            statusText = "READING OUTPUTS..."
-            stateProc.running = true
-        }
-    }
-
+    function refresh() { if (!stateProc.running) { statusText = "READING OUTPUTS..."; stateProc.running = true } }
     Component.onCompleted: if (visible) refresh()
     onVisibleChanged: if (visible) refresh()
 
     Process {
         id: stateProc
-        command: ["wlr-randr"]
+        command: [root.helper, "state"]
         stdout: StdioCollector {
             onStreamFinished: {
+                var previousName = root.selectedOutput() ? root.selectedOutput().name : ""
                 var parsed = root.parseState(text)
-                root.backendAvailable = parsed.length > 0
-                root.outputs = parsed
-                if (parsed.length === 0) {
-                    root.selectedIndex = -1
-                    root.statusText = "WLR OUTPUT BACKEND UNAVAILABLE"
-                } else {
-                    if (root.selectedIndex < 0 || root.selectedIndex >= parsed.length) root.selectedIndex = 0
-                    root.loadDraft()
-                    root.statusText = ""
-                }
+                root.outputs = parsed; root.backendAvailable = parsed.length > 0
+                if (!parsed.length) { root.selectedIndex = -1; root.statusText = "DISPLAY BACKEND UNAVAILABLE"; return }
+                var next = 0
+                if (previousName !== "") for (var i = 0; i < parsed.length; i++) if (parsed[i].name === previousName) { next = i; break }
+                root.selectedIndex = next; root.loadDraft(); root.statusText = ""
             }
         }
     }
 
     Process {
-        id: applyProc
-        command: ["true"]
+        id: applyProc; command: ["true"]
         onExited: function(exitCode, exitStatus) {
-            if (exitCode === 0) {
-                root.statusText = "DISPLAY UPDATED"
-                saveProc.exec([root.saveHelper])
-                refreshDelay.restart()
-            } else {
-                root.statusText = "DISPLAY UPDATE FAILED"
-            }
+            root.statusText = exitCode === 0 ? "DISPLAY UPDATED + SAVED" : "DISPLAY UPDATE FAILED"
+            if (exitCode === 0) refreshDelay.restart()
         }
     }
-
     Process {
-        id: mainProc
-        command: ["true"]
+        id: mainProc; command: ["true"]
         onExited: function(exitCode, exitStatus) {
-            if (exitCode === 0) {
-                root.statusText = "MAIN DISPLAY UPDATED"
-                saveProc.exec([root.saveHelper])
-                refreshDelay.restart()
-            } else {
-                root.statusText = "MAIN DISPLAY UPDATE FAILED"
-            }
+            root.statusText = exitCode === 0 ? "MAIN DISPLAY UPDATED" : "MAIN DISPLAY UPDATE FAILED"
+            if (exitCode === 0) refreshDelay.restart()
         }
     }
-
-    Process { id: saveProc; command: [root.saveHelper] }
+    Process { id: advancedProc; command: ["true"] }
     Timer { id: refreshDelay; interval: 450; repeat: false; onTriggered: root.refresh() }
 
     ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 14
-        spacing: 10
-
+        anchors.fill: parent; anchors.margins: 14; spacing: 10
         RowLayout {
             Layout.fillWidth: true
             Text { Layout.fillWidth: true; text: ">_ DISPLAYS_"; font.family: root.pixel; font.pixelSize: 17; color: root.cyanB }
-            Text {
-                text: "<_ BACK"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanD
-                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.requestBack() }
-            }
+            Text { text: "<_ BACK"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanD; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.requestBack() } }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: root.cyanD }
-
-        Text {
-            Layout.fillWidth: true
-            text: "SELECT OUTPUT"
-            font.family: root.pixel; font.pixelSize: 12; color: root.cyanB
-        }
+        Text { text: "SELECT OUTPUT"; font.family: root.pixel; font.pixelSize: 12; color: root.cyanB }
 
         ListView {
-            id: outputList
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(176, Math.max(44, root.outputs.length * 44))
-            clip: true
-            spacing: 5
-            model: root.outputs
+            id: outputList; Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(176, Math.max(44, root.outputs.length * 44)); clip: true; spacing: 5; model: root.outputs
             delegate: Rectangle {
-                required property var modelData
-                required property int index
+                required property var modelData; required property int index
                 width: outputList.width; height: 39
                 readonly property bool selected: index === root.selectedIndex
                 readonly property bool main: modelData.enabled && modelData.x === 0 && modelData.y === 0
                 color: selected ? root.cyanD : (outMa.containsMouse ? "#143245" : "#0c1620")
                 border.color: selected ? root.cyan : root.cyanD; border.width: 1
                 Column {
-                    anchors.left: parent.left; anchors.right: statusLabel.left
-                    anchors.leftMargin: 8; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
-                    spacing: 1
+                    anchors.left: parent.left; anchors.right: statusLabel.left; anchors.leftMargin: 8; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 1
                     Text { width: parent.width; text: modelData.name; font.family: root.pixel; font.pixelSize: 12; color: parent.parent.selected ? "#04141c" : root.cyanB; elide: Text.ElideRight }
                     Text { width: parent.width; text: modelData.description; font.family: root.pixel; font.pixelSize: 9; color: parent.parent.selected ? "#082b3c" : root.cyanD; elide: Text.ElideRight }
                 }
-                Text {
-                    id: statusLabel
-                    anchors.right: parent.right; anchors.rightMargin: 7; anchors.verticalCenter: parent.verticalCenter
-                    text: parent.main ? "MAIN" : (modelData.enabled ? "ON" : "OFF")
-                    font.family: root.pixel; font.pixelSize: 9
-                    color: parent.selected ? "#04141c" : (parent.main ? root.cyanB : root.cyanD)
-                }
+                Text { id: statusLabel; anchors.right: parent.right; anchors.rightMargin: 7; anchors.verticalCenter: parent.verticalCenter; text: parent.main ? "MAIN" : (modelData.enabled ? "ON" : "OFF"); font.family: root.pixel; font.pixelSize: 9; color: parent.selected ? "#04141c" : root.cyanD }
                 MouseArea { id: outMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.selectOutput(index) }
             }
         }
 
-        Text {
-            visible: !root.backendAvailable
-            Layout.fillWidth: true
-            text: "wlr-randr could not read outputs."
-            font.family: root.pixel; font.pixelSize: 11; color: root.warn
-            wrapMode: Text.WordWrap
-        }
+        Text { visible: !root.backendAvailable; Layout.fillWidth: true; text: "The active compositor could not report any outputs."; font.family: root.pixel; font.pixelSize: 11; color: root.warn; wrapMode: Text.WordWrap }
 
         ColumnLayout {
-            visible: root.selectedOutput() !== null
-            Layout.fillWidth: true
-            spacing: 8
-
+            visible: root.selectedOutput() !== null; Layout.fillWidth: true; spacing: 8
             RowLayout {
                 Layout.fillWidth: true; spacing: 6
                 Rectangle {
-                    Layout.fillWidth: true; height: 30
-                    color: root.draftEnabled ? root.cyan : "transparent"
-                    border.color: root.cyanD; border.width: 1
+                    Layout.fillWidth: true; height: 30; color: root.draftEnabled ? root.cyan : "transparent"; border.color: root.cyanD; border.width: 1
                     Text { anchors.centerIn: parent; text: root.draftEnabled ? "ENABLED" : "DISABLED"; font.family: root.pixel; font.pixelSize: 11; color: root.draftEnabled ? "#04141c" : root.cyanB }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.draftEnabled = !root.draftEnabled }
                 }
                 Rectangle {
                     Layout.fillWidth: true; height: 30
-                    readonly property bool isMain: {
-                        var o = root.selectedOutput(); return o && o.enabled && o.x === 0 && o.y === 0
-                    }
-                    color: isMain ? root.cyan : "transparent"
-                    border.color: root.cyanD; border.width: 1
+                    readonly property bool isMain: { var o = root.selectedOutput(); return o && o.enabled && o.x === 0 && o.y === 0 }
+                    color: isMain ? root.cyan : "transparent"; border.color: root.cyanD; border.width: 1
                     Text { anchors.centerIn: parent; text: parent.isMain ? "MAIN" : "SET MAIN"; font.family: root.pixel; font.pixelSize: 11; color: parent.isMain ? "#04141c" : root.cyanB }
                     MouseArea { anchors.fill: parent; enabled: root.selectedOutput() && root.selectedOutput().enabled; cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor; onClicked: root.setMain() }
                 }
@@ -409,124 +238,52 @@ Rectangle {
             Text { text: "RESOLUTION"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanD }
             RowLayout {
                 Layout.fillWidth: true; spacing: 5
-                Repeater {
-                    model: ["<", root.draftWidth > 0 ? (root.draftWidth + "x" + root.draftHeight) : "preferred", ">"]
-                    delegate: Rectangle {
-                        required property var modelData
-                        required property int index
-                        Layout.fillWidth: index === 1
-                        width: index === 1 ? 180 : 34; height: 28
-                        color: index === 1 ? "#0c1620" : (resMa.containsMouse ? "#143245" : "transparent")
-                        border.color: root.cyanD; border.width: 1
-                        Text { anchors.centerIn: parent; text: modelData; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
-                        MouseArea { id: resMa; anchors.fill: parent; hoverEnabled: index !== 1; enabled: index !== 1; cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor; onClicked: root.cycleResolution(index === 0 ? -1 : 1) }
-                    }
-                }
+                Rectangle { width: 34; height: 28; color: resLeft.containsMouse ? "#143245" : "transparent"; border.color: root.cyanD; Text { anchors.centerIn: parent; text: "<"; font.family: root.pixel; color: root.cyanB } MouseArea { id: resLeft; anchors.fill: parent; hoverEnabled: true; onClicked: root.cycleResolution(-1) } }
+                Rectangle { Layout.fillWidth: true; height: 28; color: "#0c1620"; border.color: root.cyanD; Text { anchors.centerIn: parent; text: root.draftWidth > 0 ? root.draftWidth + "x" + root.draftHeight : "preferred"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB } }
+                Rectangle { width: 34; height: 28; color: resRight.containsMouse ? "#143245" : "transparent"; border.color: root.cyanD; Text { anchors.centerIn: parent; text: ">"; font.family: root.pixel; color: root.cyanB } MouseArea { id: resRight; anchors.fill: parent; hoverEnabled: true; onClicked: root.cycleResolution(1) } }
             }
 
             Text { text: "REFRESH RATE"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanD }
             RowLayout {
                 Layout.fillWidth: true; spacing: 5
-                Repeater {
-                    model: ["<", root.draftRefresh > 0 ? (root.draftRefresh.toFixed(3) + " Hz") : "default", ">"]
-                    delegate: Rectangle {
-                        required property var modelData
-                        required property int index
-                        Layout.fillWidth: index === 1
-                        width: index === 1 ? 180 : 34; height: 28
-                        color: index === 1 ? "#0c1620" : (rateMa.containsMouse ? "#143245" : "transparent")
-                        border.color: root.cyanD; border.width: 1
-                        Text { anchors.centerIn: parent; text: modelData; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
-                        MouseArea { id: rateMa; anchors.fill: parent; hoverEnabled: index !== 1; enabled: index !== 1; cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor; onClicked: root.cycleRefresh(index === 0 ? -1 : 1) }
-                    }
-                }
+                Rectangle { width: 34; height: 28; color: rateLeft.containsMouse ? "#143245" : "transparent"; border.color: root.cyanD; Text { anchors.centerIn: parent; text: "<"; font.family: root.pixel; color: root.cyanB } MouseArea { id: rateLeft; anchors.fill: parent; hoverEnabled: true; onClicked: root.cycleRefresh(-1) } }
+                Rectangle { Layout.fillWidth: true; height: 28; color: "#0c1620"; border.color: root.cyanD; Text { anchors.centerIn: parent; text: root.draftRefresh > 0 ? root.draftRefresh.toFixed(3) + " Hz" : "default"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB } }
+                Rectangle { width: 34; height: 28; color: rateRight.containsMouse ? "#143245" : "transparent"; border.color: root.cyanD; Text { anchors.centerIn: parent; text: ">"; font.family: root.pixel; color: root.cyanB } MouseArea { id: rateRight; anchors.fill: parent; hoverEnabled: true; onClicked: root.cycleRefresh(1) } }
             }
 
             RowLayout {
                 Layout.fillWidth: true; spacing: 8
                 ColumnLayout {
-                    Layout.fillWidth: true; spacing: 3
+                    Layout.fillWidth: true
                     Text { text: "SCALE"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanD }
-                    RowLayout {
-                        spacing: 4
-                        Text { text: "<"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.cycleScale(-1) } }
-                        Text { text: root.draftScale.toFixed(2) + "x"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
-                        Text { text: ">"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.cycleScale(1) } }
-                    }
+                    RowLayout { Text { text: "<"; font.family: root.pixel; color: root.cyanB; MouseArea { anchors.fill: parent; onClicked: root.cycleScale(-1) } } Text { text: root.draftScale.toFixed(2) + "x"; font.family: root.pixel; color: root.cyanB } Text { text: ">"; font.family: root.pixel; color: root.cyanB; MouseArea { anchors.fill: parent; onClicked: root.cycleScale(1) } } }
                 }
                 ColumnLayout {
-                    Layout.fillWidth: true; spacing: 3
+                    Layout.fillWidth: true
                     Text { text: "ROTATION"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanD }
-                    RowLayout {
-                        spacing: 4
-                        Text { text: "<"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.cycleTransform(-1) } }
-                        Text { text: root.draftTransform; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
-                        Text { text: ">"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.cycleTransform(1) } }
-                    }
+                    RowLayout { Text { text: "<"; font.family: root.pixel; color: root.cyanB; MouseArea { anchors.fill: parent; onClicked: root.cycleTransform(-1) } } Text { text: root.draftTransform; font.family: root.pixel; color: root.cyanB } Text { text: ">"; font.family: root.pixel; color: root.cyanB; MouseArea { anchors.fill: parent; onClicked: root.cycleTransform(1) } } }
                 }
             }
 
             Text { text: "POSITION"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanD }
             RowLayout {
                 Layout.fillWidth: true; spacing: 8
-                Text { text: "X"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
-                Rectangle {
-                    Layout.fillWidth: true; height: 28; color: "#0c1620"; border.color: root.cyanD; border.width: 1
-                    TextInput {
-                        anchors.fill: parent; anchors.margins: 6
-                        text: String(root.draftX); selectByMouse: true
-                        inputMethodHints: Qt.ImhFormattedNumbersOnly
-                        font.family: root.pixel; font.pixelSize: 11; color: root.cyanB
-                        onEditingFinished: { var v = parseInt(text); if (!isNaN(v)) root.draftX = v; text = String(root.draftX) }
-                    }
-                }
-                Text { text: "Y"; font.family: root.pixel; font.pixelSize: 11; color: root.cyanB }
-                Rectangle {
-                    Layout.fillWidth: true; height: 28; color: "#0c1620"; border.color: root.cyanD; border.width: 1
-                    TextInput {
-                        anchors.fill: parent; anchors.margins: 6
-                        text: String(root.draftY); selectByMouse: true
-                        inputMethodHints: Qt.ImhFormattedNumbersOnly
-                        font.family: root.pixel; font.pixelSize: 11; color: root.cyanB
-                        onEditingFinished: { var v = parseInt(text); if (!isNaN(v)) root.draftY = v; text = String(root.draftY) }
-                    }
-                }
+                Text { text: "X"; font.family: root.pixel; color: root.cyanB }
+                Rectangle { Layout.fillWidth: true; height: 28; color: "#0c1620"; border.color: root.cyanD; TextInput { anchors.fill: parent; anchors.margins: 6; text: String(root.draftX); selectByMouse: true; font.family: root.pixel; color: root.cyanB; onEditingFinished: { var v=parseInt(text); if (!isNaN(v)) root.draftX=v; text=String(root.draftX) } } }
+                Text { text: "Y"; font.family: root.pixel; color: root.cyanB }
+                Rectangle { Layout.fillWidth: true; height: 28; color: "#0c1620"; border.color: root.cyanD; TextInput { anchors.fill: parent; anchors.margins: 6; text: String(root.draftY); selectByMouse: true; font.family: root.pixel; color: root.cyanB; onEditingFinished: { var v=parseInt(text); if (!isNaN(v)) root.draftY=v; text=String(root.draftY) } } }
             }
 
-            Text {
-                Layout.fillWidth: true
-                text: "MAIN is the output at 0,0. SET MAIN rebases every active display while preserving their relative layout."
-                font.family: root.pixel; font.pixelSize: 9; color: root.cyanD
-                wrapMode: Text.WordWrap
-            }
+            Text { Layout.fillWidth: true; text: "MAIN is the output at 0,0. SET MAIN preserves relative placement. Advanced compositor-specific options stay in the native config/tool."; font.family: root.pixel; font.pixelSize: 9; color: root.cyanD; wrapMode: Text.WordWrap }
 
             RowLayout {
                 Layout.fillWidth: true; spacing: 6
-                Rectangle {
-                    Layout.fillWidth: true; height: 32
-                    color: applyMa.containsMouse ? root.cyan : "transparent"
-                    border.color: root.cyan; border.width: 1
-                    Text { anchors.centerIn: parent; text: "APPLY + SAVE"; font.family: root.pixel; font.pixelSize: 11; color: applyMa.containsMouse ? "#04141c" : root.cyanB }
-                    MouseArea { id: applyMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.applySelected() }
-                }
-                Rectangle {
-                    width: 82; height: 32
-                    color: refreshMa.containsMouse ? "#143245" : "transparent"
-                    border.color: root.cyanD; border.width: 1
-                    Text { anchors.centerIn: parent; text: "REFRESH"; font.family: root.pixel; font.pixelSize: 10; color: root.cyanB }
-                    MouseArea { id: refreshMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.refresh() }
-                }
+                Rectangle { Layout.fillWidth: true; height: 32; color: applyMa.containsMouse ? root.cyan : "transparent"; border.color: root.cyan; Text { anchors.centerIn: parent; text: "APPLY + SAVE"; font.family: root.pixel; font.pixelSize: 11; color: applyMa.containsMouse ? "#04141c" : root.cyanB } MouseArea { id: applyMa; anchors.fill: parent; hoverEnabled: true; onClicked: root.applySelected() } }
+                Rectangle { width: 82; height: 32; color: refreshMa.containsMouse ? "#143245" : "transparent"; border.color: root.cyanD; Text { anchors.centerIn: parent; text: "REFRESH"; font.family: root.pixel; font.pixelSize: 10; color: root.cyanB } MouseArea { id: refreshMa; anchors.fill: parent; hoverEnabled: true; onClicked: root.refresh() } }
             }
         }
 
         Item { Layout.fillHeight: true }
-        Text {
-            Layout.fillWidth: true
-            visible: root.statusText !== ""
-            text: root.statusText
-            font.family: root.pixel; font.pixelSize: 10
-            color: root.statusText.indexOf("FAILED") >= 0 || root.statusText.indexOf("CANNOT") >= 0 || root.statusText.indexOf("UNAVAILABLE") >= 0 ? root.warn : root.cyanD
-            wrapMode: Text.WordWrap
-        }
+        Text { Layout.fillWidth: true; visible: root.statusText !== ""; text: root.statusText; font.family: root.pixel; font.pixelSize: 10; color: root.statusText.indexOf("FAILED") >= 0 || root.statusText.indexOf("CANNOT") >= 0 || root.statusText.indexOf("UNAVAILABLE") >= 0 ? root.warn : root.cyanD; wrapMode: Text.WordWrap }
     }
 }
