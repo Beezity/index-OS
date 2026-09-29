@@ -42,7 +42,13 @@ else
   check_file "$CFG/labwc/index-display-restore" "labwc display restorer"
   [[ "${XDG_CURRENT_DESKTOP:-}" == *labwc* || "${XDG_SESSION_DESKTOP:-}" == *labwc* ]] && ok "labwc session detected" || warn "doctor is not running inside a labwc session"
 fi
-if has systemctl; then systemctl is-enabled --quiet gdm.service 2>/dev/null || systemctl is-enabled --quiet gdm3.service 2>/dev/null && ok "GDM enabled" || warn "GDM is not enabled"; fi
+if has systemctl; then
+  if systemctl is-enabled --quiet gdm.service 2>/dev/null || systemctl is-enabled --quiet gdm3.service 2>/dev/null; then
+    ok "GDM enabled"
+  else
+    warn "GDM is not enabled"
+  fi
+fi
 
 section "INDEX SHELL"
 for pair in \
