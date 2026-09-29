@@ -1,0 +1,28 @@
+// WILL OF THE CITY :: THE INDEX — managed input state
+// INDEX_POINTER_SPEED=0.00
+// INDEX_NATURAL_SCROLL=no
+// INDEX_TAP_CLICK=yes
+// This file is owned by index-input. Put advanced per-device rules in config.kdl.
+
+input {
+    keyboard {
+        xkb { }
+    }
+
+    mouse {
+        accel-speed 0.00
+        accel-profile "adaptive"
+    }
+
+    touchpad {
+        tap
+        dwt
+        accel-speed 0.00
+        accel-profile "adaptive"
+    }
+
+    trackpoint {
+        accel-speed 0.00
+        accel-profile "adaptive"
+    }
+}

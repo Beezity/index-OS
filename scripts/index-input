@@ -1,18 +1,129 @@
 #!/bin/sh
-# WILL OF THE CITY :: THE INDEX — labwc input settings helper
+# WILL OF THE CITY :: THE INDEX — compositor-aware input settings helper
 set -eu
 
-RC="${INDEX_INPUT_RC:-${XDG_CONFIG_HOME:-$HOME/.config}/labwc/rc.xml}"
-LOCK="${RC}.input.lock"
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+LABWC_RC="${INDEX_INPUT_RC:-$CFG/labwc/rc.xml}"
+LABWC_LOCK="${LABWC_RC}.input.lock"
+NIRI_INPUT="${INDEX_NIRI_INPUT:-$CFG/niri/index-input.kdl}"
+NIRI_LOCK="${NIRI_INPUT}.lock"
 
 sanitize() { printf '%s' "$1" | tr '\t\r\n' '   '; }
 valid_speed() { printf '%s\n' "$1" | grep -Eq '^-?(0([.][0-9]+)?|1([.]0+)?)$'; }
 
-need_backend() {
-  [ -f "$RC" ] || { echo "input backend unavailable: $RC" >&2; exit 1; }
+backend() {
+  case "${INDEX_INPUT_BACKEND:-${INDEX_COMPOSITOR:-}}" in
+    niri|labwc) printf '%s' "${INDEX_INPUT_BACKEND:-$INDEX_COMPOSITOR}"; return ;;
+  esac
+  if [ -n "${NIRI_SOCKET:-}" ]; then printf niri; return; fi
+  case ":${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:" in
+    *:niri:*) printf niri; return ;;
+    *:labwc:*) printf labwc; return ;;
+  esac
+  if [ -f "$NIRI_INPUT" ] && [ ! -f "$LABWC_RC" ]; then printf niri; else printf labwc; fi
 }
 
-managed_value() {
+touchpad_present() {
+  for f in /sys/class/input/event*/device/name /sys/class/input/input*/name; do
+    [ -r "$f" ] || continue
+    name=$(cat "$f" 2>/dev/null || true)
+    printf '%s\n' "$name" | grep -Eqi 'touchpad|trackpad' && { printf '1'; return; }
+  done
+  grep -Eqi 'touchpad|trackpad' /proc/bus/input/devices 2>/dev/null && printf '1' || printf '0'
+}
+
+# ----------------------------- niri backend -----------------------------
+niri_marker() {
+  key=$1
+  sed -n "s|^// INDEX_${key}=||p" "$NIRI_INPUT" 2>/dev/null | tail -n1
+}
+
+niri_state_values() {
+  speed=$(niri_marker POINTER_SPEED || true)
+  natural=$(niri_marker NATURAL_SCROLL || true)
+  tap=$(niri_marker TAP_CLICK || true)
+  valid=1
+  if ! valid_speed "$speed"; then speed=0.00; valid=0; fi
+  case "$natural" in yes|no) ;; *) natural=no; valid=0 ;; esac
+  case "$tap" in yes|no) ;; *) tap=yes; valid=0 ;; esac
+  printf '%s\t%s\t%s\t%s' "$valid" "$speed" "$natural" "$tap"
+}
+
+write_niri_unlocked() {
+  speed=$1 natural=$2 tap=$3
+  dir=$(dirname "$NIRI_INPUT")
+  mkdir -p "$dir"
+  tmp=$(mktemp "$dir/.index-input.kdl.XXXXXX")
+  trap 'rm -f "$tmp"' EXIT HUP INT TERM
+  {
+    printf '%s\n' '// WILL OF THE CITY :: THE INDEX — managed input state'
+    printf '// INDEX_POINTER_SPEED=%s\n' "$speed"
+    printf '// INDEX_NATURAL_SCROLL=%s\n' "$natural"
+    printf '// INDEX_TAP_CLICK=%s\n' "$tap"
+    printf '%s\n\n' '// This file is owned by index-input. Keep advanced per-device rules in config.kdl.'
+    printf '%s\n' 'input {'
+    printf '%s\n' '    keyboard {' '        xkb { }' '    }' ''
+    printf '%s\n' '    mouse {'
+    printf '        accel-speed %s\n' "$speed"
+    printf '%s\n' '        accel-profile "adaptive"'
+    [ "$natural" = yes ] && printf '%s\n' '        natural-scroll'
+    printf '%s\n' '    }' ''
+    printf '%s\n' '    touchpad {'
+    [ "$tap" = yes ] && printf '%s\n' '        tap'
+    printf '%s\n' '        dwt'
+    printf '        accel-speed %s\n' "$speed"
+    printf '%s\n' '        accel-profile "adaptive"'
+    [ "$natural" = yes ] && printf '%s\n' '        natural-scroll'
+    printf '%s\n' '    }' ''
+    printf '%s\n' '    trackpoint {'
+    printf '        accel-speed %s\n' "$speed"
+    printf '%s\n' '        accel-profile "adaptive"'
+    [ "$natural" = yes ] && printf '%s\n' '        natural-scroll'
+    printf '%s\n' '    }' '}'
+  } > "$tmp"
+  chmod 600 "$tmp" 2>/dev/null || true
+  mv "$tmp" "$NIRI_INPUT"
+  trap - EXIT HUP INT TERM
+}
+
+write_niri() {
+  speed=$1 natural=$2 tap=$3
+  if command -v flock >/dev/null 2>&1; then
+    ( flock -x 9; write_niri_unlocked "$speed" "$natural" "$tap" ) 9>"$NIRI_LOCK"
+  else
+    write_niri_unlocked "$speed" "$natural" "$tap"
+  fi
+}
+
+niri_set() {
+  key=$1 value=$2
+  values=$(niri_state_values)
+  speed=$(printf '%s' "$values" | cut -f2)
+  natural=$(printf '%s' "$values" | cut -f3)
+  tap=$(printf '%s' "$values" | cut -f4)
+  case "$key" in
+    speed) speed=$value ;;
+    natural) natural=$value ;;
+    tap) tap=$value ;;
+    *) return 2 ;;
+  esac
+  write_niri "$speed" "$natural" "$tap"
+  # Niri live-reloads included configuration files automatically. A bad write
+  # should still be surfaced immediately when the validator is available.
+  if command -v niri >/dev/null 2>&1; then
+    niri validate >/dev/null 2>&1 || {
+      echo "niri rejected the updated input configuration" >&2
+      return 1
+    }
+  fi
+}
+
+# ---------------------------- labwc backend -----------------------------
+labwc_need_backend() {
+  [ -f "$LABWC_RC" ] || { echo "input backend unavailable: $LABWC_RC" >&2; exit 1; }
+}
+
+labwc_managed_value() {
   tag=$1 scope=$2
   awk -v tag="$tag" -v scope="$scope" '
     /<device[^>]*category="default"[^>]*>/ { managed=(scope == "pointer") }
@@ -28,16 +139,7 @@ managed_value() {
       }
     }
     /<\/device>/ { managed=0 }
-  ' "$RC" 2>/dev/null | head -n1
-}
-
-touchpad_present() {
-  for f in /sys/class/input/event*/device/name /sys/class/input/input*/name; do
-    [ -r "$f" ] || continue
-    name=$(cat "$f" 2>/dev/null || true)
-    printf '%s\n' "$name" | grep -Eqi 'touchpad|trackpad' && { printf '1'; return; }
-  done
-  grep -Eqi 'touchpad|trackpad' /proc/bus/input/devices 2>/dev/null && printf '1' || printf '0'
+  ' "$LABWC_RC" 2>/dev/null | head -n1
 }
 
 reload_labwc() {
@@ -46,9 +148,9 @@ reload_labwc() {
   labwc --reconfigure >/dev/null 2>&1 || true
 }
 
-replace_managed_unlocked() {
+replace_labwc_unlocked() {
   tag=$1 value=$2 scope=$3
-  dir=$(dirname "$RC")
+  dir=$(dirname "$LABWC_RC")
   tmp=$(mktemp "$dir/.rc.xml.input.XXXXXX")
   trap 'rm -f "$tmp"' EXIT HUP INT TERM
   awk -v tag="$tag" -v value="$value" -v scope="$scope" '
@@ -67,47 +169,60 @@ replace_managed_unlocked() {
     { print }
     /<\/device>/ { managed=0 }
     END { if (found == 0) exit 3 }
-  ' "$RC" > "$tmp" || {
+  ' "$LABWC_RC" > "$tmp" || {
     status=$?
     rm -f "$tmp"
     trap - EXIT HUP INT TERM
-    [ "$status" -eq 3 ] && echo "input setting missing from managed Labwc device categories: $tag" >&2
+    [ "$status" -eq 3 ] && echo "input setting missing from managed labwc device categories: $tag" >&2
     return "$status"
   }
-  if cmp -s "$RC" "$tmp"; then
+  if cmp -s "$LABWC_RC" "$tmp"; then
     rm -f "$tmp"
     trap - EXIT HUP INT TERM
     return 0
   fi
-  chmod --reference="$RC" "$tmp" 2>/dev/null || true
-  mv "$tmp" "$RC"
+  chmod --reference="$LABWC_RC" "$tmp" 2>/dev/null || true
+  mv "$tmp" "$LABWC_RC"
   trap - EXIT HUP INT TERM
 }
 
-replace_managed() {
-  need_backend
+replace_labwc() {
+  labwc_need_backend
   tag=$1 value=$2 scope=$3
   if command -v flock >/dev/null 2>&1; then
-    ( flock -x 9; replace_managed_unlocked "$tag" "$value" "$scope" ) 9>"$LOCK"
+    ( flock -x 9; replace_labwc_unlocked "$tag" "$value" "$scope" ) 9>"$LABWC_LOCK"
   else
-    replace_managed_unlocked "$tag" "$value" "$scope"
+    replace_labwc_unlocked "$tag" "$value" "$scope"
   fi
   reload_labwc
 }
 
 state() {
-  if [ ! -f "$RC" ]; then
-    printf '0\t0.00\tno\t0\tyes\n'
-    return 0
-  fi
-  speed=$(managed_value pointerSpeed pointer || true)
-  natural=$(managed_value naturalScroll pointer || true)
-  tap=$(managed_value tap touchpad || true)
+  b=$(backend)
   touchpad=$(touchpad_present)
-  valid=1
-  if ! valid_speed "$speed"; then speed=0.00; valid=0; fi
-  case "$natural" in yes|no) ;; *) natural=no; valid=0 ;; esac
-  case "$tap" in yes|no) ;; *) tap=yes; [ "$touchpad" = 1 ] && valid=0 ;; esac
+  if [ "$b" = niri ]; then
+    if [ ! -f "$NIRI_INPUT" ]; then
+      printf '0\t0.00\tno\t%s\tyes\n' "$touchpad"
+      return 0
+    fi
+    values=$(niri_state_values)
+    valid=$(printf '%s' "$values" | cut -f1)
+    speed=$(printf '%s' "$values" | cut -f2)
+    natural=$(printf '%s' "$values" | cut -f3)
+    tap=$(printf '%s' "$values" | cut -f4)
+  else
+    if [ ! -f "$LABWC_RC" ]; then
+      printf '0\t0.00\tno\t%s\tyes\n' "$touchpad"
+      return 0
+    fi
+    speed=$(labwc_managed_value pointerSpeed pointer || true)
+    natural=$(labwc_managed_value naturalScroll pointer || true)
+    tap=$(labwc_managed_value tap touchpad || true)
+    valid=1
+    if ! valid_speed "$speed"; then speed=0.00; valid=0; fi
+    case "$natural" in yes|no) ;; *) natural=no; valid=0 ;; esac
+    case "$tap" in yes|no) ;; *) tap=yes; [ "$touchpad" = 1 ] && valid=0 ;; esac
+  fi
   printf '%s\t%s\t%s\t%s\t%s\n' "$valid" "$(sanitize "$speed")" "$natural" "$touchpad" "$tap"
 }
 
@@ -119,17 +234,17 @@ case "${1:-}" in
   set-speed)
     [ "$#" -eq 2 ] || exit 2
     valid_speed "$2" || { echo "invalid pointer speed: $2" >&2; exit 2; }
-    replace_managed pointerSpeed "$2" pointer
+    if [ "$(backend)" = niri ]; then niri_set speed "$2"; else replace_labwc pointerSpeed "$2" pointer; fi
     ;;
   set-natural-scroll)
     [ "$#" -eq 2 ] || exit 2
     case "$2" in yes|no) ;; *) echo "invalid natural-scroll value: $2" >&2; exit 2 ;; esac
-    replace_managed naturalScroll "$2" pointer
+    if [ "$(backend)" = niri ]; then niri_set natural "$2"; else replace_labwc naturalScroll "$2" pointer; fi
     ;;
   set-tap)
     [ "$#" -eq 2 ] || exit 2
     case "$2" in yes|no) ;; *) echo "invalid tap value: $2" >&2; exit 2 ;; esac
-    replace_managed tap "$2" touchpad
+    if [ "$(backend)" = niri ]; then niri_set tap "$2"; else replace_labwc tap "$2" touchpad; fi
     ;;
   *)
     echo "usage: index-input {state|set-speed VALUE|set-natural-scroll yes|no|set-tap yes|no}" >&2

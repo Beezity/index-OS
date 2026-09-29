@@ -7,7 +7,7 @@ export INDEX_ROOT
 source "$SCRIPT_DIR/common.sh"
 trap 'bad "installation failed at line $LINENO"; exit 1' ERR
 
-say "WILL OF THE CITY :: THE INDEX — Debian/labwc"
+say "WILL OF THE CITY :: THE INDEX — Debian/labwc compatibility backend"
 command -v apt-get >/dev/null 2>&1 || { bad "Debian with apt is required."; exit 1; }
 [[ -r /etc/os-release ]] || { bad "could not read /etc/os-release"; exit 1; }
 . /etc/os-release
@@ -24,6 +24,7 @@ else
   exit 1
 fi
 note "detected $DEBIAN_LABEL"
+note "niri is not yet the supported Debian backend; retaining labwc for this release"
 validate_repository_layout
 
 say "backing up files managed by THE INDEX..."
@@ -86,9 +87,11 @@ for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi qalc grim s
   require_command "$cmd"
 done
 
+# WindowManager/ext-workspace support used by THE INDEX landed in Quickshell
+# 0.3.1. Debian Trixie backports and Sid both provide this release.
 QS_VERSION="$(dpkg-query -W -f='${Version}' quickshell 2>/dev/null | sed 's/^[0-9]*://' | cut -d- -f1)"
-if dpkg --compare-versions "$QS_VERSION" lt 0.3.0; then
-  bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"
+if dpkg --compare-versions "$QS_VERSION" lt 0.3.1; then
+  bad "quickshell >= 0.3.1 is required; installed: $QS_VERSION"
   exit 1
 fi
 ok "Quickshell $QS_VERSION"
@@ -100,6 +103,7 @@ sudo systemctl enable --now NetworkManager.service bluetooth.service cups.servic
 sudo systemctl start power-profiles-daemon.service
 sudo systemctl enable gdm3.service
 
+export INDEX_COMPOSITOR=labwc
 export INDEX_DEX_COMMAND="dex"
 export INDEX_POLKIT_AGENT="$POLKIT_AGENT"
 export INDEX_CURSOR_ROOT="/usr/share/icons/Adwaita"

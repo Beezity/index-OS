@@ -2,10 +2,35 @@
 # WILL OF THE CITY :: THE INDEX — power/idle policy helper
 set -eu
 
-CONF="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/index.conf"
-IDLE="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/index-idle"
+CFG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONF="$CFG_ROOT/the-index/session.conf"
+LEGACY_CONF="$CFG_ROOT/labwc/index.conf"
+IDLE="$HOME/.local/bin/index-idle"
+[ -x "$IDLE" ] || IDLE="$CFG_ROOT/labwc/index-idle"
 
 sanitize() { printf '%s' "$1" | tr '\t\r\n' '   '; }
+
+backend() {
+  case "${INDEX_COMPOSITOR:-}" in niri|labwc) printf '%s' "$INDEX_COMPOSITOR"; return ;; esac
+  if [ -n "${NIRI_SOCKET:-}" ]; then printf niri; return; fi
+  case ":${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:" in
+    *:niri:*) printf niri; return ;;
+    *:labwc:*) printf labwc; return ;;
+  esac
+  [ -f "$CFG_ROOT/niri/config.kdl" ] && [ ! -f "$CFG_ROOT/labwc/rc.xml" ] && { printf niri; return; }
+  printf labwc
+}
+
+ensure_shared_config() {
+  [ -f "$CONF" ] && return 0
+  mkdir -p "$(dirname "$CONF")"
+  if [ -f "$LEGACY_CONF" ]; then
+    grep -E '^(BRIGHTNESS|SCREEN_OFF_SEC)=' "$LEGACY_CONF" > "$CONF" 2>/dev/null || : > "$CONF"
+  else
+    : > "$CONF"
+  fi
+  chmod 600 "$CONF" 2>/dev/null || true
+}
 
 profile_get() {
   if command -v powerprofilesctl >/dev/null 2>&1; then
@@ -87,18 +112,29 @@ lid_action() {
 }
 
 screen_seconds() {
+  ensure_shared_config
   v=$(sed -n 's/^SCREEN_OFF_SEC=\([0-9][0-9]*\)$/\1/p' "$CONF" 2>/dev/null | tail -1 || true)
   [ -n "$v" ] && printf '%s' "$v" || printf '600'
 }
 
+sync_legacy_key() {
+  key=$1 value=$2
+  [ "$(backend)" = labwc ] || return 0
+  mkdir -p "$(dirname "$LEGACY_CONF")"
+  touch "$LEGACY_CONF"
+  t=$(mktemp "$LEGACY_CONF.tmp.XXXXXX")
+  { grep -v "^${key}=" "$LEGACY_CONF" || true; printf '%s=%s\n' "$key" "$value"; } > "$t"
+  mv "$t" "$LEGACY_CONF"
+}
+
 write_key() {
   key=$1 value=$2
-  mkdir -p "$(dirname "$CONF")"
-  touch "$CONF"
+  ensure_shared_config
   lock="$CONF.lock"
   write_locked() {
     t=$(mktemp "$CONF.tmp.XXXXXX")
     { grep -v "^${key}=" "$CONF" || true; printf '%s=%s\n' "$key" "$value"; } > "$t"
+    chmod 600 "$t" 2>/dev/null || true
     mv "$t" "$CONF"
   }
   if command -v flock >/dev/null 2>&1; then
@@ -106,6 +142,10 @@ write_key() {
   else
     write_locked
   fi
+  # Debian's compatibility backend still has a labwc autostart/idle script
+  # reading index.conf. Mirror only these two shared keys until Debian moves to
+  # niri; the authoritative state remains ~/.config/the-index/session.conf.
+  case "$key" in BRIGHTNESS|SCREEN_OFF_SEC) sync_legacy_key "$key" "$value" ;; esac
 }
 
 write_screen_seconds() {
@@ -113,7 +153,8 @@ write_screen_seconds() {
   case "$v" in ''|*[!0-9]*) echo "invalid screen timeout: $v" >&2; exit 2 ;; esac
   write_key SCREEN_OFF_SEC "$v"
   if [ -x "$IDLE" ]; then
-    setsid sh "$IDLE" >/dev/null 2>&1 &
+    pkill -x swayidle >/dev/null 2>&1 || true
+    setsid "$IDLE" >/dev/null 2>&1 &
   fi
 }
 

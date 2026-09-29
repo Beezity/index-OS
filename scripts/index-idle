@@ -1,0 +1,30 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — compositor-aware idle policy
+set -eu
+
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/the-index/session.conf"
+TIMEOUT=600
+if [ -f "$CONF" ]; then
+  v=$(sed -n 's/^SCREEN_OFF_SEC=\([0-9][0-9]*\)$/\1/p' "$CONF" | tail -n1)
+  [ -n "${v:-}" ] && TIMEOUT="$v"
+fi
+
+pkill -x swayidle >/dev/null 2>&1 || true
+[ "$TIMEOUT" -gt 0 ] || exit 0
+
+if [ -n "${NIRI_SOCKET:-}" ] && command -v niri >/dev/null 2>&1; then
+  exec swayidle -w \
+    timeout "$TIMEOUT" 'niri msg action power-off-monitors >/dev/null 2>&1' \
+    resume 'niri msg action power-on-monitors >/dev/null 2>&1' \
+    before-sleep "$HOME/.local/bin/index-lock"
+fi
+
+if command -v wlopm >/dev/null 2>&1; then
+  exec swayidle -w \
+    timeout "$TIMEOUT" 'wlopm --off "*"' \
+    resume 'wlopm --on "*"' \
+    before-sleep "$HOME/.local/bin/index-lock"
+fi
+
+# Lock-before-sleep still works even when output-power control is unavailable.
+exec swayidle -w before-sleep "$HOME/.local/bin/index-lock"

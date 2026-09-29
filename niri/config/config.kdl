@@ -1,0 +1,162 @@
+// WILL OF THE CITY :: THE INDEX — niri compositor
+// Managed settings are split into small include files so Settings can update
+// input/output/cursor state without rewriting the hand-maintained base config.
+
+include "index-input.kdl"
+include "index-cursor.kdl"
+include "index-outputs.kdl"
+
+environment {
+    QT_QPA_PLATFORM "wayland"
+    MOZ_ENABLE_WAYLAND "1"
+    GTK_THEME "the-index"
+}
+
+// Niri-session already owns XDG autostart and portal activation. This process
+// starts only THE INDEX-specific user services and shell surfaces.
+spawn-sh-at-startup "$HOME/.local/bin/index-session-start"
+
+prefer-no-csd
+screenshot-path "~/Pictures/Screenshots/screenshot_%Y-%m-%d_%H-%M-%S.png"
+
+hotkey-overlay {
+    skip-at-startup
+    hide-not-bound
+}
+
+overview {
+    backdrop-color "#05080d"
+}
+
+layout {
+    gaps 6
+    center-focused-column "on-overflow"
+
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+        proportion 1.0
+    }
+    default-column-width { proportion 0.5; }
+
+    focus-ring { off; }
+    border {
+        width 2
+        active-color "#5DADE2"
+        inactive-color "#173247"
+        urgent-color "#FF6B6B"
+    }
+
+    shadow {
+        on
+        softness 18
+        spread 2
+        offset x=0 y=4
+        color "#0008"
+    }
+}
+
+// Keep transient utility windows from consuming a full scrolling column.
+window-rule {
+    match title=r#"^(Open File|Save File|Open Folder|Select Folder)$"#
+    open-floating true
+}
+window-rule {
+    match app-id=r#"(?i)(pavucontrol|nm-connection-editor|blueman-manager|org\.gnome\.FileRoller)$"#
+    open-floating true
+}
+window-rule {
+    match app-id=r#"(?i)(firefox|zen|zen-browser)$"# title="^Picture-in-Picture$"
+    open-floating true
+}
+
+binds {
+    // Existing THE INDEX shortcuts.
+    Mod+Return hotkey-overlay-title="Terminal" { spawn "foot"; }
+    Mod+Space repeat=false hotkey-overlay-title="THE INDEX launcher" { spawn-sh "qs ipc call startmenu toggle || quickshell ipc call startmenu toggle"; }
+    Mod+D hotkey-overlay-title="Wofi launcher" { spawn "wofi" "--show" "drun"; }
+    Mod+Q repeat=false { close-window; }
+    Mod+F { maximize-column; }
+    Mod+Shift+F { fullscreen-window; }
+    Mod+L repeat=false hotkey-overlay-title="Lock" { spawn-sh "$HOME/.local/bin/index-lock"; }
+    Mod+P repeat=false hotkey-overlay-title="Prescript" { spawn-sh "qs ipc call prescript toggle || quickshell ipc call prescript toggle"; }
+    Mod+V repeat=false hotkey-overlay-title="Clipboard history" { spawn-sh "qs ipc call clipboard toggle || quickshell ipc call clipboard toggle"; }
+    Mod+Shift+O repeat=false hotkey-overlay-title="About system" { spawn-sh "qs ipc call aboutsystem toggle || quickshell ipc call aboutsystem toggle"; }
+
+    // Niri's overview is a core part of the scrolling workflow. Super+O is
+    // reserved for it; About System moves to Super+Shift+O above.
+    Mod+O repeat=false hotkey-overlay-title="Overview" { toggle-overview; }
+
+    // Scrolling layout navigation.
+    Mod+Left { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Up { focus-window-up; }
+    Mod+Down { focus-window-down; }
+    Mod+H { focus-column-left; }
+    Mod+J { focus-window-down; }
+    Mod+K { focus-window-up; }
+
+    Mod+Ctrl+Left { move-column-left; }
+    Mod+Ctrl+Right { move-column-right; }
+    Mod+Ctrl+Up { move-window-up; }
+    Mod+Ctrl+Down { move-window-down; }
+    Mod+Ctrl+H { move-column-left; }
+    Mod+Ctrl+J { move-window-down; }
+    Mod+Ctrl+K { move-window-up; }
+
+    Mod+Shift+Left { focus-monitor-left; }
+    Mod+Shift+Right { focus-monitor-right; }
+    Mod+Shift+Up { focus-monitor-up; }
+    Mod+Shift+Down { focus-monitor-down; }
+    Mod+Ctrl+Shift+Left { move-column-to-monitor-left; }
+    Mod+Ctrl+Shift+Right { move-column-to-monitor-right; }
+    Mod+Ctrl+Shift+Up { move-column-to-monitor-up; }
+    Mod+Ctrl+Shift+Down { move-column-to-monitor-down; }
+
+    Mod+Page_Down { focus-workspace-down; }
+    Mod+Page_Up { focus-workspace-up; }
+    Mod+Ctrl+Page_Down { move-column-to-workspace-down; }
+    Mod+Ctrl+Page_Up { move-column-to-workspace-up; }
+    Mod+WheelScrollDown cooldown-ms=150 { focus-workspace-down; }
+    Mod+WheelScrollUp cooldown-ms=150 { focus-workspace-up; }
+    Mod+Shift+WheelScrollDown { focus-column-right; }
+    Mod+Shift+WheelScrollUp { focus-column-left; }
+
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+Ctrl+1 { move-column-to-workspace 1; }
+    Mod+Ctrl+2 { move-column-to-workspace 2; }
+    Mod+Ctrl+3 { move-column-to-workspace 3; }
+    Mod+Ctrl+4 { move-column-to-workspace 4; }
+    Mod+Ctrl+5 { move-column-to-workspace 5; }
+
+    Mod+BracketLeft { consume-or-expel-window-left; }
+    Mod+BracketRight { consume-or-expel-window-right; }
+    Mod+R { switch-preset-column-width; }
+    Mod+Shift+R { switch-preset-column-width-back; }
+    Mod+C { center-column; }
+    Mod+Shift+V { toggle-window-floating; }
+    Mod+W { toggle-column-tabbed-display; }
+
+    // Keep the DMS-inspired screenshot behavior implemented by index-snip.
+    Mod+Shift+S repeat=false { spawn-sh "$HOME/.local/bin/index-snip region"; }
+    Print repeat=false { spawn-sh "$HOME/.local/bin/index-snip full"; }
+    Shift+Print repeat=false { spawn-sh "$HOME/.local/bin/index-snip copy-region"; }
+
+    XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+5%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "5%-"; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+ -l 1.0"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"; }
+    XF86AudioMute allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
+    XF86AudioPlay allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioNext allow-when-locked=true { spawn "playerctl" "next"; }
+    XF86AudioPrev allow-when-locked=true { spawn "playerctl" "previous"; }
+
+    Mod+Shift+Slash { show-hotkey-overlay; }
+    Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
+    Mod+Shift+E repeat=false hotkey-overlay-title="Log out" { quit; }
+}

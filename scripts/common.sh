@@ -14,8 +14,12 @@ note(){ printf '   %s%s%s\n' "$DIM" "$1" "$NC"; }
 require_command(){ command -v "$1" >/dev/null 2>&1 || { bad "required command missing after installation: $1"; return 1; }; }
 require_file(){ [[ -f "$INDEX_ROOT/$1" ]] || { bad "repository file missing: $1"; return 1; }; }
 
+# Keep both compositor backends in the repository during migration. Fedora and
+# Arch install niri; Debian retains the proven labwc backend until an official
+# Debian niri package is available from the supported release repositories.
 INDEX_REQUIRED_FILES=(
   wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/BluetoothMenu.qml quickshell/PowerPanel.qml quickshell/DisplaysPanel.qml quickshell/InputPanel.qml quickshell/ClipboardPopup.qml quickshell/Notifications.qml quickshell/NotifHistory.qml quickshell/NotificationPrefs.qml quickshell/NotificationPanel.qml quickshell/Prescript.qml quickshell/PrescriptState.qml quickshell/StartMenuState.qml quickshell/lock/lock.qml quickshell/prescript.json
+  niri/config/config.kdl niri/config/index-input.kdl niri/config/index-cursor.kdl niri/config/index-outputs.kdl niri/config/portal/niri-portals.conf niri/session/the-index.desktop
   labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment
   labwc/config/index-lock labwc/config/index-idle labwc/config/index-clip labwc/config/index-display-save labwc/config/index-display-restore
   labwc/config/fontconfig/fonts.conf labwc/config/gtk/settings.ini
@@ -24,8 +28,10 @@ INDEX_REQUIRED_FILES=(
   labwc/theme/the-index/labwc/themerc
   labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme
   labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps labwc/session/the-index.desktop
-  fish/config.fish install-fish.sh install-fedora.sh patch-fedora.sh setup.sh
-  scripts/common.sh scripts/install-common.sh scripts/distro/fedora.sh scripts/distro/fedora-patch.sh
+  fish/config.fish install-fish.sh install-fedora.sh patch-fedora.sh patch-niri-fedora.sh setup.sh
+  scripts/common.sh scripts/install-common.sh scripts/install-niri-common.sh
+  scripts/distro/fedora.sh scripts/distro/fedora-patch.sh scripts/distro/fedora-niri-patch.sh
+  scripts/index-session-start scripts/index-lock scripts/index-logout scripts/index-idle scripts/index-display-save scripts/index-display-restore
   scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications scripts/index-settings
 )
 validate_repository_layout(){

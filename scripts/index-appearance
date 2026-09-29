@@ -2,10 +2,13 @@
 # WILL OF THE CITY :: THE INDEX — appearance preferences
 set -eu
 
-CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/the-index"
+ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
+CFG_DIR="$ROOT/the-index"
 CFG="$CFG_DIR/appearance.conf"
-LABWC="${XDG_CONFIG_HOME:-$HOME/.config}/labwc"
-DEFAULT_WALL="$LABWC/wall.png"
+LABWC="$ROOT/labwc"
+NIRI="$ROOT/niri"
+DEFAULT_WALL="$CFG_DIR/wall.png"
+LEGACY_WALL="$LABWC/wall.png"
 CACHE_DIR="${INDEX_APPEARANCE_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/the-index/appearance}"
 PICTURES_DIR="${INDEX_APPEARANCE_PICTURES_DIR:-$HOME/Pictures}"
 mkdir -p "$CFG_DIR"
@@ -18,6 +21,7 @@ setv() {
   key=$1 value=$2
   tmp=$(mktemp "$CFG_DIR/.appearance.XXXXXX")
   { [ -f "$CFG" ] && grep -v "^${key}=" "$CFG" || true; printf '%s=%s\n' "$key" "$value"; } > "$tmp"
+  chmod 600 "$tmp" 2>/dev/null || true
   mv "$tmp" "$CFG"
 }
 
@@ -46,10 +50,7 @@ list_wallpapers() {
     -print 2>/dev/null | LC_ALL=C sort -f
 }
 
-cache_path() {
-  printf '%s/%s.list' "$CACHE_DIR" "$1"
-}
-
+cache_path() { printf '%s/%s.list' "$CACHE_DIR" "$1"; }
 cache_stale() {
   target=$1
   [ -f "$target" ] || return 0
@@ -85,10 +86,7 @@ ensure_choice() {
 
 choose_value() {
   kind=$1 prompt=$2
-  command -v wofi >/dev/null 2>&1 || {
-    echo "wofi is required" >&2
-    exit 1
-  }
+  command -v wofi >/dev/null 2>&1 || { echo "wofi is required" >&2; exit 1; }
   ensure_choice "$kind"
   wofi --dmenu -p "$prompt" < "$(cache_path "$kind")" || true
 }
@@ -107,36 +105,72 @@ apply_icons() {
   theme=$1
   command -v gsettings >/dev/null 2>&1 && gsettings set org.gnome.desktop.interface icon-theme "$theme" >/dev/null 2>&1 || true
   for gtk in gtk-3.0 gtk-4.0; do
-    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-icon-theme-name "$theme"
+    set_ini_value "$ROOT/$gtk/settings.ini" gtk-icon-theme-name "$theme"
   done
   for q in qt5ct qt6ct; do
-    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$q/$q.conf" icon_theme "$theme"
+    set_ini_value "$ROOT/$q/$q.conf" icon_theme "$theme"
   done
+}
+
+write_niri_cursor() {
+  theme=$1 size=$2
+  [ -d "$NIRI" ] || return 0
+  escaped=$(printf '%s' "$theme" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  tmp=$(mktemp "$NIRI/.index-cursor.kdl.XXXXXX")
+  {
+    printf '%s\n' '// WILL OF THE CITY :: THE INDEX — managed cursor state'
+    printf '%s\n' '// This file is owned by index-appearance.'
+    printf '%s\n' 'cursor {'
+    printf '    xcursor-theme "%s"\n' "$escaped"
+    printf '    xcursor-size %s\n' "$size"
+    printf '%s\n' '}'
+  } > "$tmp"
+  chmod 600 "$tmp" 2>/dev/null || true
+  mv "$tmp" "$NIRI/index-cursor.kdl"
+  if command -v niri >/dev/null 2>&1 && [ -n "${NIRI_SOCKET:-}" ]; then
+    niri validate >/dev/null 2>&1 || echo "warning: niri rejected cursor configuration" >&2
+  fi
 }
 
 apply_cursor() {
   theme=$1 size=${2:-24}
   case "$size" in ''|*[!0-9]*) echo "invalid cursor size: $size" >&2; exit 2 ;; esac
-  mkdir -p "$HOME/.local/share/icons/default" "$LABWC"
+  [ "$size" -ge 8 ] && [ "$size" -le 256 ] || { echo "invalid cursor size: $size" >&2; exit 2; }
+  mkdir -p "$HOME/.local/share/icons/default"
   printf '[Icon Theme]\nInherits=%s\n' "$theme" > "$HOME/.local/share/icons/default/index.theme"
   command -v gsettings >/dev/null 2>&1 && {
     gsettings set org.gnome.desktop.interface cursor-theme "$theme" >/dev/null 2>&1 || true
     gsettings set org.gnome.desktop.interface cursor-size "$size" >/dev/null 2>&1 || true
   }
   for gtk in gtk-3.0 gtk-4.0; do
-    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-cursor-theme-name "$theme"
-    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-cursor-theme-size "$size"
+    set_ini_value "$ROOT/$gtk/settings.ini" gtk-cursor-theme-name "$theme"
+    set_ini_value "$ROOT/$gtk/settings.ini" gtk-cursor-theme-size "$size"
   done
-  envf="$LABWC/environment"
-  touch "$envf"
-  sed -i '/^XCURSOR_THEME=/d;/^XCURSOR_SIZE=/d' "$envf"
-  printf 'XCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$theme" "$size" >> "$envf"
-  command -v labwc >/dev/null 2>&1 && labwc --reconfigure >/dev/null 2>&1 || true
+
+  # Keep every installed compositor backend synchronized. Niri live-reloads
+  # the managed include; labwc still consumes its environment file.
+  write_niri_cursor "$theme" "$size"
+  if [ -d "$LABWC" ]; then
+    envf="$LABWC/environment"
+    touch "$envf"
+    sed -i '/^XCURSOR_THEME=/d;/^XCURSOR_SIZE=/d' "$envf"
+    printf 'XCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$theme" "$size" >> "$envf"
+    if command -v labwc >/dev/null 2>&1 && [ "${XDG_CURRENT_DESKTOP:-}" = labwc ]; then
+      labwc --reconfigure >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+resolve_default_wall() {
+  if [ -f "$DEFAULT_WALL" ]; then printf '%s' "$DEFAULT_WALL"
+  elif [ -f "$LEGACY_WALL" ]; then printf '%s' "$LEGACY_WALL"
+  else printf '%s' "$DEFAULT_WALL"
+  fi
 }
 
 apply_wallpaper() {
   wall=$1
-  [ -f "$wall" ] || wall=$DEFAULT_WALL
+  [ -f "$wall" ] || wall=$(resolve_default_wall)
   [ -f "$wall" ] || { echo "Wallpaper not found: $wall" >&2; return 1; }
   if command -v swaybg >/dev/null 2>&1; then
     pkill -x swaybg >/dev/null 2>&1 || true
@@ -189,12 +223,16 @@ case "${1:-}" in
   set-cursor) [ "$#" -ge 2 ] && [ "$#" -le 3 ] || exit 2; setv CURSOR_THEME "$2"; setv CURSOR_SIZE "${3:-24}"; apply_cursor "$2" "${3:-24}" ;;
   set-cursor-size) [ "$#" -eq 2 ] || exit 2; theme=$(getv CURSOR_THEME); [ -n "$theme" ] || theme=Adwaita; setv CURSOR_SIZE "$2"; apply_cursor "$theme" "$2" ;;
   set-wallpaper) [ "$#" -eq 2 ] || exit 2; [ -f "$2" ] || { echo "Wallpaper not found: $2" >&2; exit 2; }; setv WALLPAPER "$2"; apply_wallpaper "$2" ;;
-  reset-wallpaper) setv WALLPAPER "$DEFAULT_WALL"; apply_wallpaper "$DEFAULT_WALL" ;;
+  reset-wallpaper) wall=$(resolve_default_wall); setv WALLPAPER "$wall"; apply_wallpaper "$wall" ;;
   apply)
     icons=$(getv ICON_THEME); cursor=$(getv CURSOR_THEME); size=$(getv CURSOR_SIZE); wall=$(getv WALLPAPER)
     [ -n "$icons" ] && apply_icons "$icons" || true
     [ -n "$cursor" ] && apply_cursor "$cursor" "${size:-24}" || true
-    if [ -n "$wall" ] && [ -f "$wall" ]; then apply_wallpaper "$wall"; else setv WALLPAPER "$DEFAULT_WALL"; apply_wallpaper "$DEFAULT_WALL"; fi
+    if [ -n "$wall" ] && [ -f "$wall" ]; then
+      apply_wallpaper "$wall"
+    else
+      wall=$(resolve_default_wall); setv WALLPAPER "$wall"; apply_wallpaper "$wall"
+    fi
     ;;
   *)
     echo "usage: index-appearance {state|list-icons|list-cursors|list-wallpapers|refresh-choices|choose-icons|choose-cursor [SIZE]|choose-wallpaper|get KEY|set-icons THEME|set-cursor THEME [SIZE]|set-cursor-size SIZE|set-wallpaper FILE|reset-wallpaper|apply}" >&2

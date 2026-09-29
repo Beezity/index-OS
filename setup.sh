@@ -7,4 +7,4 @@ bash "$DIR/install.sh"
 
 echo
 echo "THE INDEX installation is complete."
-echo "Log in on a TTY and start it with: dbus-run-session labwc"
+echo "Log in on a TTY and start it with: niri-session"

@@ -1,0 +1,83 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — session services
+set -u
+
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+BIN="$HOME/.local/bin"
+
+# niri-session imports its own compositor environment. Keep D-Bus/systemd in
+# sync for services which were already running before the graphical session.
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+  dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY NIRI_SOCKET XDG_CURRENT_DESKTOP XDG_SESSION_TYPE >/dev/null 2>&1 || true
+fi
+
+# Wallpaper state is shared across compositors. The installer places the stock
+# image in ~/.config/the-index/wall.png.
+if [ -x "$BIN/index-appearance" ] && [ -f "$CFG/the-index/appearance.conf" ]; then
+  "$BIN/index-appearance" apply >/dev/null 2>&1 &
+elif command -v swaybg >/dev/null 2>&1 && [ -f "$CFG/the-index/wall.png" ]; then
+  swaybg -i "$CFG/the-index/wall.png" -m fill >/dev/null 2>&1 &
+fi
+
+# VMware's SVGA3D + Qt Quick Wayland/EGL path can fail after EGL surface
+# creation. Preserve THE INDEX's existing software-rendering workaround there.
+INDEX_QS_ENV=""
+if [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi 'vmware' /sys/class/dmi/id/sys_vendor; then
+  INDEX_QS_ENV="QT_QUICK_BACKEND=software"
+elif command -v systemd-detect-virt >/dev/null 2>&1 && [ "$(systemd-detect-virt 2>/dev/null || true)" = "vmware" ]; then
+  INDEX_QS_ENV="QT_QUICK_BACKEND=software"
+fi
+
+if ! pgrep -u "$(id -u)" -x quickshell >/dev/null 2>&1; then
+  if [ -n "$INDEX_QS_ENV" ]; then
+    env $INDEX_QS_ENV quickshell -p "$CFG/quickshell/shell.qml" >/dev/null 2>&1 &
+  else
+    quickshell -p "$CFG/quickshell/shell.qml" >/dev/null 2>&1 &
+  fi
+fi
+
+# Start one authentication agent. Paths cover the agents used by the Fedora,
+# Arch and Debian adapters without tying the shell to one distro.
+for p in \
+  /usr/libexec/kf6/polkit-kde-authentication-agent-1 \
+  /usr/lib/polkit-kde-authentication-agent-1 \
+  /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 \
+  /usr/libexec/polkit-gnome-authentication-agent-1; do
+  if [ -x "$p" ]; then
+    "$p" >/dev/null 2>&1 &
+    break
+  fi
+done
+
+# Clipboard history. The helper owns pruning and size limits.
+if command -v wl-paste >/dev/null 2>&1 && command -v cliphist >/dev/null 2>&1; then
+  if [ -x "$BIN/index-clipboard" ]; then
+    "$BIN/index-clipboard" prune >/dev/null 2>&1 || true
+    wl-paste --type text --watch "$BIN/index-clipboard" store text >/dev/null 2>&1 &
+    wl-paste --type image --watch "$BIN/index-clipboard" store image >/dev/null 2>&1 &
+  else
+    wl-paste --type text --watch cliphist store >/dev/null 2>&1 &
+    wl-paste --type image --watch cliphist store >/dev/null 2>&1 &
+  fi
+fi
+
+command -v udiskie >/dev/null 2>&1 && udiskie --no-notify >/dev/null 2>&1 &
+
+# Session state is compositor-neutral. Migrate brightness lazily from the old
+# labwc index.conf when present so existing installations keep their setting.
+SESSION_CONF="$CFG/the-index/session.conf"
+LEGACY_CONF="$CFG/labwc/index.conf"
+if [ ! -f "$SESSION_CONF" ] && [ -f "$LEGACY_CONF" ]; then
+  mkdir -p "$CFG/the-index"
+  grep -E '^(BRIGHTNESS|SCREEN_OFF_SEC)=' "$LEGACY_CONF" > "$SESSION_CONF" 2>/dev/null || true
+fi
+[ -f "$SESSION_CONF" ] && . "$SESSION_CONF"
+if [ -n "${BRIGHTNESS:-}" ] && command -v brightnessctl >/dev/null 2>&1; then
+  brightnessctl -c backlight set "$BRIGHTNESS%" >/dev/null 2>&1 || true
+fi
+
+[ -x "$BIN/index-idle" ] && "$BIN/index-idle" >/dev/null 2>&1 &
+
+# Niri-session already activates xdg-desktop-autostart.target, so deliberately
+# do not run dex here; that would launch normal desktop autostarts twice.
+exit 0
