@@ -12,10 +12,14 @@ THE INDEX keeps a compact cyan/DOS-style interface while relying on standard Lin
 
 - **labwc** compositor with THE INDEX server-side window decorations
 - **Quickshell** top bar, menus, notifications, settings, clipboard popup, and session lock
+- the top bar is rendered on every connected monitor and follows monitor hotplug/unplug events
+- desktop atmosphere elements are rendered per monitor, including the district text, top-right quote, bottom-right standby text, centered quote ticker, and rising cyan motes
+- Prescript of the Day is rendered on every monitor from one shared global state, so all copies show and reroll the same prescript
 - centered clock, workspaces, task buttons, notification history, battery status, system tray, and `SET` control in the bar
 - centered THE INDEX application/search menu with `Super+Space` and `= expression` calculator input backed by Qalculate!
-- native Settings panels for **Network**, **Bluetooth**, **Audio**, **Appearance**, **Power**, and **Notifications**
+- native Settings panels for **Network**, **Bluetooth**, **Audio**, **Appearance**, **Power**, **Displays**, and **Notifications**
 - pointer/touchpad controls integrated into Settings
+- display management through `wlr-randr`, including output enable/disable, logical main display, resolution, refresh rate, position, scale, rotation, and persistent layouts
 - searchable clipboard history with `Super+V`, backed by `cliphist`
 - configurable notification sounds, popup duration, Do Not Disturb, notification actions, and in-session history
 - Wi-Fi management through NetworkManager with advanced configuration delegated to `nm-connection-editor`
@@ -98,14 +102,17 @@ Open Settings with the `SET` control on the right side of the top bar.
 | Audio | output/input state and volume controls, advanced PipeWire mixer |
 | Appearance | wallpaper, icon theme, cursor theme and cursor size |
 | Power | power profile, battery state, brightness, suspend, screen timeout and lid behavior |
+| Displays | output enable/disable, main display, resolution, refresh rate, position, scale, rotation, save layout |
 | Notifications | Do Not Disturb, notification sounds, popup duration, history controls and test notification |
 | Input | pointer speed, natural scrolling and touchpad tap-to-click where supported |
+
+The Displays panel treats the output at logical position `0,0` as the main display. **Set Main** rebases the active monitor layout around the selected output without changing the monitors' relative arrangement. Applied layouts are saved and restored on later THE INDEX sessions.
 
 Advanced system configuration stays in the relevant external tool rather than being reimplemented completely in QML.
 
 ## Application/search menu
 
-Open the centered THE INDEX menu with `Super+Space` or by clicking `// THE INDEX` in the top bar. Normal text filters installed desktop applications.
+Open the centered THE INDEX menu with `Super+Space` or by clicking `// THE INDEX` in the top bar. Normal text filters installed desktop applications. On a multi-monitor setup, the keyboard shortcut targets the monitor containing the active application and falls back to the logical main display when no application is active.
 
 Prefix a query with `=` to use the Qalculate!-backed calculator instead of application search. For example:
 
@@ -128,7 +135,7 @@ Press Enter or click the calculator result to copy it to the clipboard. The sepa
 | `Super+F` | Toggle maximize |
 | `Super+L` | Lock session |
 | `Super+1` … `Super+5` | Switch workspace |
-| `Super+P` | Toggle Prescript of the Day |
+| `Super+P` | Toggle Prescript of the Day on all monitors |
 | `Super+V` | Open clipboard history |
 | `Super+Shift+S` | Region screenshot/editor |
 | `Print` | Full screenshot |
@@ -191,7 +198,7 @@ For non-interactive confirmation:
 index-uninstall --yes
 ```
 
-The uninstaller removes THE INDEX configuration, themes, bundled fonts, helper files, caches, and session registration. It intentionally leaves distro packages and saved backups installed so a previous configuration can still be restored afterward.
+The uninstaller removes THE INDEX-managed configuration, themes, bundled fonts, helper files, caches, and session registration. It intentionally leaves distro packages and saved backups installed so a previous configuration can still be restored afterward.
 
 ## VMware guests
 
@@ -213,8 +220,8 @@ Drop optional replacements into `assets/`, then rerun the installer for your dis
 
 The main implementation is split between:
 
-- `quickshell/` — bar, settings panels, notifications, clipboard UI, lock screen and other QML components
-- `labwc/` — compositor configuration, session scripts, GTK theme and desktop defaults
+- `quickshell/` — bar, per-monitor desktop surfaces, settings panels, notifications, clipboard UI, lock screen and other QML components
+- `labwc/` — compositor configuration, display-layout persistence, session scripts, GTK theme and desktop defaults
 - `scripts/` — shared helpers, installer logic, diagnostics, backup/restore, update and uninstall tools
 - `scripts/distro/` — Arch, Fedora and Debian package/setup adapters
 - `assets/` — bundled fonts, sounds and optional media
