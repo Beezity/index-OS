@@ -87,12 +87,11 @@ Singleton {
     }
 
     function save() {
-        saveProc.command = [
+        saveProc.exec([
             "sh", "-c",
             "mkdir -p \"$1\" && printf '%s\\n%s\\n' \"$2\" \"$3\" > \"$4\"",
             "sh", root.cacheDir, root.dateKey, root.text_, root.cachePath
-        ]
-        saveProc.running = true
+        ])
     }
 
     function setPrescript(value, key, playSound) {
