@@ -58,10 +58,10 @@ if [[ "$POWER_BACKEND" == power-profiles-daemon ]]; then sudo systemctl start po
 else sudo systemctl enable --now tuned.service; sudo systemctl start tuned-ppd.service; INDEX_POWER_PROFILE_SERVICE="tuned-ppd.service"; fi
 sudo systemctl enable gdm.service
 
-# DisplaysPanel is shared by both compositor backends. Keep labwc's existing
-# wlr-randr persistence behind the same helper used by the Niri backend.
+# DisplaysPanel and session actions are shared by both compositor backends.
 mkdir -p "$HOME/.local/bin" "$HOME/.config/the-index"
 install -m755 "$INDEX_ROOT/scripts/index-displays" "$HOME/.local/bin/index-displays"
+install -m755 "$INDEX_ROOT/scripts/index-logout" "$HOME/.local/bin/index-logout"
 printf 'labwc\n' > "$HOME/.config/the-index/compositor"
 
 export INDEX_DEX_COMMAND="dex-autostart"
