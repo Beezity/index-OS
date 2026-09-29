@@ -19,7 +19,7 @@ for path in \
   "$HOME/.config/gtk-4.0/settings.ini" "$HOME/.config/gtk-4.0/gtk.css" \
   "$HOME/.config/wofi/config" "$HOME/.config/wofi/style.css" \
   "$HOME/.config/foot/foot.ini" "$HOME/.config/fish/config.fish" \
-  "$HOME/.config/xdg-desktop-portal/labwc-portals.conf" "$HOME/.config/xdg-desktop-portal/wlr/config" \
+  "$HOME/.config/xdg-desktop-portal/labwc-portals.conf" "$HOME/.config/xdg-desktop-portal/niri-portals.conf" "$HOME/.config/xdg-desktop-portal/wlr/config" \
   "$HOME/.config/qt5ct/qt5ct.conf" "$HOME/.config/qt5ct/colors/the-index.conf" \
   "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt6ct/colors/the-index.conf" \
   "$HOME/.config/environment.d/60-index-browsers.conf" \
