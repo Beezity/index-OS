@@ -20,11 +20,11 @@ jobs:
         run: |
           bash -n install-niri.sh install-niri-fedora.sh install-niri-debian.sh \
             scripts/install-niri-common.sh scripts/distro/arch-niri.sh scripts/distro/fedora-niri.sh scripts/distro/debian-niri.sh \
-            scripts/index-lock scripts/index-idle scripts/index-input scripts/index-power scripts/index-appearance scripts/index-doctor scripts/index-backup scripts/index-uninstall scripts/index-update \
+            scripts/index-lock scripts/index-idle scripts/index-logout scripts/index-input scripts/index-power scripts/index-appearance scripts/index-doctor scripts/index-backup scripts/index-uninstall scripts/index-update \
             niri/config/index-autostart
           shellcheck --severity=error install-niri.sh install-niri-fedora.sh install-niri-debian.sh \
             scripts/install-niri-common.sh scripts/distro/arch-niri.sh scripts/distro/fedora-niri.sh scripts/distro/debian-niri.sh \
-            scripts/index-lock scripts/index-idle scripts/index-input scripts/index-power scripts/index-appearance scripts/index-doctor scripts/index-backup scripts/index-uninstall scripts/index-update \
+            scripts/index-lock scripts/index-idle scripts/index-logout scripts/index-input scripts/index-power scripts/index-appearance scripts/index-doctor scripts/index-backup scripts/index-uninstall scripts/index-update \
             niri/config/index-autostart
           python3 -m py_compile scripts/index-displays
 
@@ -101,6 +101,7 @@ jobs:
           test -s niri/config/index-autostart
           test -s niri/config/portal/niri-portals.conf
           test -s niri/session/the-index-niri.desktop
+          test -s scripts/index-logout
           grep -q '^Exec=niri-session$' niri/session/the-index-niri.desktop
           grep -q 'include optional=true "custom.kdl"' niri/config/config.kdl
           grep -q '^org.freedesktop.impl.portal.FileChooser=gtk;$' niri/config/portal/niri-portals.conf
@@ -110,6 +111,9 @@ jobs:
           grep -q 'gnome-keyring' scripts/distro/debian-niri.sh
           grep -q 'index-displays' quickshell/DisplaysPanel.qml
           ! grep -q 'wlr-randr' quickshell/DisplaysPanel.qml
+          grep -q 'WindowManager.screenProjection(bar.screen).windowsets' quickshell/Bar.qml
+          grep -q '/.local/bin/index-logout' quickshell/Bar.qml
+          ! grep -q '/.config/labwc/index-logout' quickshell/Bar.qml
           grep -q 'custom.kdl' scripts/index-uninstall
           ! grep -q 'remove "$HOME/.config/niri"' scripts/index-uninstall
           python3 - <<'PY'
