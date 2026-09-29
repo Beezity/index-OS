@@ -49,7 +49,7 @@ jobs:
           fi
           EOF
           chmod +x "$tmp/bin/niri"
-          run_display() { env HOME="$tmp/home" PATH="$tmp/bin:$PATH" NIRI_SOCKET=fake python3 scripts/index-displays "$@"; }
+          run_display() { env HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/home/.config" PATH="$tmp/bin:$PATH" NIRI_SOCKET=fake python3 scripts/index-displays "$@"; }
           state="$(run_display state)"
           printf '%s\n' "$state"
           printf '%s\n' "$state" | grep -q $'^@output\tHDMI-A-1\t'
