@@ -1,0 +1,12 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — compositor-aware logout
+set -eu
+
+if [ -n "${NIRI_SOCKET:-}" ] && command -v niri >/dev/null 2>&1; then
+  exec niri msg action quit --skip-confirmation
+fi
+if command -v labwc >/dev/null 2>&1 && { [ "${XDG_CURRENT_DESKTOP:-}" = labwc ] || [ "${XDG_SESSION_DESKTOP:-}" = labwc ]; }; then
+  exec labwc --exit
+fi
+printf '%s\n' 'THE INDEX: no supported compositor session detected' >&2
+exit 1
