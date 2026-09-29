@@ -15,7 +15,7 @@ require_command(){ command -v "$1" >/dev/null 2>&1 || { bad "required command mi
 require_file(){ [[ -f "$INDEX_ROOT/$1" ]] || { bad "repository file missing: $1"; return 1; }; }
 
 INDEX_REQUIRED_FILES=(
-  wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/BluetoothMenu.qml quickshell/PowerPanel.qml quickshell/InputPanel.qml quickshell/ClipboardPopup.qml quickshell/Notifications.qml quickshell/NotifHistory.qml quickshell/NotificationPrefs.qml quickshell/NotificationPanel.qml quickshell/lock/lock.qml quickshell/prescript.json
+  wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/BluetoothMenu.qml quickshell/PowerPanel.qml quickshell/InputPanel.qml quickshell/ClipboardPopup.qml quickshell/Notifications.qml quickshell/NotifHistory.qml quickshell/NotificationPrefs.qml quickshell/NotificationPanel.qml quickshell/Prescript.qml quickshell/lock/lock.qml quickshell/prescript.json
   labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment
   labwc/config/index-lock labwc/config/index-idle labwc/config/index-clip
   labwc/config/fontconfig/fonts.conf labwc/config/gtk/settings.ini

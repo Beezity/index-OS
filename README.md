@@ -112,6 +112,7 @@ Advanced system configuration stays in the relevant external tool rather than be
 | `Super+F` | Toggle maximize |
 | `Super+L` | Lock session |
 | `Super+1` … `Super+5` | Switch workspace |
+| `Super+P` | Toggle Prescript of the Day |
 | `Super+V` | Open clipboard history |
 | `Super+Shift+S` | Region screenshot/editor |
 | `Print` | Full screenshot |
