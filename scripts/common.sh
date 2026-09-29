@@ -28,8 +28,9 @@ INDEX_REQUIRED_FILES=(
   labwc/theme/the-index/labwc/themerc
   labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme
   labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps labwc/session/the-index.desktop
-  fish/config.fish install-fish.sh install-fedora.sh patch-fedora.sh setup.sh
-  scripts/common.sh scripts/install-common.sh scripts/distro/fedora.sh scripts/distro/fedora-patch.sh
+  fish/config.fish install-fish.sh install-fedora.sh patch-fedora.sh patch-niri-fedora.sh setup.sh
+  scripts/common.sh scripts/install-common.sh scripts/install-niri-common.sh
+  scripts/distro/fedora.sh scripts/distro/fedora-patch.sh scripts/distro/fedora-niri-patch.sh
   scripts/index-session-start scripts/index-lock scripts/index-logout scripts/index-idle scripts/index-display-save scripts/index-display-restore
   scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications scripts/index-settings
 )
