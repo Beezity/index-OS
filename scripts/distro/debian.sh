@@ -33,7 +33,7 @@ for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi qalc grim s
 QS_VERSION="$(dpkg-query -W -f='${Version}' quickshell 2>/dev/null | sed 's/^[0-9]*://' | cut -d- -f1)"; dpkg --compare-versions "$QS_VERSION" ge 0.3.0 || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }
 POLKIT_AGENT="$(dpkg -L polkit-kde-agent-1 | grep '/polkit-kde-authentication-agent-1$' | head -n1 || true)"; [[ -x "$POLKIT_AGENT" ]] || { bad "could not locate polkit-kde-authentication-agent-1"; exit 1; }
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service; sudo systemctl start power-profiles-daemon.service; sudo systemctl enable gdm3.service
-mkdir -p "$HOME/.local/bin" "$HOME/.config/the-index"; install -m755 "$INDEX_ROOT/scripts/index-displays" "$HOME/.local/bin/index-displays"; printf 'labwc\n' > "$HOME/.config/the-index/compositor"
+mkdir -p "$HOME/.local/bin" "$HOME/.config/the-index"; install -m755 "$INDEX_ROOT/scripts/index-displays" "$HOME/.local/bin/index-displays"; install -m755 "$INDEX_ROOT/scripts/index-logout" "$HOME/.local/bin/index-logout"; printf 'labwc\n' > "$HOME/.config/the-index/compositor"
 export INDEX_DEX_COMMAND="dex" INDEX_POLKIT_AGENT="$POLKIT_AGENT" INDEX_CURSOR_ROOT="/usr/share/icons/Adwaita" INDEX_FILE_ROLLER_DESKTOP="org.gnome.FileRoller.desktop"
 export INDEX_REQUIRE_CURSOR_INDEX=0 INDEX_VALIDATE_CURSOR_ROOT=1 INDEX_VALIDATE_TITLEBAR_BUTTONS=0 INDEX_POWER_PROFILE_SERVICE="power-profiles-daemon.service" INDEX_GDM_SERVICE="gdm3.service" INDEX_COMPLETION_EXTRA=""
 export INDEX_COMPLETION_FIRST_LINE="$DEBIAN_LABEL installation complete. GDM is installed and enabled. Reboot to log in and select THE INDEX from GDM's session menu."
