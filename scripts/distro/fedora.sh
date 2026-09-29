@@ -78,8 +78,10 @@ for cmd in niri niri-session xwayland-satellite quickshell swaybg swayidle foot 
   require_command "$cmd"
 done
 
+# The generic WindowManager/ext-workspace API used by the bar is a Quickshell
+# 0.3.1 feature. The Fedora 44 COPR currently provides 0.3.1.
 QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"
-[[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }
+[[ "$(printf '%s\n%s\n' 0.3.1 "$QS_VERSION" | sort -V | head -n1)" == "0.3.1" ]] || { bad "quickshell >= 0.3.1 is required; installed: $QS_VERSION"; exit 1; }
 ok "Quickshell $QS_VERSION"
 
 NIRI_VERSION="$(niri --version | awk '{print $2}' | head -n1)"
