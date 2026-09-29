@@ -2,8 +2,9 @@
 """THE INDEX display backend for labwc and niri.
 
 The QML panel consumes a stable line protocol from this helper instead of
-knowing compositor-specific output APIs.  Niri persistence is its included
-outputs.kdl; labwc keeps using wlr-randr plus the existing JSON saver.
+knowing compositor-specific output APIs. Niri persistence is its included
+outputs.kdl plus a small managed state file used to retain disconnected output
+layouts; labwc keeps using wlr-randr plus the existing JSON saver.
 """
 from __future__ import annotations
 
@@ -18,8 +19,10 @@ from pathlib import Path
 
 HOME = Path.home()
 XDG_CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config"))
+INDEX_DIR = XDG_CONFIG / "the-index"
 NIRI_DIR = XDG_CONFIG / "niri"
 NIRI_OUTPUTS = NIRI_DIR / "outputs.kdl"
+NIRI_STATE = INDEX_DIR / "displays.json"
 LABWC_SAVE = XDG_CONFIG / "labwc" / "index-display-save"
 
 
@@ -72,7 +75,10 @@ def niri_outputs() -> list[dict]:
                 "preferred": bool(mode.get("is_preferred", False)),
                 "current": current_idx == idx,
             })
-        desc = " ".join(x for x in [obj.get("make"), obj.get("model"), obj.get("serial")] if x)
+        desc = " ".join(
+            str(x) for x in [obj.get("make"), obj.get("model"), obj.get("serial_number")]
+            if x not in (None, "")
+        )
         out.append({
             "name": name,
             "description": desc or name,
@@ -138,19 +144,102 @@ def state() -> list[dict]:
 
 
 def current_mode(output: dict) -> dict | None:
-    for mode in output["modes"]:
+    for mode in output.get("modes", []):
         if mode.get("current"):
             return mode
-    for mode in output["modes"]:
+    for mode in output.get("modes", []):
         if mode.get("preferred"):
             return mode
-    return output["modes"][0] if output["modes"] else None
+    modes = output.get("modes", [])
+    return modes[0] if modes else None
+
+
+def snapshot_output(output: dict) -> dict:
+    mode = current_mode(output)
+    modes: list[dict] = []
+    if mode:
+        modes.append({
+            "width": int(mode.get("width", 0)),
+            "height": int(mode.get("height", 0)),
+            "refresh": float(mode.get("refresh", 0)),
+            "preferred": bool(mode.get("preferred", False)),
+            "current": True,
+        })
+    return {
+        "name": str(output.get("name", "")),
+        "description": str(output.get("description", output.get("name", ""))),
+        "enabled": bool(output.get("enabled", False)),
+        "x": int(output.get("x", 0)),
+        "y": int(output.get("y", 0)),
+        "scale": float(output.get("scale", 1.0)),
+        "transform": str(output.get("transform", "normal")),
+        "modes": modes,
+    }
+
+
+def load_niri_state() -> dict:
+    try:
+        data = json.loads(NIRI_STATE.read_text())
+        if isinstance(data, dict) and isinstance(data.get("outputs", {}), dict):
+            return data
+    except (OSError, ValueError, TypeError):
+        pass
+    return {"version": 1, "main": None, "outputs": {}}
+
+
+def known_niri_outputs(live: list[dict]) -> list[dict]:
+    saved = load_niri_state().get("outputs", {})
+    known: dict[str, dict] = {}
+    for name, value in saved.items():
+        if not isinstance(value, dict):
+            continue
+        entry = snapshot_output({**value, "name": name})
+        if entry["name"]:
+            known[entry["name"]] = entry
+    for output in live:
+        if output.get("name"):
+            known[str(output["name"])] = output
+    return sorted(known.values(), key=lambda o: o["name"].casefold())
+
+
+def save_niri_state(outputs: list[dict], main_name: str | None) -> None:
+    INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": 1,
+        "main": main_name,
+        "outputs": {o["name"]: snapshot_output(o) for o in outputs if o.get("name")},
+    }
+    fd, tmp_name = tempfile.mkstemp(prefix=".displays.", suffix=".json", dir=INDEX_DIR)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        os.chmod(tmp_name, 0o600)
+        os.replace(tmp_name, NIRI_STATE)
+    finally:
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+
+
+def choose_main(outputs: list[dict], requested: str | None) -> str | None:
+    if requested and any(o.get("name") == requested and o.get("enabled") for o in outputs):
+        return requested
+    at_origin = next((o["name"] for o in outputs if o.get("enabled") and o.get("x") == 0 and o.get("y") == 0), None)
+    if at_origin:
+        return at_origin
+    previous = load_niri_state().get("main")
+    if previous and any(o.get("name") == previous and o.get("enabled") for o in outputs):
+        return str(previous)
+    return None
 
 
 def write_niri(outputs: list[dict], main_name: str | None = None) -> None:
     NIRI_DIR.mkdir(parents=True, exist_ok=True)
+    main_name = choose_main(outputs, main_name)
     lines = ["// WILL OF THE CITY :: THE INDEX — managed display configuration",
-             "// Written by index-displays. Advanced output options belong in config.kdl.", ""]
+             "// Written by index-displays. Advanced output options belong in custom.kdl.", ""]
     for output in outputs:
         name = json.dumps(str(output["name"]), ensure_ascii=False)
         lines.append(f"output {name} {{")
@@ -187,6 +276,7 @@ def write_niri(outputs: list[dict], main_name: str | None = None) -> None:
                 NIRI_OUTPUTS.write_text(old)
             sys.stderr.write(validation.stderr or validation.stdout or "niri configuration validation failed\n")
             raise SystemExit(1)
+        save_niri_state(outputs, main_name)
     finally:
         try:
             os.unlink(tmp_name)
@@ -205,21 +295,26 @@ def do_apply(args: list[str]) -> None:
     name, enabled_s, width_s, height_s, refresh_s, x_s, y_s, scale_s, transform = args
     enabled = enabled_s == "1"
     if compositor() == "niri":
-        outputs = state()
-        target = next((o for o in outputs if o["name"] == name), None)
+        live = state()
+        target = next((o for o in live if o["name"] == name), None)
         if target is None:
             raise SystemExit(f"unknown output: {name}")
-        if not enabled and sum(1 for o in outputs if o["enabled"]) <= 1 and target["enabled"]:
+        if not enabled and sum(1 for o in live if o["enabled"]) <= 1 and target["enabled"]:
             raise SystemExit("cannot disable the last active display")
         target["enabled"] = enabled
         if enabled:
             width, height, refresh = int(width_s), int(height_s), float(refresh_s)
             target["x"], target["y"] = int(x_s), int(y_s)
             target["scale"], target["transform"] = float(scale_s), transform
+            matched = False
             for mode in target["modes"]:
-                mode["current"] = (mode["width"] == width and mode["height"] == height and
-                                   (refresh <= 0 or abs(mode["refresh"] - refresh) < 0.01))
-        write_niri(outputs)
+                is_match = (mode["width"] == width and mode["height"] == height and
+                            (refresh <= 0 or abs(mode["refresh"] - refresh) < 0.01))
+                mode["current"] = is_match
+                matched = matched or is_match
+            if width > 0 and height > 0 and not matched:
+                raise SystemExit("requested mode is unavailable on this output")
+        write_niri(known_niri_outputs(live))
         return
 
     cmd = ["wlr-randr", "--output", name]
@@ -239,20 +334,25 @@ def do_apply(args: list[str]) -> None:
 
 
 def set_main(name: str) -> None:
-    outputs = state()
-    target = next((o for o in outputs if o["name"] == name), None)
+    live = state()
+    target = next((o for o in live if o["name"] == name), None)
     if not target or not target["enabled"]:
         raise SystemExit("main output must be active")
     dx, dy = target["x"], target["y"]
-    for output in outputs:
-        if output["enabled"]:
-            output["x"] -= dx
-            output["y"] -= dy
     if compositor() == "niri":
+        outputs = known_niri_outputs(live)
+        for output in outputs:
+            if output["enabled"]:
+                output["x"] -= dx
+                output["y"] -= dy
         write_niri(outputs, main_name=name)
     else:
+        for output in live:
+            if output["enabled"]:
+                output["x"] -= dx
+                output["y"] -= dy
         cmd = ["wlr-randr"]
-        for output in outputs:
+        for output in live:
             if output["enabled"]:
                 cmd += ["--output", output["name"], "--pos", f'{output["x"]},{output["y"]}']
         subprocess.run(cmd, check=True)
@@ -261,8 +361,9 @@ def set_main(name: str) -> None:
 
 def save() -> None:
     if compositor() == "niri":
-        outputs = state()
-        main = next((o["name"] for o in outputs if o["enabled"] and o["x"] == 0 and o["y"] == 0), None)
+        live = state()
+        outputs = known_niri_outputs(live)
+        main = next((o["name"] for o in live if o["enabled"] and o["x"] == 0 and o["y"] == 0), None)
         write_niri(outputs, main_name=main)
     else:
         labwc_save()
@@ -279,11 +380,14 @@ def main() -> int:
         do_apply(sys.argv[2:])
         return 0
     if command == "set-main" and len(sys.argv) == 3:
-        set_main(sys.argv[2]); return 0
+        set_main(sys.argv[2])
+        return 0
     if command == "save":
-        save(); return 0
+        save()
+        return 0
     print("usage: index-displays {state|apply NAME 0|1 WIDTH HEIGHT REFRESH X Y SCALE TRANSFORM|set-main NAME|save}", file=sys.stderr)
     return 2
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
