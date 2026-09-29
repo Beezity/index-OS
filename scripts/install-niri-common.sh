@@ -10,11 +10,13 @@ trap 'bad "installation failed at line $LINENO"; exit 1' ERR
 : "${INDEX_COMPLETION_EXTRA:=}"
 : "${INDEX_GDM_SERVICE:=gdm.service}"
 
-# Capture the old labwc-managed common input state before replacing helpers.
-# This lets an existing THE INDEX installation keep pointer/touchpad behavior on
-# its first niri login without copying labwc XML into niri.
+# Capture common input state only on the first niri migration. Subsequent
+# updates preserve the managed niri include and must not overwrite user changes
+# with stale values left in the old labwc configuration.
+HAD_NIRI_INPUT=0
+[[ -f "$CFG/niri/index-input.kdl" ]] && HAD_NIRI_INPUT=1
 OLD_INPUT_STATE=""
-if [[ -x "$HOME/.local/bin/index-input" ]]; then
+if (( HAD_NIRI_INPUT == 0 )) && [[ -x "$HOME/.local/bin/index-input" ]]; then
   OLD_INPUT_STATE="$(INDEX_INPUT_BACKEND=labwc "$HOME/.local/bin/index-input" state 2>/dev/null || true)"
 fi
 
@@ -50,8 +52,9 @@ fonts=("$INDEX_ROOT"/assets/*.ttf "$INDEX_ROOT"/assets/*.otf)
 ((${#fonts[@]})) || { bad "no bundled fonts found in assets/"; exit 1; }
 cp -f "${fonts[@]}" "$HOME/.local/share/fonts/"
 shopt -u nullglob
-# The fontconfig/GTK/Qt assets are compositor-neutral even though their source
-# path predates the niri migration. Keep one canonical copy until Debian moves.
+# These theme assets are compositor-neutral even though their source directory
+# predates the niri migration. Keeping one canonical copy prevents drift while
+# Debian still uses the labwc backend.
 cp -f "$INDEX_ROOT/labwc/config/fontconfig/fonts.conf" "$CFG/fontconfig/fonts.conf"
 fc-cache -f >/dev/null
 
@@ -157,9 +160,20 @@ done
 install -m755 "$INDEX_ROOT/labwc/app-fixes/index-default-apps" "$HOME/.local/bin/index-default-apps"
 install -m755 "$INDEX_ROOT/labwc/app-fixes/index-snip" "$HOME/.local/bin/index-snip"
 
-# Preserve the common input values from an existing labwc installation only on
-# the first niri migration; later installs keep the managed niri files above.
-if [[ -n "$OLD_INPUT_STATE" && ! -s "$STATE_TMP/index-input.kdl" ]]; then
+# The current Quickshell bar/display panel was originally shipped with two
+# ~/.config/labwc helper paths. Keep tiny forwarding shims during migration;
+# all state and operations live in the compositor-neutral ~/.local/bin helpers.
+mkdir -p "$CFG/labwc"
+for helper in index-logout index-display-save index-display-restore; do
+  cat > "$CFG/labwc/$helper" <<EOF
+#!/bin/sh
+exec "\$HOME/.local/bin/$helper" "\$@"
+EOF
+  chmod +x "$CFG/labwc/$helper"
+done
+
+# Preserve common input values from labwc only on the first migration.
+if (( HAD_NIRI_INPUT == 0 )) && [[ -n "$OLD_INPUT_STATE" ]]; then
   IFS=$'\t' read -r old_ok old_speed old_natural _old_touchpad old_tap <<< "$OLD_INPUT_STATE"
   if [[ "$old_ok" == 1 ]]; then
     INDEX_INPUT_BACKEND=niri "$HOME/.local/bin/index-input" set-speed "$old_speed" || true
@@ -168,15 +182,15 @@ if [[ -n "$OLD_INPUT_STATE" && ! -s "$STATE_TMP/index-input.kdl" ]]; then
   fi
 fi
 
-# Apply the shared appearance state to the niri cursor include. Wallpaper is
-# started by index-session-start after login.
+# Apply shared appearance state to niri's cursor include. Wallpaper is started
+# by index-session-start after login.
 if [[ -x "$HOME/.local/bin/index-appearance" ]]; then
   "$HOME/.local/bin/index-appearance" apply >/dev/null 2>&1 || true
 fi
 
 # When migrating from a running wlroots session, snapshot its current monitor
-# arrangement into niri's persistent output include. If no output-management
-# session is available now, niri will safely auto-configure on first login.
+# arrangement into niri's persistent output include. Otherwise niri safely
+# auto-configures outputs on first login.
 if command -v wlr-randr >/dev/null 2>&1 && wlr-randr >/dev/null 2>&1; then
   INDEX_COMPOSITOR=niri "$HOME/.local/bin/index-display-save" >/dev/null 2>&1 || true
 fi
