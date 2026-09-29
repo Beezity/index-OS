@@ -144,7 +144,15 @@ PanelWindow {
                             required property var modelData
                             readonly property bool isActive: ToplevelManager.activeToplevel === modelData
                             readonly property string rawTitle: modelData.title || modelData.appId || "window"
-                            readonly property string displayTitle: rawTitle.length > 18 ? rawTitle.slice(0, 15) + "..." : rawTitle
+                            // Browsers and some other apps use Unicode dash characters in
+                            // their Wayland titles. The bundled DOS font maps those
+                            // codepoints to unrelated glyphs, so normalize separators.
+                            readonly property string normalizedTitle: rawTitle
+                                .replace(/\s*[\u2010-\u2015\u2212]\s*/g, " - ")
+                                .replace(/\s+-\s+/g, " - ")
+                            readonly property string displayTitle: normalizedTitle.length > 18
+                                ? normalizedTitle.slice(0, 15) + "..."
+                                : normalizedTitle
                             width: Math.min(160, taskLabel.implicitWidth + 26)
                             height: 22
                             color: isActive ? bar.cyan : (taskArea.containsMouse ? "#143245" : "#0c1620")
