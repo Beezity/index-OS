@@ -26,6 +26,9 @@ record(){
   fi
 }
 
+# Keep both compositor trees in migration backups so switching back to the
+# previous labwc session remains reversible while niri is being adopted.
+record "$HOME/.config/niri"
 record "$HOME/.config/labwc"
 record "$HOME/.config/quickshell"
 record "$HOME/.config/fastfetch"
@@ -38,14 +41,16 @@ for path in \
   "$HOME/.config/gtk-4.0/settings.ini" "$HOME/.config/gtk-4.0/gtk.css" \
   "$HOME/.config/wofi/config" "$HOME/.config/wofi/style.css" \
   "$HOME/.config/foot/foot.ini" "$HOME/.config/fish/config.fish" \
+  "$HOME/.config/xdg-desktop-portal/niri-portals.conf" \
   "$HOME/.config/xdg-desktop-portal/labwc-portals.conf" "$HOME/.config/xdg-desktop-portal/wlr/config" \
   "$HOME/.config/qt5ct/qt5ct.conf" "$HOME/.config/qt5ct/colors/the-index.conf" \
   "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt6ct/colors/the-index.conf" \
   "$HOME/.config/environment.d/60-index-browsers.conf" \
   "$HOME/.config/mimeapps.list" "$HOME/.config/user-dirs.dirs" "$HOME/.config/user-dirs.locale" \
   "$HOME/.local/share/icons/default/index.theme" \
-  "$HOME/.local/bin/index-default-apps" "$HOME/.local/bin/index-snip" "$HOME/.local/bin/index-doctor" \
-  "$HOME/.local/bin/index-backup" "$HOME/.local/bin/index-restore" "$HOME/.local/bin/index-appearance" "$HOME/.local/bin/index-audio" "$HOME/.local/bin/index-network" "$HOME/.local/bin/index-bluetooth" "$HOME/.local/bin/index-power" "$HOME/.local/bin/index-input" "$HOME/.local/bin/index-clipboard" "$HOME/.local/bin/index-notifications" "$HOME/.local/bin/index-settings" \
+  "$HOME/.local/bin/index-default-apps" "$HOME/.local/bin/index-snip" \
+  "$HOME/.local/bin/index-session-start" "$HOME/.local/bin/index-lock" "$HOME/.local/bin/index-logout" "$HOME/.local/bin/index-idle" "$HOME/.local/bin/index-display-save" "$HOME/.local/bin/index-display-restore" \
+  "$HOME/.local/bin/index-doctor" "$HOME/.local/bin/index-backup" "$HOME/.local/bin/index-restore" "$HOME/.local/bin/index-appearance" "$HOME/.local/bin/index-audio" "$HOME/.local/bin/index-network" "$HOME/.local/bin/index-bluetooth" "$HOME/.local/bin/index-power" "$HOME/.local/bin/index-input" "$HOME/.local/bin/index-clipboard" "$HOME/.local/bin/index-notifications" "$HOME/.local/bin/index-settings" \
   /usr/share/wayland-sessions/the-index.desktop \
   /etc/systemd/logind.conf.d/90-index.conf \
   /etc/apt/sources.list.d/index-os-trixie-backports.sources; do
