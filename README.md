@@ -62,6 +62,16 @@ bash ./install-fedora.sh
 
 Quickshell is installed from the `nett00n/hyprland` COPR because it is not currently provided by Fedora's official repositories.
 
+The Fedora installer preserves an already-installed RPM Fusion `ffmpeg` rather than forcing Fedora's conflicting `ffmpeg-free` package. It also keeps an existing `power-profiles-daemon` instead of replacing it with the mutually exclusive `tuned-ppd` backend.
+
+For testing a development branch on an existing Fedora THE INDEX installation without invoking DNF or changing installed packages, use:
+
+```bash
+bash ./patch-fedora.sh
+```
+
+The Fedora patch helper creates a normal THE INDEX backup and updates the branch's Quickshell files, labwc display configuration, screenshot helper, Universal DOS font, and diagnostics while preserving the existing libinput block. Log out and back in after applying it.
+
 ### Debian 13 / Sid
 
 Target: Debian 13 (Trixie) stable or Debian Sid.
