@@ -129,10 +129,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate config with Fedora Niri
+      - name: Validate static and generated config with Fedora Niri
         run: |
           docker run --rm -v "$PWD:/repo:ro" fedora:44 bash -lc '
-            dnf -y install niri >/dev/null &&
-            cd /repo &&
+            set -euo pipefail
+            dnf -y install niri python3 >/dev/null
+            cd /repo
             NIRI_CONFIG=/repo/niri/config/config.kdl niri validate
+
+            tmp=$(mktemp -d)
+            trap "rm -rf $tmp" EXIT
+            cp -a /repo/niri/config/. "$tmp/"
+
+            INDEX_INPUT_BACKEND=niri \
+              INDEX_INPUT_NIRI="$tmp/input.kdl" \
+              INDEX_NIRI_CONFIG="$tmp/config.kdl" \
+              sh /repo/scripts/index-input set-speed 0.35
+            INDEX_INPUT_BACKEND=niri \
+              INDEX_INPUT_NIRI="$tmp/input.kdl" \
+              INDEX_NIRI_CONFIG="$tmp/config.kdl" \
+              sh /repo/scripts/index-input set-natural-scroll yes
+            INDEX_INPUT_BACKEND=niri \
+              INDEX_INPUT_NIRI="$tmp/input.kdl" \
+              INDEX_NIRI_CONFIG="$tmp/config.kdl" \
+              sh /repo/scripts/index-input set-tap no
+            NIRI_CONFIG="$tmp/config.kdl" niri validate
+
+            mkdir -p "$tmp/state"
+            XDG_CONFIG_HOME="$tmp" NIRI_CONFIG="$tmp/config.kdl" python3 - <<PY
+import runpy
+ns = runpy.run_path("/repo/scripts/index-displays")
+ns["write_niri"]([
+    {"name":"HDMI-A-1","description":"ASUSTeK","enabled":True,"x":0,"y":0,"scale":1.0,"transform":"normal","modes":[{"width":1920,"height":1080,"refresh":180.0,"preferred":True,"current":True}]},
+    {"name":"eDP-1","description":"Internal","enabled":True,"x":1920,"y":0,"scale":1.0,"transform":"normal","modes":[{"width":1920,"height":1080,"refresh":144.0,"preferred":True,"current":True}]},
+], "HDMI-A-1")
+PY
+            NIRI_CONFIG="$tmp/config.kdl" niri validate
+            niri msg action quit --help >/dev/null
           '
