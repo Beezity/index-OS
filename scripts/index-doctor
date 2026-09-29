@@ -22,7 +22,11 @@ ok "architecture: $(uname -m)"; printf '  %sINFO%s  kernel: %s\n' "$DIM" "$NC" "
 
 section "CORE"
 for cmd in quickshell foot fish fastfetch wofi; do check_cmd "$cmd"; done
-if [[ "$COMPOSITOR" == niri ]]; then check_cmd niri; check_cmd niri-session; check_cmd xwayland-satellite; else check_cmd labwc; check_cmd wlr-randr; fi
+if [[ "$COMPOSITOR" == niri ]]; then
+  check_cmd niri; check_cmd niri-session; check_cmd xwayland-satellite; check_cmd gnome-keyring-daemon
+else
+  check_cmd labwc; check_cmd wlr-randr
+fi
 
 section "SESSION"
 if [[ "$COMPOSITOR" == niri ]]; then
@@ -32,6 +36,12 @@ if [[ "$COMPOSITOR" == niri ]]; then
   check_file "$CFG/niri/outputs.kdl" "Niri managed outputs"
   check_file "$CFG/niri/cursor.kdl" "Niri managed cursor"
   check_file "$CFG/niri/index-autostart" "Niri startup"
+  check_file "$CFG/xdg-desktop-portal/niri-portals.conf" "Niri portal preferences"
+  if [[ -f "$CFG/xdg-desktop-portal/niri-portals.conf" ]] && grep -q '^org.freedesktop.impl.portal.FileChooser=gtk;$' "$CFG/xdg-desktop-portal/niri-portals.conf"; then
+    ok "GTK file chooser portal selected"
+  else
+    fail "Niri GTK file chooser portal override missing"
+  fi
   if has niri && NIRI_CONFIG="$CFG/niri/config.kdl" niri validate >/dev/null 2>&1; then ok "Niri configuration validates"; else fail "Niri configuration validation failed"; fi
   [[ -n "${NIRI_SOCKET:-}" || "${XDG_CURRENT_DESKTOP:-}" == *niri* ]] && ok "Niri session detected" || warn "doctor is not running inside a Niri session"
 else
