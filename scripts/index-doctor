@@ -44,8 +44,11 @@ fi
 section "INDEX CONFIG"
 check_file "$HOME/.config/labwc/rc.xml" "labwc configuration"
 check_file "$HOME/.config/labwc/autostart" "labwc autostart"
+check_file "$HOME/.config/labwc/index-display-save" "display layout saver"
+check_file "$HOME/.config/labwc/index-display-restore" "display layout restorer"
 check_file "$HOME/.config/quickshell/shell.qml" "Quickshell shell"
 check_file "$HOME/.config/quickshell/Bar.qml" "Quickshell top bar"
+check_file "$HOME/.config/quickshell/StartMenuState.qml" "launcher IPC router"
 check_file "$HOME/.config/quickshell/ClipboardPopup.qml" "Clipboard popup"
 check_file "$HOME/.local/bin/index-clipboard" "Clipboard helper"
 if [[ -x "$HOME/.local/bin/index-clipboard" ]]; then
@@ -65,19 +68,26 @@ check_file "$HOME/.config/quickshell/BluetoothMenu.qml" "Bluetooth panel"
 check_file "$HOME/.local/bin/index-bluetooth" "Bluetooth helper"
 check_file "$HOME/.config/quickshell/PowerPanel.qml" "Power panel"
 check_file "$HOME/.local/bin/index-power" "Power helper"
+check_file "$HOME/.config/quickshell/DisplaysPanel.qml" "Display panel"
 check_file "$HOME/.config/quickshell/InputPanel.qml" "Input panel"
 check_file "$HOME/.local/bin/index-input" "Input helper"
 check_file "$HOME/.config/quickshell/Prescript.qml" "Prescript widget"
+check_file "$HOME/.config/quickshell/PrescriptState.qml" "Shared Prescript state"
 check_file "$HOME/.local/bin/index-settings" "Settings utility helper"
-if [[ -f "$HOME/.config/quickshell/Prescript.qml" && -f "$HOME/.config/labwc/rc.xml" ]] && grep -q 'target: "prescript"' "$HOME/.config/quickshell/Prescript.qml" && grep -q '<keybind key="W-p">' "$HOME/.config/labwc/rc.xml"; then
+if [[ -f "$HOME/.config/quickshell/PrescriptState.qml" && -f "$HOME/.config/labwc/rc.xml" ]] && grep -q 'target: "prescript"' "$HOME/.config/quickshell/PrescriptState.qml" && grep -q '<keybind key="W-p">' "$HOME/.config/labwc/rc.xml"; then
   ok "Prescript IPC toggle and Super+P binding"
 else
   fail "Prescript IPC toggle or Super+P binding missing"
 fi
-if [[ -f "$HOME/.config/quickshell/Bar.qml" && -f "$HOME/.config/labwc/rc.xml" ]] && grep -q 'target: "startmenu"' "$HOME/.config/quickshell/Bar.qml" && grep -q '<keybind key="W-space">' "$HOME/.config/labwc/rc.xml"; then
-  ok "launcher IPC toggle and Super+Space binding"
+if [[ -f "$HOME/.config/quickshell/StartMenuState.qml" && -f "$HOME/.config/quickshell/Bar.qml" && -f "$HOME/.config/labwc/rc.xml" ]] && grep -q 'target: "startmenu"' "$HOME/.config/quickshell/StartMenuState.qml" && grep -q 'target: "startmenu-"' "$HOME/.config/quickshell/Bar.qml" && grep -q '<keybind key="W-space">' "$HOME/.config/labwc/rc.xml"; then
+  ok "multimonitor launcher IPC and Super+Space binding"
 else
-  fail "launcher IPC toggle or Super+Space binding missing"
+  fail "launcher IPC router or Super+Space binding missing"
+fi
+if [[ -f "$HOME/.config/quickshell/shell.qml" ]] && grep -q 'model: Quickshell.screens' "$HOME/.config/quickshell/shell.qml" && grep -q 'screen: modelData' "$HOME/.config/quickshell/shell.qml"; then
+  ok "per-monitor shell surfaces enabled"
+else
+  fail "per-monitor shell surfaces missing"
 fi
 if [[ -x "$HOME/.local/bin/index-input" ]]; then
   INPUT_STATE="$("$HOME/.local/bin/index-input" state 2>/dev/null || true)"
@@ -107,7 +117,7 @@ if has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -
 if has fc-match && fc-match 'Perfect DOS VGA 437' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS'; then ok "Perfect DOS VGA base font available"; else warn "Perfect DOS VGA base font could not be confirmed"; fi
 
 section "DESKTOP SERVICES"
-for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist qalc ffmpeg notify-send playerctl upower brightnessctl; do check_cmd "$cmd"; done
+for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist qalc ffmpeg notify-send playerctl upower brightnessctl wlr-randr; do check_cmd "$cmd"; done
 if has systemctl; then
   for svc in NetworkManager bluetooth cups; do
     if systemctl is-enabled --quiet "$svc.service" 2>/dev/null; then ok "$svc enabled"; else warn "$svc not enabled"; fi
