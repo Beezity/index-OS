@@ -34,65 +34,35 @@ PACKAGES=(
   qt6-qtmultimedia qt6-qtsvg qt6-qtdeclarative qt6-qtwayland qt6ct qt5ct
   brightnessctl upower gammastep gnome-power-manager
   dejavu-sans-fonts liberation-fonts-all google-noto-fonts-all papirus-icon-theme papirus-icon-theme-dark
-  adwaita-cursor-theme cups cups-pdf system-config-printer flatpak git pciutils libxml2 util-linux
+  adwaita-cursor-theme cups cups-pdf system-config-printer flatpak git pciutils libxml2 util-linux python3
 )
-
-# Fedora's ffmpeg-free conflicts with RPM Fusion's full ffmpeg package. Keep an
-# already-installed ffmpeg provider instead of asking DNF to replace it.
-if command -v ffmpeg >/dev/null 2>&1; then
-  note "existing ffmpeg provider detected; leaving it unchanged"
-else
-  PACKAGES+=(ffmpeg-free)
-fi
-
-# tuned-ppd and power-profiles-daemon intentionally provide the same D-Bus API
-# and conflict at the RPM level. Respect whichever backend is already present.
+if command -v ffmpeg >/dev/null 2>&1; then note "existing ffmpeg provider detected; leaving it unchanged"; else PACKAGES+=(ffmpeg-free); fi
 if rpm -q power-profiles-daemon >/dev/null 2>&1 || command -v powerprofilesctl >/dev/null 2>&1; then
-  POWER_BACKEND="power-profiles-daemon"
-  note "existing power-profiles-daemon detected; leaving it in place"
-elif rpm -q tuned-ppd >/dev/null 2>&1; then
-  POWER_BACKEND="tuned-ppd"
-  note "existing tuned-ppd detected"
-else
-  POWER_BACKEND="tuned-ppd"
-  PACKAGES+=(tuned-ppd)
-fi
-
-sudo dnf -y install "${PACKAGES[@]}"
-ok "official Fedora dependencies installed"
+  POWER_BACKEND="power-profiles-daemon"; note "existing power-profiles-daemon detected; leaving it in place"
+elif rpm -q tuned-ppd >/dev/null 2>&1; then POWER_BACKEND="tuned-ppd"; note "existing tuned-ppd detected"
+else POWER_BACKEND="tuned-ppd"; PACKAGES+=(tuned-ppd); fi
+sudo dnf -y install "${PACKAGES[@]}"; ok "official Fedora dependencies installed"
 
 say "installing Quickshell..."
 sudo dnf -y install dnf5-plugins || sudo dnf -y install dnf-plugins-core
 dnf copr --help >/dev/null 2>&1 || { bad "DNF COPR support is unavailable; cannot install Quickshell."; exit 1; }
-if ! sudo dnf -y copr enable nett00n/hyprland; then
-  bad "could not enable nett00n/hyprland COPR for Fedora $FEDORA_VERSION; Quickshell is required"
-  exit 1
-fi
-if ! sudo dnf -y install quickshell; then
-  bad "Quickshell is unavailable from nett00n/hyprland for Fedora $FEDORA_VERSION"
-  exit 1
-fi
+sudo dnf -y copr enable nett00n/hyprland
+sudo dnf -y install quickshell
 ok "Quickshell installed"
 
-for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi qalc grim slurp wl-copy wl-paste cliphist ffmpeg notify-send nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics busctl flock fc-cache xmllint; do
-  require_command "$cmd"
-done
-
-QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"
-[[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }
-ok "Quickshell $QS_VERSION"
+for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi qalc grim slurp wl-copy wl-paste cliphist ffmpeg notify-send nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics busctl flock fc-cache xmllint python3; do require_command "$cmd"; done
+QS_VERSION="$(rpm -q --qf '%{VERSION}' quickshell)"; [[ "$(printf '%s\n%s\n' 0.3.0 "$QS_VERSION" | sort -V | head -n1)" == "0.3.0" ]] || { bad "quickshell >= 0.3.0 is required; installed: $QS_VERSION"; exit 1; }; ok "Quickshell $QS_VERSION"
 
 sudo systemctl enable --now NetworkManager.service bluetooth.service cups.service
-if [[ "$POWER_BACKEND" == power-profiles-daemon ]]; then
-  sudo systemctl start power-profiles-daemon.service
-  INDEX_POWER_PROFILE_SERVICE="power-profiles-daemon.service"
-else
-  sudo systemctl enable --now tuned.service
-  # tuned-ppd is D-Bus activated; starting it once verifies the compatibility service.
-  sudo systemctl start tuned-ppd.service
-  INDEX_POWER_PROFILE_SERVICE="tuned-ppd.service"
-fi
+if [[ "$POWER_BACKEND" == power-profiles-daemon ]]; then sudo systemctl start power-profiles-daemon.service; INDEX_POWER_PROFILE_SERVICE="power-profiles-daemon.service"
+else sudo systemctl enable --now tuned.service; sudo systemctl start tuned-ppd.service; INDEX_POWER_PROFILE_SERVICE="tuned-ppd.service"; fi
 sudo systemctl enable gdm.service
+
+# DisplaysPanel is shared by both compositor backends. Keep labwc's existing
+# wlr-randr persistence behind the same helper used by the Niri backend.
+mkdir -p "$HOME/.local/bin" "$HOME/.config/the-index"
+install -m755 "$INDEX_ROOT/scripts/index-displays" "$HOME/.local/bin/index-displays"
+printf 'labwc\n' > "$HOME/.config/the-index/compositor"
 
 export INDEX_DEX_COMMAND="dex-autostart"
 export INDEX_POLKIT_AGENT="/usr/libexec/kf6/polkit-kde-authentication-agent-1"
