@@ -29,7 +29,7 @@ PanelWindow {
     property bool settingsOpen: false
     property bool notifOpen: false
 
-    Calendar { id: calPopup }
+    Calendar { id: calPopup; screen: bar.screen }
 
     // Each monitor gets a unique target. StartMenuState owns the public
     // `startmenu` IPC endpoint and routes Super+Space to the active screen.
@@ -226,6 +226,7 @@ PanelWindow {
     }
 
     PanelWindow {
+        screen: bar.screen
         visible: bar.menuOpen
         anchors { top: true; bottom: true; left: true; right: true }
         color: "transparent"; exclusiveZone: 0
@@ -235,6 +236,7 @@ PanelWindow {
     }
 
     PanelWindow {
+        screen: bar.screen
         visible: bar.notifOpen
         anchors { top: true; right: true }
         margins { top: bar.implicitHeight; right: 8 }
@@ -275,6 +277,7 @@ PanelWindow {
 
     PanelWindow {
         id: startMenu
+        screen: bar.screen
         visible: bar.menuOpen
         anchors { top: true; left: true }
         margins {
@@ -478,6 +481,7 @@ PanelWindow {
     }
 
     PanelWindow {
+        screen: bar.screen
         visible: bar.settingsOpen
         anchors { top: true; right: true }
         margins { top: bar.implicitHeight; right: 8 }
