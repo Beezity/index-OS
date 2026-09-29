@@ -2,8 +2,20 @@
 # WILL OF THE CITY :: THE INDEX — power/idle policy helper
 set -eu
 
-CONF="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/index.conf"
-IDLE="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/index-idle"
+XDG_CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+case ":${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:" in
+  *:niri:*|*:Niri:*) NIRI_SESSION=1 ;;
+  *) NIRI_SESSION=0 ;;
+esac
+[ -n "${NIRI_SOCKET:-}" ] && NIRI_SESSION=1
+if [ "$NIRI_SESSION" = 1 ]; then
+  CONF="$XDG_CFG/the-index/power.conf"
+  IDLE="$HOME/.local/bin/index-idle"
+else
+  CONF="$XDG_CFG/labwc/index.conf"
+  IDLE="${INDEX_IDLE_HELPER:-$HOME/.local/bin/index-idle}"
+  [ -x "$IDLE" ] || IDLE="$XDG_CFG/labwc/index-idle"
+fi
 
 sanitize() { printf '%s' "$1" | tr '\t\r\n' '   '; }
 
