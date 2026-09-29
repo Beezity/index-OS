@@ -111,3 +111,8 @@ binds {
 
     Mod+Shift+E { quit; }
 }
+
+// Advanced Niri-specific tweaks belong here rather than being recreated in
+// Settings. Because this include comes last, it can intentionally override
+// THE INDEX defaults without being overwritten by normal updates.
+include optional=true "custom.kdl"
