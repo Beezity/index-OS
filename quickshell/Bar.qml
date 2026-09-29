@@ -59,6 +59,7 @@ PanelWindow {
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: bar.cyan }
 
         Text {
+            id: clockText
             anchors.centerIn: parent
             z: 5
             text: Qt.formatDateTime(clock.date, "'_'hh:mm AP'._'")
@@ -74,6 +75,7 @@ PanelWindow {
             spacing: 10
 
             Text {
+                id: startLabel
                 text: "// THE INDEX"
                 font.family: bar.pixel; font.pixelSize: 15
                 color: bar.cyanB
@@ -85,6 +87,7 @@ PanelWindow {
             }
 
             RowLayout {
+                id: workspaceRow
                 spacing: 5
                 Repeater {
                     model: workspaceModel
@@ -116,38 +119,54 @@ PanelWindow {
                 }
             }
 
-            RowLayout {
-                Layout.maximumWidth: bar.width * 0.32
-                spacing: 4
-                Repeater {
-                    model: ToplevelManager.toplevels
-                    delegate: Rectangle {
-                        required property var modelData
-                        readonly property bool isActive: ToplevelManager.activeToplevel === modelData
-                        readonly property string rawTitle: modelData.title || modelData.appId || "window"
-                        readonly property string displayTitle: rawTitle.length > 18 ? rawTitle.slice(0, 15) + "..." : rawTitle
-                        Layout.preferredWidth: Math.min(160, taskLabel.implicitWidth + 26)
-                        Layout.minimumWidth: 40
-                        implicitHeight: 22
-                        color: isActive ? bar.cyan : (taskArea.containsMouse ? "#143245" : "#0c1620")
-                        border.color: isActive ? bar.cyanB : bar.cyanD; border.width: 1
-                        Image {
-                            id: taskIcon
-                            anchors.left: parent.left; anchors.leftMargin: 4; anchors.verticalCenter: parent.verticalCenter
-                            width: 14; height: 14; sourceSize.width: 14; sourceSize.height: 14
-                            source: Quickshell.iconPath(modelData.appId, "application-x-executable")
-                            visible: status === Image.Ready
+            // Keep task buttons entirely inside the left half of the bar. A
+            // clipped viewport is intentional: when too many windows are open,
+            // extra tasks stop at the clock instead of drawing underneath it.
+            Item {
+                id: taskViewport
+                readonly property real roomBeforeClock: Math.max(0,
+                    bar.width * 0.5 - clockText.implicitWidth * 0.5
+                    - startLabel.implicitWidth - workspaceRow.implicitWidth - 48)
+                Layout.preferredWidth: Math.min(bar.width * 0.32, roomBeforeClock)
+                Layout.maximumWidth: Layout.preferredWidth
+                Layout.minimumWidth: 0
+                implicitHeight: 22
+                clip: true
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 4
+
+                    Repeater {
+                        model: ToplevelManager.toplevels
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property bool isActive: ToplevelManager.activeToplevel === modelData
+                            readonly property string rawTitle: modelData.title || modelData.appId || "window"
+                            readonly property string displayTitle: rawTitle.length > 18 ? rawTitle.slice(0, 15) + "..." : rawTitle
+                            width: Math.min(160, taskLabel.implicitWidth + 26)
+                            height: 22
+                            color: isActive ? bar.cyan : (taskArea.containsMouse ? "#143245" : "#0c1620")
+                            border.color: isActive ? bar.cyanB : bar.cyanD; border.width: 1
+                            Image {
+                                id: taskIcon
+                                anchors.left: parent.left; anchors.leftMargin: 4; anchors.verticalCenter: parent.verticalCenter
+                                width: 14; height: 14; sourceSize.width: 14; sourceSize.height: 14
+                                source: Quickshell.iconPath(modelData.appId, "application-x-executable")
+                                visible: status === Image.Ready
+                            }
+                            Text {
+                                id: taskLabel
+                                anchors.left: parent.left; anchors.leftMargin: taskIcon.visible ? 22 : 6
+                                anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
+                                text: parent.displayTitle
+                                font.family: bar.pixel; font.pixelSize: 12
+                                color: parent.isActive ? "#04141c" : bar.cyanB
+                                clip: true
+                            }
+                            MouseArea { id: taskArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: modelData.activate() }
                         }
-                        Text {
-                            id: taskLabel
-                            anchors.left: parent.left; anchors.leftMargin: taskIcon.visible ? 22 : 6
-                            anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
-                            text: parent.displayTitle
-                            font.family: bar.pixel; font.pixelSize: 12
-                            color: parent.isActive ? "#04141c" : bar.cyanB
-                            clip: true
-                        }
-                        MouseArea { id: taskArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: modelData.activate() }
                     }
                 }
             }
