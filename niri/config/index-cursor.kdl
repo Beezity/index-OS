@@ -1,0 +1,6 @@
+// WILL OF THE CITY :: THE INDEX — managed cursor state
+// This file is owned by index-appearance.
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 24
+}
