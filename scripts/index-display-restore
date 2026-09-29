@@ -1,0 +1,88 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — restore saved output state where required
+set -eu
+
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+STATE="$CFG/the-index/display.json"
+LEGACY="$CFG/labwc/display.json"
+
+backend() {
+  case "${INDEX_COMPOSITOR:-}" in niri|labwc) printf '%s' "$INDEX_COMPOSITOR"; return ;; esac
+  if [ -n "${NIRI_SOCKET:-}" ]; then printf niri; return; fi
+  case ":${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:" in
+    *:niri:*) printf niri; return ;;
+    *:labwc:*) printf labwc; return ;;
+  esac
+  printf labwc
+}
+
+# Niri persistently consumes ~/.config/niri/index-outputs.kdl and live-reloads
+# it, so there is nothing to replay at session start.
+[ "$(backend)" = niri ] && exit 0
+
+J="$STATE"
+[ -f "$J" ] || J="$LEGACY"
+[ -f "$J" ] || exit 0
+command -v wlr-randr >/dev/null 2>&1 || exit 0
+command -v python3 >/dev/null 2>&1 || exit 0
+
+sleep 1
+python3 - "$J" <<'PY'
+import json
+import subprocess
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        outputs = json.load(handle)
+except Exception:
+    raise SystemExit(0)
+
+args = ["wlr-randr"]
+valid_transforms = {
+    "normal", "90", "180", "270",
+    "flipped", "flipped-90", "flipped-180", "flipped-270",
+}
+for output in outputs:
+    name = output.get("name")
+    if not name:
+        continue
+    args += ["--output", name]
+    if not output.get("enabled"):
+        args += ["--off"]
+        continue
+
+    args += ["--on"]
+    modes = output.get("modes") or []
+    mode = next((m for m in modes if m.get("current")), None)
+    if mode is None:
+        mode = next((m for m in modes if m.get("preferred")), None)
+    if mode is not None:
+        value = f"{int(mode['width'])}x{int(mode['height'])}"
+        refresh = float(mode.get("refresh") or 0)
+        if refresh > 0:
+            value += f"@{refresh:.3f}Hz"
+        args += ["--mode", value]
+    else:
+        args += ["--preferred"]
+
+    position = output.get("position") or {}
+    try:
+        args += ["--pos", f"{int(position.get('x', 0))},{int(position.get('y', 0))}"]
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        scale = float(output.get("scale", 1.0))
+        if scale > 0:
+            args += ["--scale", f"{scale:.4f}"]
+    except (TypeError, ValueError):
+        pass
+
+    transform = output.get("transform") or "normal"
+    if transform in valid_transforms:
+        args += ["--transform", transform]
+
+if len(args) > 1:
+    subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+PY
