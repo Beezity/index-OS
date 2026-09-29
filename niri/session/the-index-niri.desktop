@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=THE INDEX (Niri)
+Comment=THE INDEX scrolling Wayland session
+Exec=niri-session
+Type=Application
+DesktopNames=niri
