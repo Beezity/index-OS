@@ -29,7 +29,7 @@ for path in \
   "$HOME/.local/bin/index-backup" "$HOME/.local/bin/index-restore" "$HOME/.local/bin/index-uninstall" "$HOME/.local/bin/index-update" \
   "$HOME/.local/bin/index-appearance" "$HOME/.local/bin/index-audio" "$HOME/.local/bin/index-network" "$HOME/.local/bin/index-bluetooth" \
   "$HOME/.local/bin/index-power" "$HOME/.local/bin/index-input" "$HOME/.local/bin/index-clipboard" "$HOME/.local/bin/index-notifications" "$HOME/.local/bin/index-settings" \
-  "$HOME/.local/bin/index-lock" "$HOME/.local/bin/index-idle" "$HOME/.local/bin/index-displays" \
+  "$HOME/.local/bin/index-lock" "$HOME/.local/bin/index-idle" "$HOME/.local/bin/index-displays" "$HOME/.local/bin/index-logout" \
   /usr/share/wayland-sessions/the-index.desktop /usr/share/wayland-sessions/the-index-niri.desktop \
   /etc/systemd/logind.conf.d/90-index.conf /etc/apt/sources.list.d/index-os-trixie-backports.sources; do record "$path"; done
 
