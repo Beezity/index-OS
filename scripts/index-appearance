@@ -2,28 +2,33 @@
 # WILL OF THE CITY :: THE INDEX — appearance preferences
 set -eu
 
-CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/the-index"
+XDG_CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+CFG_DIR="$XDG_CFG/the-index"
 CFG="$CFG_DIR/appearance.conf"
-LABWC="${XDG_CONFIG_HOME:-$HOME/.config}/labwc"
-DEFAULT_WALL="$LABWC/wall.png"
+LABWC="$XDG_CFG/labwc"
+NIRI="$XDG_CFG/niri"
+GENERIC_WALL="$CFG_DIR/wall.png"
+LABWC_WALL="$LABWC/wall.png"
+DEFAULT_WALL="$GENERIC_WALL"
+[ -f "$DEFAULT_WALL" ] || DEFAULT_WALL="$LABWC_WALL"
 CACHE_DIR="${INDEX_APPEARANCE_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/the-index/appearance}"
 PICTURES_DIR="${INDEX_APPEARANCE_PICTURES_DIR:-$HOME/Pictures}"
 mkdir -p "$CFG_DIR"
 
-getv() {
-  [ -f "$CFG" ] && sed -n "s/^$1=//p" "$CFG" | tail -1 || true
+is_niri() {
+  [ -n "${NIRI_SOCKET:-}" ] && return 0
+  case ":${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:" in *:niri:*|*:Niri:*) return 0 ;; esac
+  return 1
 }
 
+getv() { [ -f "$CFG" ] && sed -n "s/^$1=//p" "$CFG" | tail -1 || true; }
 setv() {
   key=$1 value=$2
   tmp=$(mktemp "$CFG_DIR/.appearance.XXXXXX")
   { [ -f "$CFG" ] && grep -v "^${key}=" "$CFG" || true; printf '%s=%s\n' "$key" "$value"; } > "$tmp"
   mv "$tmp" "$CFG"
 }
-
-sanitize_state() {
-  printf '%s' "$1" | tr '\t\r\n' '   '
-}
+sanitize_state() { printf '%s' "$1" | tr '\t\r\n' '   '; }
 
 list_themes() {
   kind=$1
@@ -41,97 +46,76 @@ list_themes() {
 
 list_wallpapers() {
   [ -d "$PICTURES_DIR" ] || return 0
-  find "$PICTURES_DIR" -type f \
-    \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) \
-    -print 2>/dev/null | LC_ALL=C sort -f
+  find "$PICTURES_DIR" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -print 2>/dev/null | LC_ALL=C sort -f
 }
-
-cache_path() {
-  printf '%s/%s.list' "$CACHE_DIR" "$1"
-}
-
-cache_stale() {
-  target=$1
-  [ -f "$target" ] || return 0
-  find "$target" -mmin +4 -print -quit 2>/dev/null | grep -q .
-}
-
+cache_path() { printf '%s/%s.list' "$CACHE_DIR" "$1"; }
+cache_stale() { target=$1; [ -f "$target" ] || return 0; find "$target" -mmin +4 -print -quit 2>/dev/null | grep -q .; }
 refresh_choice() {
-  kind=$1
-  mkdir -p "$CACHE_DIR"
-  umask 077
-  target=$(cache_path "$kind")
-  tmp=$(mktemp "$CACHE_DIR/.${kind}.XXXXXX")
-  case "$kind" in
-    icons) list_themes icons > "$tmp" ;;
-    cursors) list_themes cursors > "$tmp" ;;
-    wallpapers) list_wallpapers > "$tmp" ;;
-    *) rm -f "$tmp"; return 2 ;;
-  esac
+  kind=$1; mkdir -p "$CACHE_DIR"; umask 077; target=$(cache_path "$kind"); tmp=$(mktemp "$CACHE_DIR/.${kind}.XXXXXX")
+  case "$kind" in icons) list_themes icons > "$tmp" ;; cursors) list_themes cursors > "$tmp" ;; wallpapers) list_wallpapers > "$tmp" ;; *) rm -f "$tmp"; return 2 ;; esac
   mv "$tmp" "$target"
 }
-
-refresh_choices() {
-  for kind in icons cursors wallpapers; do
-    target=$(cache_path "$kind")
-    cache_stale "$target" && refresh_choice "$kind" || true
-  done
-}
-
-ensure_choice() {
-  kind=$1
-  [ -f "$(cache_path "$kind")" ] || refresh_choice "$kind"
-}
-
+refresh_choices() { for kind in icons cursors wallpapers; do target=$(cache_path "$kind"); cache_stale "$target" && refresh_choice "$kind" || true; done; }
+ensure_choice() { kind=$1; [ -f "$(cache_path "$kind")" ] || refresh_choice "$kind"; }
 choose_value() {
   kind=$1 prompt=$2
-  command -v wofi >/dev/null 2>&1 || {
-    echo "wofi is required" >&2
-    exit 1
-  }
-  ensure_choice "$kind"
-  wofi --dmenu -p "$prompt" < "$(cache_path "$kind")" || true
+  command -v wofi >/dev/null 2>&1 || { echo "wofi is required" >&2; exit 1; }
+  ensure_choice "$kind"; wofi --dmenu -p "$prompt" < "$(cache_path "$kind")" || true
 }
 
 set_ini_value() {
   file=$1 key=$2 value=$3
   [ -f "$file" ] || return 0
-  if grep -q "^${key}=" "$file"; then
-    sed -i "s|^${key}=.*|${key}=${value}|" "$file"
-  else
-    printf '\n%s=%s\n' "$key" "$value" >> "$file"
-  fi
+  if grep -q "^${key}=" "$file"; then sed -i "s|^${key}=.*|${key}=${value}|" "$file"; else printf '\n%s=%s\n' "$key" "$value" >> "$file"; fi
 }
 
 apply_icons() {
   theme=$1
   command -v gsettings >/dev/null 2>&1 && gsettings set org.gnome.desktop.interface icon-theme "$theme" >/dev/null 2>&1 || true
-  for gtk in gtk-3.0 gtk-4.0; do
-    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-icon-theme-name "$theme"
-  done
-  for q in qt5ct qt6ct; do
-    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$q/$q.conf" icon_theme "$theme"
-  done
+  for gtk in gtk-3.0 gtk-4.0; do set_ini_value "$XDG_CFG/$gtk/settings.ini" gtk-icon-theme-name "$theme"; done
+  for q in qt5ct qt6ct; do set_ini_value "$XDG_CFG/$q/$q.conf" icon_theme "$theme"; done
+}
+
+write_niri_cursor() {
+  theme=$1 size=$2
+  mkdir -p "$NIRI"
+  old=""
+  if [ -f "$NIRI/cursor.kdl" ]; then old=$(mktemp "$NIRI/.cursor.old.XXXXXX"); cp -f "$NIRI/cursor.kdl" "$old"; fi
+  tmp=$(mktemp "$NIRI/.cursor.XXXXXX")
+  printf '// WILL OF THE CITY :: THE INDEX — managed cursor settings\ncursor {\n    xcursor-theme "%s"\n    xcursor-size %s\n}\n' "$theme" "$size" > "$tmp"
+  mv "$tmp" "$NIRI/cursor.kdl"
+  if [ "${INDEX_APPEARANCE_NO_VALIDATE:-0}" != 1 ] && command -v niri >/dev/null 2>&1; then
+    if ! NIRI_CONFIG="${INDEX_NIRI_CONFIG:-$NIRI/config.kdl}" niri validate >/dev/null; then
+      if [ -n "$old" ]; then mv "$old" "$NIRI/cursor.kdl"; else rm -f "$NIRI/cursor.kdl"; fi
+      echo 'niri rejected cursor settings; previous settings restored' >&2
+      return 1
+    fi
+  fi
+  [ -z "$old" ] || rm -f "$old"
 }
 
 apply_cursor() {
   theme=$1 size=${2:-24}
   case "$size" in ''|*[!0-9]*) echo "invalid cursor size: $size" >&2; exit 2 ;; esac
-  mkdir -p "$HOME/.local/share/icons/default" "$LABWC"
+  mkdir -p "$HOME/.local/share/icons/default"
   printf '[Icon Theme]\nInherits=%s\n' "$theme" > "$HOME/.local/share/icons/default/index.theme"
   command -v gsettings >/dev/null 2>&1 && {
     gsettings set org.gnome.desktop.interface cursor-theme "$theme" >/dev/null 2>&1 || true
     gsettings set org.gnome.desktop.interface cursor-size "$size" >/dev/null 2>&1 || true
   }
   for gtk in gtk-3.0 gtk-4.0; do
-    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-cursor-theme-name "$theme"
-    set_ini_value "${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini" gtk-cursor-theme-size "$size"
+    set_ini_value "$XDG_CFG/$gtk/settings.ini" gtk-cursor-theme-name "$theme"
+    set_ini_value "$XDG_CFG/$gtk/settings.ini" gtk-cursor-theme-size "$size"
   done
-  envf="$LABWC/environment"
-  touch "$envf"
-  sed -i '/^XCURSOR_THEME=/d;/^XCURSOR_SIZE=/d' "$envf"
-  printf 'XCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$theme" "$size" >> "$envf"
-  command -v labwc >/dev/null 2>&1 && labwc --reconfigure >/dev/null 2>&1 || true
+  if is_niri; then
+    write_niri_cursor "$theme" "$size"
+  else
+    mkdir -p "$LABWC"
+    envf="$LABWC/environment"; touch "$envf"
+    sed -i '/^XCURSOR_THEME=/d;/^XCURSOR_SIZE=/d' "$envf"
+    printf 'XCURSOR_THEME=%s\nXCURSOR_SIZE=%s\n' "$theme" "$size" >> "$envf"
+    command -v labwc >/dev/null 2>&1 && labwc --reconfigure >/dev/null 2>&1 || true
+  fi
 }
 
 apply_wallpaper() {
@@ -144,39 +128,12 @@ apply_wallpaper() {
   fi
 }
 
-choose_icons() {
-  selected=$(choose_value icons 'icon theme')
-  [ -n "$selected" ] || return 0
-  setv ICON_THEME "$selected"
-  apply_icons "$selected"
-}
-
-choose_cursor() {
-  size=${1:-24}
-  case "$size" in ''|*[!0-9]*) echo "invalid cursor size: $size" >&2; exit 2 ;; esac
-  selected=$(choose_value cursors 'cursor theme')
-  [ -n "$selected" ] || return 0
-  setv CURSOR_THEME "$selected"
-  setv CURSOR_SIZE "$size"
-  apply_cursor "$selected" "$size"
-}
-
-choose_wallpaper() {
-  selected=$(choose_value wallpapers 'wallpaper')
-  [ -n "$selected" ] || return 0
-  [ -f "$selected" ] || { echo "Wallpaper not found: $selected" >&2; exit 1; }
-  setv WALLPAPER "$selected"
-  apply_wallpaper "$selected"
-}
+choose_icons() { selected=$(choose_value icons 'icon theme'); [ -n "$selected" ] || return 0; setv ICON_THEME "$selected"; apply_icons "$selected"; }
+choose_cursor() { size=${1:-24}; case "$size" in ''|*[!0-9]*) exit 2 ;; esac; selected=$(choose_value cursors 'cursor theme'); [ -n "$selected" ] || return 0; setv CURSOR_THEME "$selected"; setv CURSOR_SIZE "$size"; apply_cursor "$selected" "$size"; }
+choose_wallpaper() { selected=$(choose_value wallpapers 'wallpaper'); [ -n "$selected" ] || return 0; [ -f "$selected" ] || { echo "Wallpaper not found: $selected" >&2; exit 1; }; setv WALLPAPER "$selected"; apply_wallpaper "$selected"; }
 
 case "${1:-}" in
-  state)
-    printf '%s\t%s\t%s\t%s\n' \
-      "$(sanitize_state "$(getv ICON_THEME)")" \
-      "$(sanitize_state "$(getv CURSOR_THEME)")" \
-      "$(sanitize_state "$(getv CURSOR_SIZE)")" \
-      "$(sanitize_state "$(getv WALLPAPER)")"
-    ;;
+  state) printf '%s\t%s\t%s\t%s\n' "$(sanitize_state "$(getv ICON_THEME)")" "$(sanitize_state "$(getv CURSOR_THEME)")" "$(sanitize_state "$(getv CURSOR_SIZE)")" "$(sanitize_state "$(getv WALLPAPER)")" ;;
   list-icons) list_themes icons ;;
   list-cursors) list_themes cursors ;;
   list-wallpapers) list_wallpapers ;;
@@ -196,8 +153,5 @@ case "${1:-}" in
     [ -n "$cursor" ] && apply_cursor "$cursor" "${size:-24}" || true
     if [ -n "$wall" ] && [ -f "$wall" ]; then apply_wallpaper "$wall"; else setv WALLPAPER "$DEFAULT_WALL"; apply_wallpaper "$DEFAULT_WALL"; fi
     ;;
-  *)
-    echo "usage: index-appearance {state|list-icons|list-cursors|list-wallpapers|refresh-choices|choose-icons|choose-cursor [SIZE]|choose-wallpaper|get KEY|set-icons THEME|set-cursor THEME [SIZE]|set-cursor-size SIZE|set-wallpaper FILE|reset-wallpaper|apply}" >&2
-    exit 2
-    ;;
+  *) echo "usage: index-appearance {state|list-icons|list-cursors|list-wallpapers|refresh-choices|choose-icons|choose-cursor [SIZE]|choose-wallpaper|get KEY|set-icons THEME|set-cursor THEME [SIZE]|set-cursor-size SIZE|set-wallpaper FILE|reset-wallpaper|apply}" >&2; exit 2 ;;
 esac
