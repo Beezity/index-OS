@@ -10,6 +10,8 @@ import Quickshell.Io
 
 PanelWindow {
     id: pres
+    property bool open: true
+    visible: open
     anchors { top: true; right: true }
     margins { top: 70; right: 28 }
     implicitWidth: 420
@@ -23,11 +25,19 @@ PanelWindow {
     readonly property color cyan:  "#5DADE2"
     readonly property color cyanB: "#85C5E8"
     readonly property color cyanD: "#3A7CA5"
+    readonly property color warn:  "#FF6B6B"
 
     property var bank: ({})
     property string text_: ""
     property string dateKey: ""
     property string shown: ""
+
+    IpcHandler {
+        target: "prescript"
+        function toggle(): void { pres.open = !pres.open }
+        function open(): void { pres.open = true }
+        function close(): void { pres.open = false }
+    }
 
     // ---- scramble reveal (same idea as the lock screen) ----
     readonly property string scrambleChars: "!<>-_\\/[]{}—=+*^?#________ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -191,14 +201,44 @@ PanelWindow {
         border.color: pres.cyan
         border.width: 2
 
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: { pres.text_ = pres.compose(); pres.dateKey = pres.todayKey() }
+        }
+
+        Text {
+            id: closeButton
+            z: 2
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 13
+            anchors.rightMargin: 13
+            text: "[X]"
+            font.family: pres.pixel
+            font.pixelSize: 14
+            color: pres.warn
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: function(mouse) {
+                    mouse.accepted = true
+                    pres.open = false
+                }
+            }
+        }
+
         Column {
             id: col
+            z: 1
             anchors.left: parent.left; anchors.right: parent.right
             anchors.top: parent.top
             anchors.margins: 13
             spacing: 6
 
             Text {
+                width: Math.max(0, col.width - closeButton.implicitWidth - 8)
                 text: ">_ PRESCRIPT OF THE DAY_"
                 font.family: pres.pixel; font.pixelSize: 14
                 color: pres.cyanD
@@ -220,12 +260,6 @@ PanelWindow {
                 font.family: pres.pixel; font.pixelSize: 10
                 color: pres.cyanD
             }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: { pres.text_ = pres.compose(); pres.dateKey = pres.todayKey() }
         }
     }
 }
