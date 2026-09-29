@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=THE INDEX
+Comment=WILL OF THE CITY :: THE INDEX (niri)
+Exec=niri-session
+TryExec=niri-session
+Type=Application
+DesktopNames=niri
