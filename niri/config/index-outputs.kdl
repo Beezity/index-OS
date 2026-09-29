@@ -1,0 +1,3 @@
+// WILL OF THE CITY :: THE INDEX — managed output state
+// index-display-save writes persistent output sections here after the user
+// applies a layout in Settings. Empty means niri should auto-configure outputs.
