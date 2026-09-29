@@ -89,17 +89,11 @@ binds {
     Mod+R { switch-preset-column-width; }
     Mod+Minus { set-column-width "-10%"; }
     Mod+Equal { set-column-width "+10%"; }
-    Mod+V { toggle-window-floating; }
+    Mod+Shift+V { toggle-window-floating; }
     Mod+W { toggle-column-tabbed-display; }
 
-    Mod+L { spawn "index-lock"; }
+    Mod+L allow-inhibiting=false { spawn "index-lock"; }
     Mod+P { spawn-sh "qs ipc call prescript toggle || quickshell ipc call prescript toggle"; }
-    Mod+V { toggle-window-floating; }
-    Mod+Shift+V { spawn "sh" "-c" "$HOME/.config/labwc/index-clip"; }
-    Mod+Ctrl+V { spawn "sh" "-c" "$HOME/.config/labwc/index-clip"; }
-
-    // Keep the existing INDEX clipboard shortcut without stealing Niri's
-    // floating toggle: Super+V is reserved for clipboard history.
     Mod+V { spawn-sh "qs ipc call clipboard toggle || quickshell ipc call clipboard toggle"; }
 
     Mod+Shift+S { screenshot; }
