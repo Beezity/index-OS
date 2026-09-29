@@ -11,8 +11,18 @@ check_cmd(){ has "$1" && ok "$1 available" || fail "$1 missing"; }
 check_file(){ [[ -e "$1" ]] && ok "$2" || fail "$2 missing ($1)"; }
 
 CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
-COMPOSITOR=labwc
-[[ -f "$CFG/the-index/compositor" ]] && COMPOSITOR="$(cat "$CFG/the-index/compositor" 2>/dev/null || true)"
+# Both compositor sessions can coexist. Prefer the compositor of the current
+# session, then fall back to the install/update marker when run from a TTY or
+# another desktop.
+COMPOSITOR=""
+if [[ -n "${NIRI_SOCKET:-}" || "${XDG_CURRENT_DESKTOP:-}" == *niri* || "${XDG_SESSION_DESKTOP:-}" == *niri* ]]; then
+  COMPOSITOR=niri
+elif [[ "${XDG_CURRENT_DESKTOP:-}" == *labwc* || "${XDG_SESSION_DESKTOP:-}" == *labwc* ]]; then
+  COMPOSITOR=labwc
+fi
+if [[ -z "$COMPOSITOR" && -f "$CFG/the-index/compositor" ]]; then
+  COMPOSITOR="$(cat "$CFG/the-index/compositor" 2>/dev/null || true)"
+fi
 case "$COMPOSITOR" in labwc|niri) ;; *) COMPOSITOR=labwc ;; esac
 
 printf '%sWILL OF THE CITY :: THE INDEX%s\n%sSYSTEM DIAGNOSTIC // %s%s\n' "$CYAN" "$NC" "$DIM" "$COMPOSITOR" "$NC"
@@ -43,7 +53,12 @@ if [[ "$COMPOSITOR" == niri ]]; then
     fail "Niri GTK file chooser portal override missing"
   fi
   if has niri && NIRI_CONFIG="$CFG/niri/config.kdl" niri validate >/dev/null 2>&1; then ok "Niri configuration validates"; else fail "Niri configuration validation failed"; fi
-  [[ -n "${NIRI_SOCKET:-}" || "${XDG_CURRENT_DESKTOP:-}" == *niri* ]] && ok "Niri session detected" || warn "doctor is not running inside a Niri session"
+  if [[ -n "${NIRI_SOCKET:-}" || "${XDG_CURRENT_DESKTOP:-}" == *niri* ]]; then
+    ok "Niri session detected"
+    if has niri && niri msg --json outputs >/dev/null 2>&1; then ok "Niri IPC/output state reachable"; else fail "Niri session detected but IPC/output state is unavailable"; fi
+  else
+    warn "doctor is not running inside a Niri session"
+  fi
 else
   check_file /usr/share/wayland-sessions/the-index.desktop "THE INDEX labwc session registered"
   check_file "$CFG/labwc/rc.xml" "labwc configuration"
@@ -72,12 +87,17 @@ for pair in \
   "$HOME/.local/bin/index-input|input backend" \
   "$HOME/.local/bin/index-power|power backend" \
   "$HOME/.local/bin/index-lock|lock helper" \
-  "$HOME/.local/bin/index-idle|idle helper"; do
+  "$HOME/.local/bin/index-idle|idle helper" \
+  "$HOME/.local/bin/index-snip|screenshot helper"; do
   check_file "${pair%%|*}" "${pair#*|}"
 done
 if [[ -f "$CFG/quickshell/shell.qml" ]] && grep -q 'model: Quickshell.screens' "$CFG/quickshell/shell.qml"; then ok "per-monitor shell surfaces enabled"; else fail "per-monitor shell surfaces missing"; fi
 if [[ -x "$HOME/.local/bin/index-input" ]]; then INPUT_STATE="$("$HOME/.local/bin/index-input" state 2>/dev/null || true)"; [[ "${INPUT_STATE%%$'\t'*}" == 1 ]] && ok "$COMPOSITOR input backend readable" || fail "$COMPOSITOR input backend unavailable"; fi
 if [[ -x "$HOME/.local/bin/index-displays" ]]; then DISPLAY_STATE="$("$HOME/.local/bin/index-displays" state 2>/dev/null | head -n1 || true)"; [[ "$DISPLAY_STATE" == $'@output\t'* ]] && ok "$COMPOSITOR display backend readable" || fail "$COMPOSITOR display backend unavailable"; fi
+PICTURES=""
+if has xdg-user-dir; then PICTURES="$(xdg-user-dir PICTURES 2>/dev/null || true)"; fi
+[[ -n "$PICTURES" ]] || PICTURES="$HOME/Pictures"
+if [[ -d "$PICTURES/Screenshots" && -w "$PICTURES/Screenshots" ]]; then ok "screenshot directory writable"; else warn "screenshot directory missing or not writable ($PICTURES/Screenshots)"; fi
 
 section "THEMING"
 check_file "$HOME/.local/share/themes/the-index/gtk-3.0/gtk.css" "Index GTK3 theme"
@@ -89,7 +109,7 @@ check_file "$CFG/gtk-4.0/settings.ini" "GTK4 settings"
 has fc-match && fc-match 'Perfect DOS VGA 437 Universal' 2>/dev/null | grep -qi 'PerfectDOS\|Perfect DOS' && ok "Perfect DOS VGA Universal font available" || warn "Universal DOS font could not be confirmed"
 
 section "DESKTOP SERVICES"
-for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist qalc ffmpeg notify-send playerctl upower brightnessctl; do check_cmd "$cmd"; done
+for cmd in nmcli bluetoothctl wpctl wl-copy wl-paste cliphist qalc ffmpeg notify-send playerctl upower brightnessctl grim slurp; do check_cmd "$cmd"; done
 if has systemctl; then
   for svc in NetworkManager bluetooth cups; do systemctl is-enabled --quiet "$svc.service" 2>/dev/null && ok "$svc enabled" || warn "$svc not enabled"; done
   if systemctl is-active --quiet power-profiles-daemon.service 2>/dev/null || systemctl is-active --quiet tuned-ppd.service 2>/dev/null; then ok "power profile backend active"; else warn "power profile backend not active"; fi
