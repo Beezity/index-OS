@@ -1,6 +1,7 @@
 singleton NotifHistory 1.0 NotifHistory.qml
 singleton NotificationPrefs 1.0 NotificationPrefs.qml
 singleton IndexTheme 1.0 IndexTheme.qml
+singleton PrescriptState 1.0 PrescriptState.qml
 Bar 1.0 Bar.qml
 AboutPopup 1.0 AboutPopup.qml
 ClipboardPopup 1.0 ClipboardPopup.qml
@@ -14,6 +15,7 @@ AppearancePanel 1.0 AppearancePanel.qml
 AudioPanel 1.0 AudioPanel.qml
 NetworkPanel 1.0 NetworkPanel.qml
 PowerPanel 1.0 PowerPanel.qml
+DisplaysPanel 1.0 DisplaysPanel.qml
 InputPanel 1.0 InputPanel.qml
 IndexSectionButton 1.0 IndexSectionButton.qml
 AboutSystem 1.0 AboutSystem.qml
