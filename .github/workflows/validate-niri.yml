@@ -139,31 +139,26 @@ jobs:
 
             tmp=$(mktemp -d)
             trap "rm -rf $tmp" EXIT
-            cp -a /repo/niri/config/. "$tmp/"
+            mkdir -p "$tmp/cfg/niri"
+            cp -a /repo/niri/config/. "$tmp/cfg/niri/"
+            cfg="$tmp/cfg/niri"
 
             INDEX_INPUT_BACKEND=niri \
-              INDEX_INPUT_NIRI="$tmp/input.kdl" \
-              INDEX_NIRI_CONFIG="$tmp/config.kdl" \
+              INDEX_INPUT_NIRI="$cfg/input.kdl" \
+              INDEX_NIRI_CONFIG="$cfg/config.kdl" \
               sh /repo/scripts/index-input set-speed 0.35
             INDEX_INPUT_BACKEND=niri \
-              INDEX_INPUT_NIRI="$tmp/input.kdl" \
-              INDEX_NIRI_CONFIG="$tmp/config.kdl" \
+              INDEX_INPUT_NIRI="$cfg/input.kdl" \
+              INDEX_NIRI_CONFIG="$cfg/config.kdl" \
               sh /repo/scripts/index-input set-natural-scroll yes
             INDEX_INPUT_BACKEND=niri \
-              INDEX_INPUT_NIRI="$tmp/input.kdl" \
-              INDEX_NIRI_CONFIG="$tmp/config.kdl" \
+              INDEX_INPUT_NIRI="$cfg/input.kdl" \
+              INDEX_NIRI_CONFIG="$cfg/config.kdl" \
               sh /repo/scripts/index-input set-tap no
-            NIRI_CONFIG="$tmp/config.kdl" niri validate
+            NIRI_CONFIG="$cfg/config.kdl" niri validate
 
-            mkdir -p "$tmp/state"
-            XDG_CONFIG_HOME="$tmp" NIRI_CONFIG="$tmp/config.kdl" python3 - <<PY
-import runpy
-ns = runpy.run_path("/repo/scripts/index-displays")
-ns["write_niri"]([
-    {"name":"HDMI-A-1","description":"ASUSTeK","enabled":True,"x":0,"y":0,"scale":1.0,"transform":"normal","modes":[{"width":1920,"height":1080,"refresh":180.0,"preferred":True,"current":True}]},
-    {"name":"eDP-1","description":"Internal","enabled":True,"x":1920,"y":0,"scale":1.0,"transform":"normal","modes":[{"width":1920,"height":1080,"refresh":144.0,"preferred":True,"current":True}]},
-], "HDMI-A-1")
-PY
-            NIRI_CONFIG="$tmp/config.kdl" niri validate
+            XDG_CONFIG_HOME="$tmp/cfg" NIRI_CONFIG="$cfg/config.kdl" python3 -c "import runpy; ns=runpy.run_path(\"/repo/scripts/index-displays\"); ns[\"write_niri\"]([{\"name\":\"HDMI-A-1\",\"description\":\"ASUSTeK\",\"enabled\":True,\"x\":0,\"y\":0,\"scale\":1.0,\"transform\":\"normal\",\"modes\":[{\"width\":1920,\"height\":1080,\"refresh\":180.0,\"preferred\":True,\"current\":True}]},{\"name\":\"eDP-1\",\"description\":\"Internal\",\"enabled\":True,\"x\":1920,\"y\":0,\"scale\":1.0,\"transform\":\"normal\",\"modes\":[{\"width\":1920,\"height\":1080,\"refresh\":144.0,\"preferred\":True,\"current\":True}]}], \"HDMI-A-1\")"
+            grep -q "output \"HDMI-A-1\"" "$cfg/outputs.kdl"
+            NIRI_CONFIG="$cfg/config.kdl" niri validate
             niri msg action quit --help >/dev/null
           '
