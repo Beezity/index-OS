@@ -1,0 +1,48 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — compositor-aware idle/lock policy
+set -u
+
+GENERIC_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/the-index/power.conf"
+LABWC_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/index.conf"
+LOCKER="$HOME/.local/bin/index-lock"
+SEC=600
+
+is_niri=0
+case ":${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:" in *:niri:*|*:Niri:*) is_niri=1 ;; esac
+[ -n "${NIRI_SOCKET:-}" ] && is_niri=1
+
+CONF="$LABWC_CONF"
+[ "$is_niri" = 1 ] && CONF="$GENERIC_CONF"
+if [ -f "$CONF" ]; then
+  value="$(sed -n 's/^SCREEN_OFF_SEC=\([0-9][0-9]*\)$/\1/p' "$CONF" | tail -n1)"
+  [ -n "$value" ] && SEC="$value"
+fi
+
+pkill -x swayidle 2>/dev/null || true
+sleep 0.2
+
+if [ "$is_niri" = 1 ]; then
+  if [ "$SEC" -gt 0 ] 2>/dev/null; then
+    OFF_SEC=$((SEC + 5))
+    exec swayidle -w \
+      timeout "$SEC"     "$LOCKER" \
+      timeout "$OFF_SEC" 'niri msg action power-off-monitors' \
+      resume              'niri msg action power-on-monitors' \
+      before-sleep        "$LOCKER" \
+      lock                "$LOCKER"
+  else
+    exec swayidle -w before-sleep "$LOCKER" lock "$LOCKER"
+  fi
+fi
+
+if [ "$SEC" -gt 0 ] 2>/dev/null; then
+  OFF_SEC=$((SEC + 5))
+  exec swayidle -w \
+    timeout "$SEC"     "$LOCKER" \
+    timeout "$OFF_SEC" 'wlopm --off \*' \
+    resume              'wlopm --on \*' \
+    before-sleep        "$LOCKER" \
+    lock                "$LOCKER"
+else
+  exec swayidle -w before-sleep "$LOCKER" lock "$LOCKER"
+fi
