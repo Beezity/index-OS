@@ -1,6 +1,6 @@
 // ============================================================
 //  WILL OF THE CITY :: THE INDEX — top bar
-//  Quickshell 0.3+ / labwc. Workspaces use ext-workspace-v1
+//  Quickshell 0.3+ / Wayland. Workspaces use ext-workspace-v1
 //  through Quickshell.WindowManager instead of simulated keys.
 // ============================================================
 
@@ -42,9 +42,12 @@ PanelWindow {
 
     SystemClock { id: clock; precision: SystemClock.Minutes }
 
+    // Use the screen projection rather than the global WindowManager list.
+    // This matters on Niri where workspaces belong to individual monitors;
+    // labwc's projection still resolves to the desktops visible on this output.
     ScriptModel {
         id: workspaceModel
-        values: WindowManager.windowsets
+        values: (bar.screen ? WindowManager.screenProjection(bar.screen).windowsets : [])
             .filter(function(ws) { return ws.shouldDisplay })
             .sort(function(a, b) {
                 if (a.coordinates.length > 0 && b.coordinates.length > 0)
@@ -488,7 +491,7 @@ PanelWindow {
                     Layout.fillWidth: true; spacing: 6
                     Repeater {
                         model: [
-                            { label: "LOGOUT", cmd: ["sh", "-c", "$HOME/.config/labwc/index-logout"] },
+                            { label: "LOGOUT", cmd: [Quickshell.env("HOME") + "/.local/bin/index-logout"] },
                             { label: "SLEEP", cmd: ["systemctl", "suspend"], laptop: true },
                             { label: "REBOOT", cmd: ["systemctl", "reboot"] },
                             { label: "OFF", cmd: ["systemctl", "poweroff"] }
