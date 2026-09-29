@@ -12,13 +12,12 @@ ok(){ printf '   %s✓%s %s\n' "$GRN" "$NC" "$1"; }
 bad(){ printf '   %s✗%s %s\n' "$RED" "$NC" "$1"; }
 note(){ printf '   %s%s%s\n' "$DIM" "$1" "$NC"; }
 require_command(){ command -v "$1" >/dev/null 2>&1 || { bad "required command missing after installation: $1"; return 1; }; }
-require_file(){ [[ -f "$INDEX_ROOT/$1" ]] || { bad "repository file missing: $1"; return 1; }
-}
+require_file(){ [[ -f "$INDEX_ROOT/$1" ]] || { bad "repository file missing: $1"; return 1; }; }
 
 INDEX_REQUIRED_FILES=(
   wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/BluetoothMenu.qml quickshell/PowerPanel.qml quickshell/DisplaysPanel.qml quickshell/InputPanel.qml quickshell/ClipboardPopup.qml quickshell/Notifications.qml quickshell/NotifHistory.qml quickshell/NotificationPrefs.qml quickshell/NotificationPanel.qml quickshell/Prescript.qml quickshell/PrescriptState.qml quickshell/StartMenuState.qml quickshell/lock/lock.qml quickshell/prescript.json
   labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment
-  labwc/config/index-lock labwc/config/index-idle labwc/config/index-clip
+  labwc/config/index-lock labwc/config/index-idle labwc/config/index-clip labwc/config/index-display-save labwc/config/index-display-restore
   labwc/config/fontconfig/fonts.conf labwc/config/gtk/settings.ini
   labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf
   labwc/config/qt5ct/colors/the-index.conf labwc/config/qt6ct/colors/the-index.conf
