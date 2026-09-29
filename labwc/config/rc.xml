@@ -13,8 +13,8 @@
   <theme>
     <name>the-index</name>
     <titlebar><layout>icon:iconify,max,close</layout></titlebar>
-    <font place="ActiveWindow"><name>Perfect DOS VGA 437</name><size>10</size></font>
-    <font place="InactiveWindow"><name>Perfect DOS VGA 437</name><size>10</size></font>
+    <font place="ActiveWindow"><name>Perfect DOS VGA 437 Universal</name><size>10</size></font>
+    <font place="InactiveWindow"><name>Perfect DOS VGA 437 Universal</name><size>10</size></font>
   </theme>
   <desktops>
     <number>5</number>
@@ -40,9 +40,9 @@
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>
     <keybind key="W-v"><action name="Execute"><command>sh -c "$HOME/.config/labwc/index-clip"</command></action></keybind>
     <keybind key="W-S-d"><action name="Execute"><command>sh -c "$HOME/.config/labwc/index-display-save; notify-send 'THE INDEX' 'display layout saved'"</command></action></keybind>
-    <keybind key="W-S-s"><action name="Execute"><command>sh -c "$HOME/.local/bin/index-snip"</command></action></keybind>
-    <keybind key="Print"><action name="Execute"><command>sh -c "grim ~/Pictures/index-$(date +%Y%m%d-%H%M%S).png"</command></action></keybind>
-    <keybind key="S-Print"><action name="Execute"><command>sh -c "grim -g \"$(slurp)\" - | wl-copy"</command></action></keybind>
+    <keybind key="W-S-s"><action name="Execute"><command>sh -c "$HOME/.local/bin/index-snip region"</command></action></keybind>
+    <keybind key="Print"><action name="Execute"><command>sh -c "$HOME/.local/bin/index-snip full"</command></action></keybind>
+    <keybind key="S-Print"><action name="Execute"><command>sh -c "$HOME/.local/bin/index-snip copy-region"</command></action></keybind>
     <keybind key="XF86MonBrightnessUp"><action name="Execute"><command>brightnessctl set +5%</command></action></keybind>
     <keybind key="XF86MonBrightnessDown"><action name="Execute"><command>brightnessctl set 5%-</command></action></keybind>
     <keybind key="XF86AudioRaiseVolume"><action name="Execute"><command>wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+</command></action></keybind>

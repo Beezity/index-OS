@@ -38,10 +38,11 @@ Rectangle {
     property bool networkOpen: false
     property bool bluetoothOpen: false
     property bool powerOpen: false
+    property bool displaysOpen: false
     property bool inputOpen: false
     property bool notificationOpen: false
 
-    readonly property bool subpanelOpen: appearanceOpen || audioOpen || networkOpen || bluetoothOpen || powerOpen || inputOpen || notificationOpen
+    readonly property bool subpanelOpen: appearanceOpen || audioOpen || networkOpen || bluetoothOpen || powerOpen || displaysOpen || inputOpen || notificationOpen
     readonly property string settingsHelper: Quickshell.env("HOME") + "/.local/bin/index-settings"
     readonly property string powerHelper: Quickshell.env("HOME") + "/.local/bin/index-power"
 
@@ -62,6 +63,7 @@ Rectangle {
             panel.networkOpen = false
             panel.bluetoothOpen = false
             panel.powerOpen = false
+            panel.displaysOpen = false
             panel.inputOpen = false
             panel.notificationOpen = false
         }
@@ -172,7 +174,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 14
         spacing: 12
-        visible: !panel.appearanceOpen && !panel.audioOpen && !panel.networkOpen && !panel.bluetoothOpen && !panel.powerOpen && !panel.inputOpen && !panel.notificationOpen
+        visible: !panel.appearanceOpen && !panel.audioOpen && !panel.networkOpen && !panel.bluetoothOpen && !panel.powerOpen && !panel.displaysOpen && !panel.inputOpen && !panel.notificationOpen
 
         // header
         RowLayout {
@@ -404,7 +406,8 @@ Rectangle {
                     { t: "AUDIO",     s: "devices", page: "audio" },
                     { t: "APPEARANCE", s: "themes", page: "appearance" },
                     { t: "POWER",      s: "profiles", page: "power" },
-                    { t: "NOTIFICATIONS", s: NotificationPrefs.dnd ? "DND" : "popups", page: "notifications" }
+                    { t: "NOTIFICATIONS", s: NotificationPrefs.dnd ? "DND" : "popups", page: "notifications" },
+                    { t: "DISPLAYS",   s: "outputs", page: "displays" }
                 ]
                 delegate: Rectangle {
                     required property var modelData
@@ -431,6 +434,7 @@ Rectangle {
                             else if (modelData.page === "network") panel.networkOpen = true
                             else if (modelData.page === "bluetooth") panel.bluetoothOpen = true
                             else if (modelData.page === "power") panel.powerOpen = true
+                            else if (modelData.page === "displays") panel.displaysOpen = true
                             else if (modelData.page === "notifications") panel.notificationOpen = true
                         }
                     }
@@ -557,6 +561,12 @@ Rectangle {
         anchors.fill: parent
         visible: panel.powerOpen
         onRequestBack: panel.powerOpen = false
+    }
+
+    DisplaysPanel {
+        anchors.fill: parent
+        visible: panel.displaysOpen
+        onRequestBack: panel.displaysOpen = false
     }
 
     InputPanel {

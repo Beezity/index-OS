@@ -15,16 +15,18 @@ require_command(){ command -v "$1" >/dev/null 2>&1 || { bad "required command mi
 require_file(){ [[ -f "$INDEX_ROOT/$1" ]] || { bad "repository file missing: $1"; return 1; }; }
 
 INDEX_REQUIRED_FILES=(
-  wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/BluetoothMenu.qml quickshell/PowerPanel.qml quickshell/InputPanel.qml quickshell/ClipboardPopup.qml quickshell/Notifications.qml quickshell/NotifHistory.qml quickshell/NotificationPrefs.qml quickshell/NotificationPanel.qml quickshell/Prescript.qml quickshell/lock/lock.qml quickshell/prescript.json
+  wallpaper/the-index.png quickshell/shell.qml quickshell/Bar.qml quickshell/SettingsPanel.qml quickshell/AppearancePanel.qml quickshell/AudioPanel.qml quickshell/NetworkPanel.qml quickshell/BluetoothMenu.qml quickshell/PowerPanel.qml quickshell/DisplaysPanel.qml quickshell/InputPanel.qml quickshell/ClipboardPopup.qml quickshell/Notifications.qml quickshell/NotifHistory.qml quickshell/NotificationPrefs.qml quickshell/NotificationPanel.qml quickshell/Prescript.qml quickshell/PrescriptState.qml quickshell/StartMenuState.qml quickshell/lock/lock.qml quickshell/prescript.json
   labwc/config/rc.xml labwc/config/menu.xml labwc/config/autostart labwc/config/environment
-  labwc/config/index-lock labwc/config/index-idle labwc/config/index-clip
+  labwc/config/index-lock labwc/config/index-idle labwc/config/index-clip labwc/config/index-display-save labwc/config/index-display-restore
   labwc/config/fontconfig/fonts.conf labwc/config/gtk/settings.ini
   labwc/config/portal/labwc-portals.conf labwc/config/portal/wlr.conf
   labwc/config/qt5ct/colors/the-index.conf labwc/config/qt6ct/colors/the-index.conf
   labwc/theme/the-index/labwc/themerc
   labwc/theme/the-index-gtk/gtk-3.0/gtk.css labwc/theme/the-index-gtk/gtk-4.0/gtk.css labwc/theme/the-index-gtk/index.theme
   labwc/app-fixes/index-snip labwc/app-fixes/index-default-apps labwc/session/the-index.desktop
-  fish/config.fish install-fish.sh scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications scripts/index-settings
+  fish/config.fish install-fish.sh install-fedora.sh patch-fedora.sh setup.sh
+  scripts/common.sh scripts/install-common.sh scripts/distro/fedora.sh scripts/distro/fedora-patch.sh
+  scripts/index-doctor scripts/index-backup scripts/index-restore scripts/index-update scripts/index-appearance scripts/index-audio scripts/index-network scripts/index-bluetooth scripts/index-power scripts/index-input scripts/index-clipboard scripts/index-notifications scripts/index-settings
 )
 validate_repository_layout(){
   local rel

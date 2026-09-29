@@ -6,14 +6,43 @@
 // ============================================================
 
 import Quickshell
+import "."
 
 ShellRoot {
-    Bar {}
+    // Force construction of the singleton that owns the public launcher IPC
+    // endpoint. Individual bars register unique per-output targets.
+    readonly property var launcherIpc: StartMenuState
+
+    // Screen-local desktop surfaces are instantiated once per connected output.
+    // Quickshell.screens updates automatically on hotplug/unplug.
+    Variants {
+        model: Quickshell.screens
+        Bar {
+            required property var modelData
+            screen: modelData
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+        Atmosphere {
+            required property var modelData
+            screen: modelData
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+        Prescript {
+            required property var modelData
+            screen: modelData
+        }
+    }
+
+    // These remain single global services/popups.
     AboutPopup {}
     ClipboardPopup {}
-    Atmosphere {}
     Notifications {}
     Osd {}
-    Prescript {}
     DeviceWatch {}
 }

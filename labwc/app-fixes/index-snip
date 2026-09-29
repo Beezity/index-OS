@@ -1,21 +1,65 @@
 #!/bin/sh
 set -eu
 
-OUT_DIR="${XDG_PICTURES_DIR:-$HOME/Pictures}"
+# WILL OF THE CITY :: THE INDEX — screenshot helper
+# DMS-inspired default: capture, save, copy to clipboard, notify. No editor
+# window is opened automatically.
+MODE="${1:-region}"
+
+PICTURES=""
+if command -v xdg-user-dir >/dev/null 2>&1; then
+  PICTURES="$(xdg-user-dir PICTURES 2>/dev/null || true)"
+fi
+[ -n "$PICTURES" ] || PICTURES="$HOME/Pictures"
+
+OUT_DIR="$PICTURES/Screenshots"
 mkdir -p "$OUT_DIR"
-OUT="$OUT_DIR/index-$(date +%Y%m%d-%H%M%S).png"
-TMP="$(mktemp --suffix=.png)"
-trap 'rm -f "$TMP"' EXIT INT TERM
 
-GEOM="$(slurp)" || exit 0
-[ -n "$GEOM" ] || exit 0
+STAMP="$(date '+%Y-%m-%d_%H-%M-%S')"
+BASE="screenshot_$STAMP"
+OUT="$OUT_DIR/$BASE.png"
+N=2
+while [ -e "$OUT" ]; do
+  OUT="$OUT_DIR/${BASE}_$N.png"
+  N=$((N + 1))
+done
 
-grim -g "$GEOM" "$TMP"
-wl-copy < "$TMP"
-if command -v swappy >/dev/null 2>&1; then
-  swappy -f "$TMP" -o "$OUT"
-else
-  cp "$TMP" "$OUT"
+TMP="$(mktemp "$OUT_DIR/.index-screenshot.XXXXXX.png")"
+cleanup() {
+  [ -n "${TMP:-}" ] && rm -f "$TMP"
+}
+trap cleanup EXIT HUP INT TERM
+
+case "$MODE" in
+  region)
+    GEOM="$(slurp)" || exit 0
+    [ -n "$GEOM" ] || exit 0
+    grim -g "$GEOM" "$TMP"
+    ;;
+  full)
+    grim "$TMP"
+    ;;
+  copy-region)
+    GEOM="$(slurp)" || exit 0
+    [ -n "$GEOM" ] || exit 0
+    grim -g "$GEOM" - | wl-copy
+    command -v notify-send >/dev/null 2>&1 && notify-send "THE INDEX" "screenshot copied to clipboard"
+    exit 0
+    ;;
+  *)
+    printf 'usage: %s {region|full|copy-region}\n' "$0" >&2
+    exit 2
+    ;;
+esac
+
+[ -s "$TMP" ] || exit 1
+mv "$TMP" "$OUT"
+TMP=""
+
+# Match the useful part of DMS' default screenshot behavior: save + clipboard.
+wl-copy < "$OUT"
+if command -v notify-send >/dev/null 2>&1; then
+  notify-send "THE INDEX" "screenshot saved to $OUT"
 fi
 
-[ -f "$OUT" ] && notify-send "THE INDEX" "screenshot saved to $OUT"
+printf '%s\n' "$OUT"

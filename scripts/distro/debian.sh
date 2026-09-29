@@ -36,7 +36,7 @@ sudo apt-get update
 
 PACKAGES=(
   labwc xwayland gdm3
-  swaybg swayidle wlopm wlr-randr wdisplays grim slurp swappy wl-clipboard cliphist
+  swaybg swayidle wlopm wlr-randr wdisplays grim slurp wl-clipboard cliphist
   foot fish wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-poppler pavucontrol fastfetch qalc
   xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk dex libnotify-bin playerctl polkit-kde-agent-1 udiskie udisks2 gvfs gvfs-backends tumbler ffmpegthumbnailer
   network-manager nm-connection-editor bluez bluez-tools blueman
@@ -82,7 +82,7 @@ else
 fi
 ok "Quickshell installed"
 
-for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi qalc grim slurp swappy wl-copy wl-paste cliphist ffmpeg notify-send nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics powerprofilesctl flock fc-cache xmllint; do
+for cmd in labwc quickshell swaybg swayidle foot fish fastfetch wofi qalc grim slurp wl-copy wl-paste cliphist ffmpeg notify-send nmcli nm-connection-editor bluetoothctl playerctl wpctl wdisplays gnome-power-statistics powerprofilesctl flock fc-cache xmllint; do
   require_command "$cmd"
 done
 
