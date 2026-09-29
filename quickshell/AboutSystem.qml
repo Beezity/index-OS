@@ -6,7 +6,7 @@ import Quickshell.Io
 
 Item {
     id: root
-    property var info: ({ distro: "...", kernel: "...", arch: "...", labwc: "...", quickshell: "..." })
+    property var info: ({ distro: "...", kernel: "...", arch: "...", compositor: "...", quickshell: "..." })
     signal requestBack()
 
     function launch(argv) { Quickshell.execDetached(argv) }
@@ -21,7 +21,10 @@ Item {
             "printf '%s\\n' \"${PRETTY_NAME:-Unknown Linux}\"; " +
             "uname -r 2>/dev/null || echo unknown; " +
             "uname -m 2>/dev/null || echo unknown; " +
-            "labwc --version 2>/dev/null | head -1 || echo unavailable; " +
+            "if [ -n \"${NIRI_SOCKET:-}\" ] && command -v niri >/dev/null 2>&1; then " +
+                "printf 'niri '; niri --version 2>/dev/null | head -1 | sed 's/^niri[[:space:]]*//'; " +
+            "elif command -v labwc >/dev/null 2>&1; then labwc --version 2>/dev/null | head -1; " +
+            "else echo unavailable; fi; " +
             "quickshell --version 2>/dev/null | head -1 || echo unavailable"]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -30,7 +33,7 @@ Item {
                     distro: l[0] || "unknown",
                     kernel: l[1] || "unknown",
                     arch: l[2] || "unknown",
-                    labwc: l[3] || "unavailable",
+                    compositor: l[3] || "unavailable",
                     quickshell: l[4] || "unavailable"
                 }
             }
@@ -65,7 +68,7 @@ Item {
         Text { text: "THE INDEX"; font.family: IndexTheme.pixel; font.pixelSize: 18; color: IndexTheme.cyan }
         Text {
             Layout.fillWidth: true
-            text: "A labwc desktop environment"
+            text: "A Wayland desktop environment"
             font.family: IndexTheme.pixel; font.pixelSize: IndexTheme.smallSize; color: IndexTheme.cyanDark
         }
 
@@ -74,7 +77,7 @@ Item {
                 ["DISTRO", root.info.distro],
                 ["KERNEL", root.info.kernel],
                 ["ARCH", root.info.arch],
-                ["LABWC", root.info.labwc],
+                ["COMPOSITOR", root.info.compositor],
                 ["QUICKSHELL", root.info.quickshell]
             ]
             delegate: RowLayout {
