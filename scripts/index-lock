@@ -1,15 +1,46 @@
 #!/bin/sh
-# WILL OF THE CITY :: THE INDEX — Quickshell session lock
-set -eu
+# WILL OF THE CITY :: THE INDEX — compositor-neutral secure session lock
+set -u
 
-LOCK="$HOME/.config/quickshell/lock/lock.qml"
-[ -f "$LOCK" ] || { notify-send "THE INDEX" "lock screen file missing" 2>/dev/null || true; exit 1; }
+LOCK_QML="$HOME/.config/quickshell/lock/lock.qml"
+
+# Do not start a second session lock for this user.
+pgrep -u "$(id -u)" -f '[q]uickshell.*lock/lock.qml' >/dev/null 2>&1 && exit 0
+
+[ -n "${WAYLAND_DISPLAY:-}" ] || {
+  printf '%s\n' 'index-lock: WAYLAND_DISPLAY is not set' >&2
+  exit 1
+}
+
+[ -f "$LOCK_QML" ] || {
+  printf 'index-lock: missing %s\n' "$LOCK_QML" >&2
+  exit 1
+}
+
+QS="$(command -v quickshell 2>/dev/null || command -v qs 2>/dev/null || true)"
+[ -n "$QS" ] || {
+  printf '%s\n' 'index-lock: quickshell is not installed' >&2
+  exit 1
+}
+
+# Show the optional cinematic intro once per login/session, preserving the
+# existing lock-screen behavior while switching compositors.
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+MARKER="$RUNTIME/index-intro-shown"
+if [ -e "$MARKER" ]; then
+  export INDEX_INTRO=0
+else
+  export INDEX_INTRO=1
+  : > "$MARKER"
+fi
 
 # WlSessionLock is compositor-neutral. Preserve the VMware Qt Quick fallback.
-if [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi 'vmware' /sys/class/dmi/id/sys_vendor; then
-  exec env QT_QUICK_BACKEND=software quickshell -p "$LOCK"
+if { [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi 'vmware' /sys/class/dmi/id/sys_vendor; } || \
+   { command -v systemd-detect-virt >/dev/null 2>&1 && [ "$(systemd-detect-virt 2>/dev/null || true)" = "vmware" ]; }; then
+  export QT_QUICK_BACKEND=software
 fi
-if command -v systemd-detect-virt >/dev/null 2>&1 && [ "$(systemd-detect-virt 2>/dev/null || true)" = "vmware" ]; then
-  exec env QT_QUICK_BACKEND=software quickshell -p "$LOCK"
-fi
-exec quickshell -p "$LOCK"
+
+# Do not retry a crashed session-lock process. Once ext-session-lock has been
+# acquired, the compositor intentionally keeps the session locked if the client
+# dies; repeated launches only hide the real failure.
+exec "$QS" -p "$LOCK_QML"
