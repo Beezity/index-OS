@@ -96,10 +96,11 @@ binds {
     Mod+P { spawn-sh "qs ipc call prescript toggle || quickshell ipc call prescript toggle"; }
     Mod+V { spawn-sh "qs ipc call clipboard toggle || quickshell ipc call clipboard toggle"; }
 
-    Mod+Shift+S { screenshot; }
-    Print { screenshot-screen; }
-    // Niri 26.04 does not expose a no-disk flag on its screenshot action.
-    // Keep THE INDEX's clipboard-only region capture through the shared helper.
+    // Keep screenshot behavior identical to the labwc backend: slurp is only
+    // the region selector; no Swappy/editor window is opened. The helper saves
+    // immediately into Pictures/Screenshots, copies the image, and notifies.
+    Mod+Shift+S { spawn "index-snip" "region"; }
+    Print { spawn "index-snip" "full"; }
     Shift+Print { spawn "index-snip" "copy-region"; }
 
     XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+ -l 1.0"; }
