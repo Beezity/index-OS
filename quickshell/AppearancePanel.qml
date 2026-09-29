@@ -13,6 +13,8 @@ Rectangle {
     readonly property color cyanB: "#85C5E8"
     readonly property color cyanD: "#3A7CA5"
     readonly property string helper: Quickshell.env("HOME") + "/.local/bin/index-appearance"
+    readonly property string defaultWall: Quickshell.env("HOME") + "/.config/the-index/wall.png"
+    readonly property string legacyDefaultWall: Quickshell.env("HOME") + "/.config/labwc/wall.png"
     property string iconTheme: "Papirus-Dark"
     property string cursorTheme: "Adwaita"
     property int cursorSize: 24
@@ -73,7 +75,7 @@ Rectangle {
         Text { text: "WALLPAPER"; font.family: root.pixel; font.pixelSize: 13; color: root.cyanB }
         Text {
             Layout.fillWidth: true
-            text: "  " + ((!root.wallpaper || root.wallpaper.endsWith("/.config/labwc/wall.png")) ? "THE INDEX DEFAULT" : root.wallpaper)
+            text: "  " + ((!root.wallpaper || root.wallpaper === root.defaultWall || root.wallpaper === root.legacyDefaultWall) ? "THE INDEX DEFAULT" : root.wallpaper)
             elide: Text.ElideMiddle; font.family: root.pixel; font.pixelSize: 10; color: root.cyanD
         }
         RowLayout { Layout.fillWidth: true; spacing: 6
