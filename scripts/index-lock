@@ -1,0 +1,15 @@
+#!/bin/sh
+# WILL OF THE CITY :: THE INDEX — Quickshell session lock
+set -eu
+
+LOCK="$HOME/.config/quickshell/lock/lock.qml"
+[ -f "$LOCK" ] || { notify-send "THE INDEX" "lock screen file missing" 2>/dev/null || true; exit 1; }
+
+# WlSessionLock is compositor-neutral. Preserve the VMware Qt Quick fallback.
+if [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi 'vmware' /sys/class/dmi/id/sys_vendor; then
+  exec env QT_QUICK_BACKEND=software quickshell -p "$LOCK"
+fi
+if command -v systemd-detect-virt >/dev/null 2>&1 && [ "$(systemd-detect-virt 2>/dev/null || true)" = "vmware" ]; then
+  exec env QT_QUICK_BACKEND=software quickshell -p "$LOCK"
+fi
+exec quickshell -p "$LOCK"
