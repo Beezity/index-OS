@@ -6,8 +6,13 @@
 // ============================================================
 
 import Quickshell
+import "."
 
 ShellRoot {
+    // Force construction of the singleton that owns the public launcher IPC
+    // endpoint. Individual bars register unique per-output targets.
+    readonly property var launcherIpc: StartMenuState
+
     // Screen-local desktop surfaces are instantiated once per connected output.
     // Quickshell.screens updates automatically on hotplug/unplug.
     Variants {
