@@ -74,10 +74,10 @@ PanelWindow {
             Text {
                 text: "// THE INDEX"
                 font.family: bar.pixel; font.pixelSize: 15
-                color: startArea.containsMouse || bar.menuOpen ? "#ffffff" : bar.cyanB
+                color: bar.cyanB
                 MouseArea {
                     id: startArea
-                    anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                     onClicked: { bar.menuOpen = !bar.menuOpen; Sfx.play("menu") }
                 }
             }
@@ -162,7 +162,6 @@ PanelWindow {
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { bar.notifOpen = !bar.notifOpen; Sfx.play("menu") } }
                 }
 
-
                 Text {
                     id: batText
                     property int pct: -1
@@ -180,7 +179,6 @@ PanelWindow {
                         batText.pct = parseInt(p[0]); batText.charging = p[1] === "Charging" || p[1] === "Full"
                     } }
                 }
-
 
                 Repeater {
                     model: SystemTray.items
@@ -277,24 +275,98 @@ PanelWindow {
         id: startMenu
         visible: bar.menuOpen
         anchors { top: true; left: true }
-        margins { top: bar.implicitHeight; left: 8 }
+        margins {
+            top: startMenu.screen ? Math.max(bar.implicitHeight, Math.round((startMenu.screen.height - startMenu.implicitHeight) / 2)) : bar.implicitHeight
+            left: startMenu.screen ? Math.max(0, Math.round((startMenu.screen.width - startMenu.implicitWidth) / 2)) : 8
+        }
         implicitWidth: 340; implicitHeight: 480
         color: "transparent"; exclusiveZone: 0
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
         WlrLayershell.namespace: "index-startmenu"
+
         property string query: ""
+        property bool calculatorMode: query.trim().indexOf("=") === 0
+        property string calculatorExpression: calculatorMode ? query.trim().slice(1).trim() : ""
+        property string calculatorResult: ""
+        property bool calculatorPending: false
         property var shownApps: {
+            if (calculatorMode) return []
             var all = DesktopEntries.applications.values || []
             var q = query.toLowerCase()
             return q.length === 0 ? all : all.filter(function(a) { return (a.name || "").toLowerCase().indexOf(q) >= 0 })
         }
-        onVisibleChanged: if (visible) { search.text = ""; query = ""; appList.currentIndex = 0; search.forceActiveFocus() }
+
+        onVisibleChanged: if (visible) {
+            search.text = ""
+            query = ""
+            calculatorResult = ""
+            calculatorPending = false
+            calcTimer.stop()
+            appList.currentIndex = 0
+            search.forceActiveFocus()
+        }
+        onQueryChanged: {
+            appList.currentIndex = 0
+            calculatorResult = ""
+            calculatorPending = false
+            calcTimer.stop()
+            if (calculatorMode && calculatorExpression.length > 0) calcTimer.start()
+        }
+
+        function evaluateCalculator(): void {
+            if (!calculatorMode || calculatorExpression.length === 0) return
+            if (calcProc.running) {
+                calculatorPending = true
+                return
+            }
+            calculatorPending = false
+            calcProc.expression = calculatorExpression
+            calcProc.command = ["qalc", "-t", calcProc.expression]
+            calcProc.running = true
+        }
+
+        function copyCalculatorResult(): void {
+            if (calculatorResult.length === 0) return
+            Quickshell.execDetached(["wl-copy", calculatorResult])
+            bar.menuOpen = false
+        }
+
         function launchCurrent(): void {
+            if (calculatorMode) {
+                copyCalculatorResult()
+                return
+            }
             if (shownApps.length === 0) return
             var i = Math.max(0, Math.min(appList.currentIndex, shownApps.length - 1))
             shownApps[i].execute(); bar.menuOpen = false
         }
+
+        Timer {
+            id: calcTimer
+            interval: 180
+            repeat: false
+            onTriggered: startMenu.evaluateCalculator()
+        }
+
+        Process {
+            id: calcProc
+            property string expression: ""
+            command: ["true"]
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    if (calcProc.expression !== startMenu.calculatorExpression) return
+                    startMenu.calculatorResult = text.trim().replace(/\s*\n\s*/g, " ")
+                }
+            }
+            onRunningChanged: {
+                if (!running && startMenu.calculatorPending) {
+                    startMenu.calculatorPending = false
+                    calcTimer.restart()
+                }
+            }
+        }
+
         Rectangle {
             anchors.fill: parent; color: "#05080d"; border.color: bar.cyan; border.width: 2
             ColumnLayout {
@@ -307,17 +379,65 @@ PanelWindow {
                         id: search
                         anchors.fill: parent; anchors.margins: 8
                         font.family: bar.pixel; font.pixelSize: 15; color: bar.cyanB
-                        onTextChanged: { startMenu.query = text; appList.currentIndex = 0 }
+                        onTextChanged: startMenu.query = text
                         Keys.onEscapePressed: bar.menuOpen = false
-                        Keys.onDownPressed: appList.incrementCurrentIndex()
-                        Keys.onUpPressed: appList.decrementCurrentIndex()
+                        Keys.onDownPressed: if (!startMenu.calculatorMode) appList.incrementCurrentIndex()
+                        Keys.onUpPressed: if (!startMenu.calculatorMode) appList.decrementCurrentIndex()
                         Keys.onReturnPressed: startMenu.launchCurrent()
                         Keys.onEnterPressed: startMenu.launchCurrent()
                         Text { anchors.fill: parent; verticalAlignment: Text.AlignVCenter; visible: search.text.length === 0; text: "search._"; color: bar.cyanD; font.family: bar.pixel; font.pixelSize: 15 }
                     }
                 }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: calcColumn.implicitHeight + 16
+                    visible: startMenu.calculatorMode
+                    color: "#0a0e16"; border.color: bar.cyanD; border.width: 1
+
+                    Column {
+                        id: calcColumn
+                        anchors.left: parent.left; anchors.right: parent.right
+                        anchors.margins: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 4
+                        Text {
+                            text: "= CALCULATOR_"
+                            font.family: bar.pixel; font.pixelSize: 11; color: bar.cyanD
+                        }
+                        Text {
+                            width: parent.width
+                            text: startMenu.calculatorExpression.length === 0
+                                ? "type an expression after ="
+                                : (calcProc.running || calcTimer.running || startMenu.calculatorPending)
+                                    ? "calculating..."
+                                    : (startMenu.calculatorResult.length > 0 ? startMenu.calculatorResult : "no result")
+                            font.family: bar.pixel; font.pixelSize: 16; color: bar.cyanB
+                            wrapMode: Text.WordWrap
+                        }
+                        Text {
+                            visible: startMenu.calculatorResult.length > 0 && !calcProc.running && !startMenu.calculatorPending
+                            text: "ENTER OR CLICK TO COPY"
+                            font.family: bar.pixel; font.pixelSize: 9; color: bar.cyanD
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: startMenu.calculatorResult.length > 0 && !calcProc.running && !startMenu.calculatorPending
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: startMenu.copyCalculatorResult()
+                    }
+                }
+
+                Item {
+                    Layout.fillWidth: true; Layout.fillHeight: true
+                    visible: startMenu.calculatorMode
+                }
+
                 ListView {
                     id: appList
+                    visible: !startMenu.calculatorMode
                     Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                     model: startMenu.shownApps; currentIndex: 0; keyNavigationWraps: true
                     delegate: Rectangle {
@@ -331,6 +451,7 @@ PanelWindow {
                         MouseArea { id: appArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onEntered: appList.currentIndex = index; onClicked: { modelData.execute(); bar.menuOpen = false } }
                     }
                 }
+
                 RowLayout {
                     Layout.fillWidth: true; spacing: 6
                     Repeater {

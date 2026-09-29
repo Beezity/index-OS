@@ -13,6 +13,7 @@ THE INDEX keeps a compact cyan/DOS-style interface while relying on standard Lin
 - **labwc** compositor with THE INDEX server-side window decorations
 - **Quickshell** top bar, menus, notifications, settings, clipboard popup, and session lock
 - centered clock, workspaces, task buttons, notification history, battery status, system tray, and `SET` control in the bar
+- centered THE INDEX application/search menu with `Super+Space` and `= expression` calculator input backed by Qalculate!
 - native Settings panels for **Network**, **Bluetooth**, **Audio**, **Appearance**, **Power**, and **Notifications**
 - pointer/touchpad controls integrated into Settings
 - searchable clipboard history with `Super+V`, backed by `cliphist`
@@ -102,11 +103,26 @@ Open Settings with the `SET` control on the right side of the top bar.
 
 Advanced system configuration stays in the relevant external tool rather than being reimplemented completely in QML.
 
+## Application/search menu
+
+Open the centered THE INDEX menu with `Super+Space` or by clicking `// THE INDEX` in the top bar. Normal text filters installed desktop applications.
+
+Prefix a query with `=` to use the Qalculate!-backed calculator instead of application search. For example:
+
+```text
+= 2 + 2
+= sqrt(144)
+= 5 ft to cm
+```
+
+Press Enter or click the calculator result to copy it to the clipboard. The separate `Super+D` Wofi launcher remains available as a fallback application launcher.
+
 ## Main shortcuts
 
 | Shortcut | Action |
 |---|---|
 | `Super+Return` | Foot terminal |
+| `Super+Space` | Toggle THE INDEX application/search menu |
 | `Super+D` | Wofi application launcher |
 | `Super+Q` | Close window |
 | `Super+F` | Toggle maximize |
