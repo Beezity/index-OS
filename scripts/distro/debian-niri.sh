@@ -20,8 +20,7 @@ bash "$SCRIPT_DIR/index-backup"; export INDEX_BACKUP_DONE=1
 sudo apt-get update
 
 # Unlike Fedora/Arch, Niri is not guaranteed to exist in every supported Debian
-# suite. Never silently build an untracked compositor from source: only enable
-# this backend when the configured Debian repositories provide a new-enough package.
+# suite. Never silently build an untracked compositor from source.
 for pkg in niri xwayland-satellite; do
   apt-cache show "$pkg" >/dev/null 2>&1 || { bad "$pkg is unavailable from the configured Debian repositories"; note "The labwc installer remains supported; retry Niri when Debian packages niri >= 26.04."; exit 1; }
 done
@@ -33,7 +32,7 @@ dpkg --compare-versions "$NIRI_PLAIN" ge 26.04 || { bad "niri >= 26.04 is requir
 PACKAGES=(
   niri xwayland-satellite xwayland gdm3 swaybg swayidle grim slurp wl-clipboard cliphist
   foot fish wofi thunar thunar-archive-plugin thunar-volman xarchiver file-roller imv mpv zathura zathura-pdf-poppler pavucontrol fastfetch qalc
-  xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk libnotify-bin playerctl polkit-kde-agent-1 udiskie udisks2 gvfs gvfs-backends tumbler ffmpegthumbnailer
+  xdg-utils xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk gnome-keyring libnotify-bin playerctl polkit-kde-agent-1 udiskie udisks2 gvfs gvfs-backends tumbler ffmpegthumbnailer
   network-manager nm-connection-editor bluez bluez-tools blueman pipewire pipewire-pulse wireplumber libspa-0.2-bluetooth ffmpeg gstreamer1.0-plugins-good gstreamer1.0-libav
   qt6-wayland qt6ct qt5ct qml6-module-qtcore qml6-module-qtmultimedia brightnessctl upower gammastep gnome-power-manager power-profiles-daemon
   fonts-dejavu fonts-liberation2 fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji fonts-noto-extra papirus-icon-theme adwaita-icon-theme
