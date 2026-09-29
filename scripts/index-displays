@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+"""THE INDEX display backend for labwc and niri.
+
+The QML panel consumes a stable line protocol from this helper instead of
+knowing compositor-specific output APIs.  Niri persistence is its included
+outputs.kdl; labwc keeps using wlr-randr plus the existing JSON saver.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+HOME = Path.home()
+XDG_CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config"))
+NIRI_DIR = XDG_CONFIG / "niri"
+NIRI_OUTPUTS = NIRI_DIR / "outputs.kdl"
+LABWC_SAVE = XDG_CONFIG / "labwc" / "index-display-save"
+
+
+def run(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(argv, text=True, capture_output=True, check=check)
+
+
+def compositor() -> str:
+    if os.environ.get("NIRI_SOCKET") and shutil.which("niri"):
+        try:
+            run(["niri", "msg", "--json", "outputs"])
+            return "niri"
+        except Exception:
+            pass
+    desk = (os.environ.get("XDG_CURRENT_DESKTOP", "") + ":" + os.environ.get("XDG_SESSION_DESKTOP", "")).lower()
+    if "niri" in desk and shutil.which("niri"):
+        return "niri"
+    return "labwc"
+
+
+def clean(value: object) -> str:
+    return str(value if value is not None else "").replace("\t", " ").replace("\r", " ").replace("\n", " ")
+
+
+def emit_output(name: str, description: str, enabled: bool, x: int, y: int,
+                scale: float, transform: str, modes: list[dict]) -> None:
+    print("\t".join(["@output", clean(name), clean(description), "1" if enabled else "0",
+                     str(x), str(y), f"{scale:.6f}", clean(transform)]))
+    for mode in modes:
+        print("\t".join(["@mode", str(int(mode["width"])), str(int(mode["height"])),
+                         f"{float(mode.get('refresh', 0)):.3f}",
+                         "1" if mode.get("preferred") else "0",
+                         "1" if mode.get("current") else "0"]))
+
+
+def niri_outputs() -> list[dict]:
+    raw = json.loads(run(["niri", "msg", "--json", "outputs"]).stdout)
+    values = list(raw.values()) if isinstance(raw, dict) else list(raw)
+    out: list[dict] = []
+    for obj in values:
+        name = str(obj.get("name", ""))
+        logical = obj.get("logical") or {}
+        current_idx = obj.get("current_mode")
+        modes = []
+        for idx, mode in enumerate(obj.get("modes") or []):
+            modes.append({
+                "width": int(mode.get("width", 0)),
+                "height": int(mode.get("height", 0)),
+                "refresh": float(mode.get("refresh_rate", 0)) / 1000.0,
+                "preferred": bool(mode.get("is_preferred", False)),
+                "current": current_idx == idx,
+            })
+        desc = " ".join(x for x in [obj.get("make"), obj.get("model"), obj.get("serial")] if x)
+        out.append({
+            "name": name,
+            "description": desc or name,
+            "enabled": current_idx is not None and bool(obj.get("logical")),
+            "x": int(logical.get("x", 0)),
+            "y": int(logical.get("y", 0)),
+            "scale": float(logical.get("scale", 1.0)),
+            "transform": str(logical.get("transform", "normal")),
+            "modes": modes,
+        })
+    return sorted(out, key=lambda o: o["name"].casefold())
+
+
+def parse_wlr() -> list[dict]:
+    text = run(["wlr-randr"]).stdout
+    outputs: list[dict] = []
+    cur = None
+    reading_modes = False
+    for line in text.splitlines():
+        if line and not line[0].isspace():
+            m = re.match(r'^(\S+)(?:\s+"(.*)")?$', line)
+            if not m:
+                continue
+            cur = {"name": m.group(1), "description": m.group(2) or m.group(1), "enabled": False,
+                   "x": 0, "y": 0, "scale": 1.0, "transform": "normal", "modes": []}
+            outputs.append(cur)
+            reading_modes = False
+            continue
+        if not cur:
+            continue
+        t = line.strip()
+        if t.startswith("Enabled:"):
+            cur["enabled"] = t[8:].strip() == "yes"
+            reading_modes = False
+        elif t == "Modes:":
+            reading_modes = True
+        elif reading_modes:
+            m = re.match(r'^(\d+)x(\d+)\s+px(?:,\s*([0-9.]+)\s+Hz)?(?:\s+\(([^)]*)\))?$', t)
+            if m:
+                flags = m.group(4) or ""
+                cur["modes"].append({"width": int(m.group(1)), "height": int(m.group(2)),
+                                     "refresh": float(m.group(3) or 0),
+                                     "preferred": "preferred" in flags, "current": "current" in flags})
+                continue
+            reading_modes = False
+        if t.startswith("Position:"):
+            try:
+                cur["x"], cur["y"] = [int(v.strip()) for v in t[9:].split(",", 1)]
+            except Exception:
+                pass
+        elif t.startswith("Transform:"):
+            cur["transform"] = t[10:].strip() or "normal"
+        elif t.startswith("Scale:"):
+            try:
+                cur["scale"] = float(t[6:].strip())
+            except ValueError:
+                pass
+    return outputs
+
+
+def state() -> list[dict]:
+    return niri_outputs() if compositor() == "niri" else parse_wlr()
+
+
+def current_mode(output: dict) -> dict | None:
+    for mode in output["modes"]:
+        if mode.get("current"):
+            return mode
+    for mode in output["modes"]:
+        if mode.get("preferred"):
+            return mode
+    return output["modes"][0] if output["modes"] else None
+
+
+def write_niri(outputs: list[dict], main_name: str | None = None) -> None:
+    NIRI_DIR.mkdir(parents=True, exist_ok=True)
+    lines = ["// WILL OF THE CITY :: THE INDEX — managed display configuration",
+             "// Written by index-displays. Advanced output options belong in config.kdl.", ""]
+    for output in outputs:
+        name = json.dumps(str(output["name"]), ensure_ascii=False)
+        lines.append(f"output {name} {{")
+        if not output["enabled"]:
+            lines.append("    off")
+        else:
+            mode = current_mode(output)
+            if mode and mode["width"] and mode["height"]:
+                hz = float(mode.get("refresh", 0))
+                spec = f'{mode["width"]}x{mode["height"]}' + (f"@{hz:.3f}" if hz > 0 else "")
+                lines.append(f"    mode {json.dumps(spec)}")
+            lines.append(f'    scale {float(output.get("scale", 1.0)):.6f}')
+            transform = str(output.get("transform", "normal"))
+            if transform not in {"normal", "90", "180", "270", "flipped", "flipped-90", "flipped-180", "flipped-270"}:
+                transform = "normal"
+            lines.append(f"    transform {json.dumps(transform)}")
+            lines.append(f'    position x={int(output.get("x", 0))} y={int(output.get("y", 0))}')
+            if main_name and output["name"] == main_name:
+                lines.append("    focus-at-startup")
+        lines.extend(["}", ""])
+
+    text = "\n".join(lines)
+    old = NIRI_OUTPUTS.read_text() if NIRI_OUTPUTS.exists() else None
+    fd, tmp_name = tempfile.mkstemp(prefix=".outputs.", suffix=".kdl", dir=NIRI_DIR)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(text)
+        os.replace(tmp_name, NIRI_OUTPUTS)
+        validation = run(["niri", "validate"], check=False)
+        if validation.returncode != 0:
+            if old is None:
+                NIRI_OUTPUTS.unlink(missing_ok=True)
+            else:
+                NIRI_OUTPUTS.write_text(old)
+            sys.stderr.write(validation.stderr or validation.stdout or "niri configuration validation failed\n")
+            raise SystemExit(1)
+    finally:
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+
+
+def labwc_save() -> None:
+    if LABWC_SAVE.exists() and os.access(LABWC_SAVE, os.X_OK):
+        subprocess.run([str(LABWC_SAVE)], check=False)
+
+
+def do_apply(args: list[str]) -> None:
+    if len(args) != 9:
+        raise SystemExit("usage: index-displays apply NAME 0|1 WIDTH HEIGHT REFRESH X Y SCALE TRANSFORM")
+    name, enabled_s, width_s, height_s, refresh_s, x_s, y_s, scale_s, transform = args
+    enabled = enabled_s == "1"
+    if compositor() == "niri":
+        outputs = state()
+        target = next((o for o in outputs if o["name"] == name), None)
+        if target is None:
+            raise SystemExit(f"unknown output: {name}")
+        if not enabled and sum(1 for o in outputs if o["enabled"]) <= 1 and target["enabled"]:
+            raise SystemExit("cannot disable the last active display")
+        target["enabled"] = enabled
+        if enabled:
+            width, height, refresh = int(width_s), int(height_s), float(refresh_s)
+            target["x"], target["y"] = int(x_s), int(y_s)
+            target["scale"], target["transform"] = float(scale_s), transform
+            for mode in target["modes"]:
+                mode["current"] = (mode["width"] == width and mode["height"] == height and
+                                   (refresh <= 0 or abs(mode["refresh"] - refresh) < 0.01))
+        write_niri(outputs)
+        return
+
+    cmd = ["wlr-randr", "--output", name]
+    if not enabled:
+        cmd.append("--off")
+    else:
+        cmd.append("--on")
+        width, height, refresh = int(width_s), int(height_s), float(refresh_s)
+        if width > 0 and height > 0:
+            mode = f"{width}x{height}" + (f"@{refresh:.3f}Hz" if refresh > 0 else "")
+            cmd += ["--mode", mode]
+        else:
+            cmd.append("--preferred")
+        cmd += ["--pos", f"{int(x_s)},{int(y_s)}", "--scale", f"{float(scale_s):.2f}", "--transform", transform]
+    subprocess.run(cmd, check=True)
+    labwc_save()
+
+
+def set_main(name: str) -> None:
+    outputs = state()
+    target = next((o for o in outputs if o["name"] == name), None)
+    if not target or not target["enabled"]:
+        raise SystemExit("main output must be active")
+    dx, dy = target["x"], target["y"]
+    for output in outputs:
+        if output["enabled"]:
+            output["x"] -= dx
+            output["y"] -= dy
+    if compositor() == "niri":
+        write_niri(outputs, main_name=name)
+    else:
+        cmd = ["wlr-randr"]
+        for output in outputs:
+            if output["enabled"]:
+                cmd += ["--output", output["name"], "--pos", f'{output["x"]},{output["y"]}']
+        subprocess.run(cmd, check=True)
+        labwc_save()
+
+
+def save() -> None:
+    if compositor() == "niri":
+        outputs = state()
+        main = next((o["name"] for o in outputs if o["enabled"] and o["x"] == 0 and o["y"] == 0), None)
+        write_niri(outputs, main_name=main)
+    else:
+        labwc_save()
+
+
+def main() -> int:
+    command = sys.argv[1] if len(sys.argv) > 1 else "state"
+    if command == "state":
+        for output in state():
+            emit_output(output["name"], output["description"], output["enabled"], output["x"], output["y"],
+                        output["scale"], output["transform"], output["modes"])
+        return 0
+    if command == "apply":
+        do_apply(sys.argv[2:])
+        return 0
+    if command == "set-main" and len(sys.argv) == 3:
+        set_main(sys.argv[2]); return 0
+    if command == "save":
+        save(); return 0
+    print("usage: index-displays {state|apply NAME 0|1 WIDTH HEIGHT REFRESH X Y SCALE TRANSFORM|set-main NAME|save}", file=sys.stderr)
+    return 2
+
+if __name__ == "__main__":
+    raise SystemExit(main())
