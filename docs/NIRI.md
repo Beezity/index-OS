@@ -61,9 +61,15 @@ The Niri installers install `xdg-desktop-portal-gnome`, `xdg-desktop-portal-gtk`
 
 ## Screenshots
 
-Niri uses its native screenshot actions. `Super+Shift+S` opens Niri's region selection and saves to `~/Pictures/Screenshots`; `Print` captures the focused screen. `Shift+Print` uses the shared `index-snip copy-region` helper for a clipboard-only region capture. Niri's normal saved captures are also copied to the clipboard.
+Both compositor backends use the same DMS-inspired `index-snip` workflow so screenshot behavior stays consistent when switching sessions:
 
-The labwc backend keeps the grim/slurp `index-snip` workflow.
+- `Super+Shift+S` selects a region with `slurp`, captures it with `grim`, saves it to the XDG Pictures directory under `Screenshots/`, copies it to the clipboard, and sends a notification.
+- `Print` captures the full logical desktop with `grim`, saves it, copies it to the clipboard, and sends a notification.
+- `Shift+Print` selects a region and copies it to the clipboard without saving a file.
+
+The Screenshots directory is created automatically and timestamped names are collision-safe. Swappy or another editor is not opened automatically. Niri supports the screencopy path used by `grim`, so the same helper can be shared rather than maintaining two screenshot implementations.
+
+The `screenshot-path` setting remains configured in Niri as a sane destination for native Niri screenshot actions invoked manually or through user overrides.
 
 ## X11 applications
 
@@ -80,7 +86,7 @@ Before the backend is considered ready, test all of these in a real Niri session
 - bar, atmosphere text/motes, and the same Prescript on every output
 - per-monitor workspaces and Niri scrolling navigation
 - launcher placement and window/task activation
-- region and screen screenshots, clipboard copy, and screenshot directory
+- region and full-layout screenshots, clipboard copy, notification, and screenshot directory
 - ext-session-lock and idle locking/monitor power-off/resume
 - pointer speed, natural scroll, tap-to-click, appearance and cursor changes
 - PipeWire audio, NetworkManager, BlueZ, notifications and clipboard history
